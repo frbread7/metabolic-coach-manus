@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.MetabolicCoach.Wear" parent="android:style/Theme.DeviceDefault">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:colorAccent">#65E6A5</item>
+    </style>
+</resources>
+

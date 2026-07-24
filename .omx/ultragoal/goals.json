@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "createdAt": "2026-07-20T02:43:23.974Z",
+  "updatedAt": "2026-07-20T02:43:47.154Z",
+  "briefPath": ".omx/ultragoal/brief.md",
+  "goalsPath": ".omx/ultragoal/goals.json",
+  "ledgerPath": ".omx/ultragoal/ledger.jsonl",
+  "codexGoalMode": "aggregate",
+  "goals": [
+    {
+      "id": "G001-build-a-production-quality-metabolic",
+      "title": "Build a production-quality Metabolic Coach ecosystem for Samsung Gala...",
+      "objective": "Build a production-quality Metabolic Coach ecosystem for Samsung Galaxy Watch8: modular Kotlin Android companion app, Wear OS touch-first application, custom Wear OS watch face with AOD, shared clean architecture, provider-based CareSens Air CGM and Samsung Health/Health Connect integration research and adapters, battery-efficient phone-watch synchronization, configurable coaching interventions, notifications, daily summaries, personalized non-medical observations, tests, architecture/developer/testing/user documentation, and reproducible phone and watch APKs. Preserve medical-safety boundaries, avoid unsupported integrations, configure every threshold, and verify builds/tests before completion.",
+      "status": "in_progress",
+      "attempt": 1,
+      "createdAt": "2026-07-20T02:43:23.974Z",
+      "updatedAt": "2026-07-20T02:43:47.154Z",
+      "startedAt": "2026-07-20T02:43:47.154Z"
+    }
+  ],
+  "codexObjective": "Complete the durable ultragoal plan in .omx/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .omx/ultragoal/ledger.jsonl as the audit trail.",
+  "activeGoalId": "G001-build-a-production-quality-metabolic"
+}

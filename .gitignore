@@ -1,0 +1,21 @@
+.gradle/
+.kotlin/
+.idea/
+**/build/
+local.properties
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+keystore.properties
+*.jks
+*.keystore
+
+# Local Android and signing outputs
+*.apk
+*.aab
+!artifacts/.gitkeep
+
+# OMX runtime artifacts are local execution state. Keep the durable plan only.
+.omx/state/
+.omx/logs/

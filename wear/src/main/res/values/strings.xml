@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Metabolic Coach</string>
+    <string name="glucose_complication">Current glucose</string>
+    <string name="coach_complication">Metabolic coach action</string>
+    <string name="activity_complication">Steps and floors</string>
+</resources>
+

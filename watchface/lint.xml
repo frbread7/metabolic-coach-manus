@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- WFF resources are discovered by the Wear OS renderer, not Android resource references. -->
+    <issue id="UnusedResources">
+        <ignore path="src/main/res/drawable/preview.xml" />
+        <ignore path="src/main/res/raw/watchface.xml" />
+        <ignore path="src/main/res/values/strings.xml" />
+        <ignore path="src/main/res/xml/watch_face_info.xml" />
+    </issue>
+    <!-- The 450x450 vector is the required watch-face preview, not an application icon. -->
+    <issue id="VectorRaster">
+        <ignore path="src/main/res/drawable/preview.xml" />
+    </issue>
+</lint>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature
+        android:name="android.hardware.type.watch"
+        android:required="true" />
+
+    <application
+        android:hasCode="false"
+        android:icon="@drawable/ic_metabolic_coach"
+        android:label="@string/watch_face_name">
+        <meta-data
+            android:name="com.google.android.wearable.standalone"
+            android:value="false" />
+        <property
+            android:name="com.google.wear.watchface.format.version"
+            android:value="4" />
+        <property
+            android:name="com.google.wear.watchface.format.publisher"
+            android:value="MetabolicCoach-0.1.0" />
+    </application>
+</manifest>

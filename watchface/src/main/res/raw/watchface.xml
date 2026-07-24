@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<WatchFace width="450" height="450">
+    <Metadata key="CLOCK_TYPE" value="DIGITAL" />
+    <Metadata key="PREVIEW_TIME" value="10:08:00" />
+
+    <UserConfigurations>
+        <ColorConfiguration
+            id="accent"
+            defaultValue="0"
+            displayName="theme_label"
+            screenReaderText="theme_label">
+            <ColorOption id="0" displayName="theme_metabolic" colors="#65E6A5 #FFFFFF" />
+            <ColorOption id="1" displayName="theme_high_contrast" colors="#FFFFFF #FFFFFF" />
+            <ColorOption id="2" displayName="theme_cyan" colors="#67E8F9 #FFFFFF" />
+        </ColorConfiguration>
+    </UserConfigurations>
+
+    <Scene backgroundColor="#000000">
+        <DigitalClock x="0" y="0" width="450" height="150">
+            <TimeText
+                x="0"
+                y="48"
+                width="450"
+                height="92"
+                format="hh:mm"
+                hourFormat="SYNC_TO_DEVICE"
+                align="CENTER"
+                alpha="255">
+                <Variant mode="AMBIENT" target="alpha" value="0" />
+                <Font
+                    family="SYNC_TO_DEVICE"
+                    size="104"
+                    weight="BOLD"
+                    color="#FFFFFF" />
+            </TimeText>
+            <TimeText
+                x="0"
+                y="48"
+                width="450"
+                height="92"
+                format="hh:mm"
+                hourFormat="SYNC_TO_DEVICE"
+                align="CENTER"
+                alpha="0">
+                <Variant mode="AMBIENT" target="alpha" value="255" />
+                <Font
+                    family="SYNC_TO_DEVICE"
+                    size="104"
+                    weight="THIN"
+                    color="#FFFFFF" />
+            </TimeText>
+        </DigitalClock>
+
+        <PartText x="320" y="135" width="74" height="28">
+            <Variant mode="AMBIENT" target="alpha" value="0" />
+            <Text align="END">
+                <Font family="SYNC_TO_DEVICE" size="22" color="#B7C4C0">
+                    <Template>%s%%<Parameter expression="[BATTERY_PERCENT]" /></Template>
+                </Font>
+            </Text>
+        </PartText>
+
+        <ComplicationSlot
+            x="70"
+            y="157"
+            width="310"
+            height="105"
+            slotId="1"
+            displayName="glucose_complication"
+            supportedTypes="SHORT_TEXT EMPTY"
+            isCustomizable="FALSE">
+            <DefaultProviderPolicy
+                primaryProvider="com.young.metaboliccoach/com.young.metaboliccoach.wear.complication.GlucoseComplicationService"
+                primaryProviderType="SHORT_TEXT"
+                defaultSystemProvider="EMPTY"
+                defaultSystemProviderType="EMPTY" />
+            <BoundingRoundBox
+                x="0"
+                y="0"
+                width="310"
+                height="105"
+                cornerRadius="28"
+                outlinePadding="2" />
+            <Complication type="SHORT_TEXT">
+                <PartDraw x="0" y="0" width="310" height="105">
+                    <Variant mode="AMBIENT" target="alpha" value="0" />
+                    <RoundRectangle
+                        x="0"
+                        y="0"
+                        width="310"
+                        height="105"
+                        cornerRadiusX="28"
+                        cornerRadiusY="28">
+                        <Fill color="#122B25" />
+                    </RoundRectangle>
+                </PartDraw>
+                <PartText x="10" y="5" width="290" height="66">
+                    <Text align="CENTER" ellipsis="TRUE">
+                        <Font
+                            family="SYNC_TO_DEVICE"
+                            size="58"
+                            weight="BOLD"
+                            color="[CONFIGURATION.accent.0]">
+                            <Template>%s<Parameter expression="[COMPLICATION.TEXT]" /></Template>
+                        </Font>
+                    </Text>
+                </PartText>
+                <PartText x="10" y="70" width="290" height="27">
+                    <Text align="CENTER" ellipsis="TRUE">
+                        <Font family="SYNC_TO_DEVICE" size="20" color="#FFFFFF">
+                            <Template>%s<Parameter expression="[COMPLICATION.TITLE]" /></Template>
+                        </Font>
+                    </Text>
+                </PartText>
+            </Complication>
+        </ComplicationSlot>
+
+        <ComplicationSlot
+            x="88"
+            y="281"
+            width="274"
+            height="58"
+            slotId="2"
+            displayName="activity_complication"
+            supportedTypes="SHORT_TEXT EMPTY"
+            isCustomizable="FALSE">
+            <DefaultProviderPolicy
+                primaryProvider="com.young.metaboliccoach/com.young.metaboliccoach.wear.complication.ActivityComplicationService"
+                primaryProviderType="SHORT_TEXT"
+                defaultSystemProvider="STEP_COUNT"
+                defaultSystemProviderType="SHORT_TEXT" />
+            <BoundingRoundBox
+                x="0"
+                y="0"
+                width="274"
+                height="58"
+                cornerRadius="22"
+                outlinePadding="2" />
+            <Complication type="SHORT_TEXT">
+                <PartText x="0" y="5" width="274" height="48">
+                    <Variant mode="AMBIENT" target="alpha" value="0" />
+                    <Text align="CENTER" ellipsis="TRUE">
+                        <Font family="SYNC_TO_DEVICE" size="30" color="#FFFFFF">
+                            <Template>%s<Parameter expression="[COMPLICATION.TEXT]" /></Template>
+                        </Font>
+                    </Text>
+                </PartText>
+            </Complication>
+        </ComplicationSlot>
+
+        <ComplicationSlot
+            x="78"
+            y="351"
+            width="294"
+            height="62"
+            slotId="3"
+            displayName="coach_complication"
+            supportedTypes="SHORT_TEXT EMPTY"
+            isCustomizable="FALSE">
+            <DefaultProviderPolicy
+                primaryProvider="com.young.metaboliccoach/com.young.metaboliccoach.wear.complication.CoachComplicationService"
+                primaryProviderType="SHORT_TEXT"
+                defaultSystemProvider="EMPTY"
+                defaultSystemProviderType="EMPTY" />
+            <BoundingRoundBox
+                x="0"
+                y="0"
+                width="294"
+                height="62"
+                cornerRadius="26"
+                outlinePadding="2" />
+            <Complication type="SHORT_TEXT">
+                <PartDraw x="0" y="0" width="294" height="62">
+                    <Variant mode="AMBIENT" target="alpha" value="0" />
+                    <RoundRectangle
+                        x="0"
+                        y="0"
+                        width="294"
+                        height="62"
+                        cornerRadiusX="26"
+                        cornerRadiusY="26">
+                        <Fill color="[CONFIGURATION.accent.0]" />
+                    </RoundRectangle>
+                </PartDraw>
+                <PartText x="8" y="8" width="278" height="46">
+                    <Variant mode="AMBIENT" target="alpha" value="0" />
+                    <Text align="CENTER" ellipsis="TRUE">
+                        <Font
+                            family="SYNC_TO_DEVICE"
+                            size="28"
+                            weight="BOLD"
+                            color="#001A12">
+                            <Template>%s<Parameter expression="[COMPLICATION.TEXT]" /></Template>
+                        </Font>
+                    </Text>
+                </PartText>
+            </Complication>
+        </ComplicationSlot>
+    </Scene>
+</WatchFace>
