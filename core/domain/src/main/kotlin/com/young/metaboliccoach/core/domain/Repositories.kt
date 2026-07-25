@@ -5,18 +5,23 @@ import com.young.metaboliccoach.core.model.CoachRecommendation
 import com.young.metaboliccoach.core.model.CoachSettings
 import com.young.metaboliccoach.core.model.DailySummary
 import com.young.metaboliccoach.core.model.GlucoseDataOrigin
+import com.young.metaboliccoach.core.model.GlucoseProviderState
 import com.young.metaboliccoach.core.model.GlucoseReading
 import com.young.metaboliccoach.core.model.InterventionSession
 import com.young.metaboliccoach.core.model.MealMarker
+import com.young.metaboliccoach.core.model.NightscoutSettings
 import com.young.metaboliccoach.core.model.PersonalObservation
 import com.young.metaboliccoach.core.model.ProviderStatus
 import com.young.metaboliccoach.core.model.QuickActionCommand
 import com.young.metaboliccoach.core.model.WatchState
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
 interface GlucoseRepository {
     fun observeLatest(): Flow<GlucoseReading?>
     fun observeProviderStatus(): Flow<ProviderStatus>
+    fun observeProviderState(): Flow<GlucoseProviderState> =
+        flowOf(GlucoseProviderState.Idle)
     fun observeAvailableOrigins(): Flow<List<GlucoseDataOrigin>>
     suspend fun readingsBetween(startEpochMillis: Long, endEpochMillis: Long): List<GlucoseReading>
     suspend fun readingsBetweenExactSource(
@@ -25,6 +30,8 @@ interface GlucoseRepository {
         endEpochMillis: Long,
     ): List<GlucoseReading>
     suspend fun refresh()
+    suspend fun refreshExactSource(sourceId: String)
+    suspend fun clearRuntimeCaches()
 }
 
 interface ActivityRepository {
@@ -36,6 +43,11 @@ interface SettingsRepository {
     fun observe(): Flow<CoachSettings>
     suspend fun update(settings: CoachSettings)
     suspend fun reset()
+}
+
+interface NightscoutSettingsRepository {
+    fun observeNightscoutSettings(): Flow<NightscoutSettings>
+    suspend fun updateNightscoutSettings(settings: NightscoutSettings)
 }
 
 interface PersonalDataRepository {

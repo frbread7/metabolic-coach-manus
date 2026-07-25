@@ -1,7 +1,7 @@
 {
   "version": 1,
   "createdAt": "2026-07-20T02:43:23.974Z",
-  "updatedAt": "2026-07-20T02:43:47.154Z",
+  "updatedAt": "2026-07-24T22:26:22.579Z",
   "briefPath": ".omx/ultragoal/brief.md",
   "goalsPath": ".omx/ultragoal/goals.json",
   "ledgerPath": ".omx/ultragoal/ledger.jsonl",
@@ -16,6 +16,16 @@
       "createdAt": "2026-07-20T02:43:23.974Z",
       "updatedAt": "2026-07-20T02:43:47.154Z",
       "startedAt": "2026-07-20T02:43:47.154Z"
+    },
+    {
+      "id": "G002-adopt-nightscout-as-the-version-1-gl",
+      "title": "Adopt Nightscout as the Version 1 glucose source",
+      "objective": "Refactor the phone glucose subsystem so configurable multi-server Nightscout is the Version 1 primary provider; preserve the provider abstraction, normalized GlucoseReading boundary, coaching engine, Wear Data Layer, notifications, MVVM/Clean Architecture/Repository/Hilt/Flow architecture, and add resilient network/cache/retry behavior, configuration UI, isolated unit tests, and documentation without direct CareSens communication.",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-07-24T22:26:22.579Z",
+      "updatedAt": "2026-07-24T22:26:22.579Z",
+      "evidence": "User design decision on 2026-07-24: the stable daily source-of-truth path is CareSens Air app to xDrip+ to Nightscout, and Version 1 must consume Nightscout only."
     }
   ],
   "codexObjective": "Complete the durable ultragoal plan in .omx/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .omx/ultragoal/ledger.jsonl as the audit trail.",

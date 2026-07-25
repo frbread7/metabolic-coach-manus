@@ -6,17 +6,16 @@ The repository is not release-ready merely because APKs assemble. A production r
 signed bundles, an authorized and measured glucose route, Galaxy Watch8 verification, WFF
 validation, privacy/health policy work, and all gates in [Testing](TESTING.md).
 
-The 2026-07-23 local candidate passed 163 JUnit executions covering 144 distinct test cases, debug
-and release lint/assembly, APK checks, release manifest isolation, and WFF v4 schema/memory
-validation; exact evidence and debug hashes are in
-[Testing](TESTING.md#latest-local-verification). Production signing, instrumentation, physical
-Galaxy Watch8 validation, and store approval remain outstanding.
+The `v0.2` Nightscout refactor has implementation and static verification complete; evidence is
+recorded in [Testing](TESTING.md#current-local-verification). Production signing, live-server
+validation, Android instrumentation, physical Galaxy Watch8 validation, and store approval remain
+outstanding.
 
-Release provider topology is intentionally narrow: Health Connect is the only implemented release
-data route, and the CareSens partner option is a nonfunctional approval placeholder. The xDrip
-receiver, permission, and provider selection are debug-only; release repository policy converts a
-persisted debug xDrip selection to Health Connect. This remains pending a verified sender contract
-and security review.
+Release provider topology is intentionally narrow: Nightscout is the only active Version 1 glucose
+provider, while Health Connect supplies activity data. The phone supports several configured
+Nightscout servers but uses exactly one explicitly selected server and never fails over
+automatically. Direct CareSens communication and xDrip broadcasts are absent from both build
+variants. Persisted legacy provider modes migrate to Nightscout.
 
 ## Application identities
 
@@ -47,9 +46,47 @@ compilation. Compilation is not instrumentation execution. Record exact counts, 
 hashes, and signing certificate digest only from a fresh successful run against the commit being
 handed off.
 
-These are debug-signed engineering artifacts, not production releases.
-The current debug files under `artifacts/` are linked to the 2026-07-23 evidence. Regenerate and
-rehash them after any source/build change.
+These are debug-signed engineering artifacts, not production releases. Regenerate and rehash them
+after every source/build change.
+
+## Versioned ZIP handoff
+
+Every successful `scripts/build-apks.sh` run packages the three verified APKs and handoff
+documentation into:
+
+```text
+artifacts/MetabolicCoach-v<version>.zip
+├── phone.apk
+├── wear.apk
+├── watchface.apk
+├── CHANGELOG.md
+└── INSTALL.md
+```
+
+The packager reads the version name from every APK and fails if phone, Wear, and watch face do not
+match. A trailing patch zero is omitted from the archive label, so APK version `0.2.0` produces
+`MetabolicCoach-v0.2.zip`. The embedded installation guide records whether the archive contains
+debug- or release-signed APKs.
+
+To package already-verified debug artifacts without rebuilding:
+
+```bash
+./scripts/package-release.sh
+```
+
+To package signed release artifacts:
+
+```bash
+MC_BUILD_VARIANT=release ./scripts/package-release.sh
+```
+
+The script creates a deterministic ZIP timestamp, validates that exactly the five contracted files
+are present, and prints the archive SHA-256. Rebuilding a debug variant refreshes its engineering
+ZIP only while that same-version archive is still marked as a debug build. A debug build can never
+replace an existing release archive under the same version label, including when the general
+overwrite switch is set. The script also refuses to replace different release bytes under an
+existing version label. Increment the application version for a new release; use
+`MC_PACKAGE_OVERWRITE=1` only for an intentional release-package replacement.
 
 ## Release APKs and signing
 
@@ -91,10 +128,10 @@ wear/build/outputs/apk/release/wear-release-unsigned.apk
 watchface/build/outputs/apk/release/watchface-release-unsigned.apk
 ```
 
-Current-checkout assembly and WFF memory/resource-only validation are recorded in
-[Testing](TESTING.md#latest-local-verification) and must be rerun after any future source/build
-change. Unsigned artifacts are static build evidence only and must not be handed off as installable
-releases.
+The current debug assembly and WFF memory/resource-only results are recorded in
+[Testing](TESTING.md#current-local-verification). Release assembly, lint, signing, and device
+validation remain separate gates. Unsigned artifacts are static build evidence only and must not
+be handed off as installable releases.
 
 For Play bundle generation after secure signing configuration is injected:
 
@@ -168,16 +205,22 @@ Recheck current policies at release time; store policy is time-sensitive.
 
 ### Provider
 
-- [ ] Authorized glucose source identified.
-- [ ] CareSens/device/region support recorded.
-- [ ] Health Connect or approved-provider latency meets a written target.
-- [ ] Health Connect writer discovery, one-writer auto-selection, multi-writer configuration gate,
-      persisted exact-source pinning, and missing-source behavior pass on target phones.
-- [ ] Background permission and degraded-mode behavior pass.
-- [ ] Release merged manifest contains no xDrip receiver or receive permission.
-- [ ] Release provider UI cannot select xDrip.
-- [ ] Release provider-policy test confirms a persisted debug xDrip selection becomes Health
-      Connect before repository access.
+- [ ] Nightscout deployment/version, public-access policy, TLS certificate, and ownership recorded.
+- [ ] The complete CareSens app → xDrip → Nightscout → phone → watch path meets a written
+      latency/reliability target.
+- [ ] Multiple-server explicit selection, source-ID isolation, no-failover behavior, and URL-change
+      history isolation pass on target phones.
+- [ ] Network loss, DNS/TLS/timeout, HTTP 304/401/403/408/429/5xx, malformed/empty responses,
+      bounded retry, cached/stale behavior, cancellation, and recovery pass.
+- [ ] HTTPS is the default; HTTP requires an explicit warning-bearing opt-out and is not used for an
+      internet-hosted release server.
+- [ ] No credential is accepted in a URL, settings/export/log/Wear payloads contain no secret, and
+      authenticated servers remain unsupported until secure phone-only storage is implemented.
+- [ ] Health Connect activity foreground/background permission and degraded-mode behavior pass.
+- [ ] Both debug and release merged manifests contain no xDrip receiver or receive permission.
+- [ ] Provider UI cannot select xDrip, Health Connect glucose, or direct CareSens in Version 1.
+- [ ] Provider-policy tests confirm every persisted legacy mode becomes Nightscout before
+      repository access.
 - [ ] Any future xDrip enablement remains blocked on a verified sender contract and security review.
 - [ ] Samsung registration complete if its direct SDK is included.
 
@@ -252,13 +295,14 @@ Use trusted release-candidate artifacts:
 1. install phone and Wear packages on paired devices;
 2. confirm certificate/package identity;
 3. grant permissions through user-visible flows;
-4. import synthetic Health Connect data;
-5. confirm state synchronization and complication update;
-6. execute walk, stair, snooze, and complete from app/notification/face;
-7. disconnect and reconnect;
-8. reboot both devices;
-9. verify ambient mode and 24-hour battery behavior;
-10. uninstall and confirm local-data behavior.
+4. configure a synthetic/test Nightscout server over HTTPS and select it explicitly;
+5. import synthetic Health Connect activity data;
+6. confirm normalized glucose and activity state synchronize to the watch and complications;
+7. switch between two synthetic Nightscout servers and confirm there is no automatic failover or
+   cross-server history/cache display;
+8. execute walk, stair, snooze, and complete from app/notification/face;
+9. disconnect, reconnect, and reboot both devices;
+10. verify ambient mode, 24-hour battery behavior, and uninstall/local-data behavior.
 
 Never use personal medical data in store review screenshots or shared test evidence.
 

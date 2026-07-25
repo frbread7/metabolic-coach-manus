@@ -51,8 +51,9 @@ class PermissionsRationaleActivity : ComponentActivity() {
                         )
                         Text(
                             "Metabolic Coach reads only the Health Connect data you grant: " +
-                                "blood glucose, steps, floors climbed, heart rate, exercise " +
-                                "sessions, and active calories.",
+                                "steps, floors climbed, heart rate, exercise sessions, and " +
+                                "active calories. Glucose is retrieved separately from the " +
+                                "Nightscout server you configure.",
                         )
                         Text(
                             "This data is used to show your current wellness context, create " +
@@ -61,8 +62,9 @@ class PermissionsRationaleActivity : ComponentActivity() {
                         )
                         Text(
                             "Health data is stored locally on your phone. It is not sold, used " +
-                                "for advertising, or uploaded to a cloud service by this version. " +
-                                "Watch synchronization uses the paired Wear OS Data Layer.",
+                                "for advertising, or uploaded by this version. The phone contacts " +
+                                "only the selected Nightscout server for glucose. Watch " +
+                                "synchronization uses the paired Wear OS Data Layer.",
                         )
                         Text(
                             "You can revoke individual Health Connect permissions at any time. " +

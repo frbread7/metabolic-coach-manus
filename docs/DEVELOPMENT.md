@@ -14,6 +14,8 @@ The project is configured for:
 - WFF v4 watch face minimum SDK 36;
 - Room 2.8.4 with database schema version 7;
 - Health Connect client 1.1.0;
+- OkHttp 5.3.0 with MockWebServer for Nightscout transport tests;
+- kotlinx-serialization JSON 1.9.0 for provider/settings parsing;
 - Google Play services Wearable 20.0.1.
 
 Wear OS 6 is based on API 36. Follow the official
@@ -51,9 +53,10 @@ Use the Gradle wrapper rather than a machine-global Gradle installation.
 compiles the Room Android migration-test source, runs the selected variant's phone, Wear, and
 watch-face lint tasks, assembles all three APKs, validates the built face, verifies every APK
 signature, verifies that phone/Wear certificates match, and writes named artifacts plus SHA-256
-hashes under `artifacts/`. It disables Gradle build-cache reuse and Kotlin incremental compilation
-so an evidence run cannot combine bytecode compiled against different shared-model constructor
-ABIs. Migration-test compilation does not execute instrumentation.
+hashes under `artifacts/`. It forces every selected task to rerun, disables Gradle build-cache
+reuse and Kotlin incremental compilation, and therefore cannot inherit a filtered test result or
+combine bytecode compiled against different shared-model constructor ABIs. Migration-test
+compilation does not execute instrumentation.
 
 Targeted iteration remains available:
 
@@ -106,19 +109,19 @@ package validation:
 ./gradlew :phone:assembleRelease :wear:assembleRelease :watchface:assembleRelease
 ```
 
-Those `*-release-unsigned.apk` files are not production deliverables. The current-checkout
-unsigned-build and WFF evidence is recorded in [Testing](TESTING.md#latest-local-verification);
-regenerate it after any future source/build change. Production signing and device/store validation
-remain separate gates.
+Those `*-release-unsigned.apk` files are not production deliverables. The current Nightscout
+evidence is recorded in [Testing](TESTING.md#current-local-verification); regenerate it after every
+future source/build change. Production signing and device/store validation remain separate gates.
 
 ## Run configurations
 
 ### Phone
 
-Run `:phone` on an Android device with Health Connect available. Manual Refresh directly executes a
-foreground provider refresh. Periodic 15-minute work is scheduled only when the device advertises
-the background-read feature and the user grants its separate permission. Grant only the record
-types needed for testing and use synthetic data.
+Run `:phone` on an Android device with network access to a synthetic/test Nightscout server.
+Manual Refresh directly executes a foreground provider refresh. A configured active server
+schedules connected-network WorkManager work at the selected interval, subject to Android's
+15-minute periodic minimum and inexact execution. Health Connect remains the activity source;
+grant only the activity record types needed for testing and use synthetic data.
 
 ### Wear
 
@@ -154,8 +157,8 @@ fresh run against each release candidate.
 - Preserve measured and received timestamps separately.
 - Store glucose internally in mg/dL and convert only for display.
 - Add no vendor SDK until its license, authorization, data contract, and test strategy are known.
-- Never log glucose values, Health Connect records, raw broadcast extras, or user identifiers in
-  production.
+- Never log glucose values, Nightscout bodies/headers/URLs/credentials, Health Connect records, raw
+  broadcast extras, or user identifiers in production.
 - Preserve the existing Room 1→2, 2→3, 3→4, 4→5, 5→6, and 6→7 migrations; add a migration and
   exported schema whenever database version 7 changes.
 - Preserve exact recommendation, trigger, activity-dose, baseline, source, and follow-up provenance
@@ -164,32 +167,49 @@ fresh run against each release candidate.
 - Keep recommendation snapshots phone-authored and immutable by stable ID. Publication retries and
   local phone actions must use the canonical persisted snapshot; watch-echoed fields may detect a
   conflict but must not author session dose or provenance.
-- Keep Health Connect glucose pinned to one exact writer package. Do not silently switch a saved
-  origin when another app writes a newer record, and do not resume coaching when multiple
-  unconfigured writers are discovered.
+- Keep Nightscout server selection explicit. Partition cache, conditional-request metadata, Room
+  queries, baselines/follow-ups, and observations by exact source ID; never auto-failover or merge
+  configured servers.
+- Keep Nightscout settings and future credentials phone-only. Reject credentials in URLs and use a
+  secure per-server credential store behind `NightscoutRequestAuthenticator` before adding
+  authenticated-server support.
 - Preserve phone instance/revision metadata, terminal-command replay history, completion-over-start
   acknowledgement ordering, durable data-reset token/command epoch matching, the Wear
   pending-mutation/tombstone reducer, and the bounded generic command outbox when changing Data
   Layer state.
 - Route phone-owned export, erase, provider ingestion/refresh, follow-up finalization,
   settings/meal writes, and quick-action mutations through `PhoneDataMutationGate`. Where both the
-  gate and the command-processor mutex are needed, acquire the mutation gate first.
+  gate and the command-processor mutex are needed, acquire the mutation gate first. Slow,
+  coroutine-cancellable provider work uses `withPreemptibleProviderLock`; local mutations use
+  `withLock` so they cancel that work before waiting without weakening the erase boundary.
 - Keep the personal-data export schema versioned, deterministic, bounded-memory, and complete for
-  every Room table/effective setting. Update export tests and documentation whenever storage
-  changes.
+  every Room table/exported coaching setting. Nightscout connection configuration and future
+  credentials stay excluded unless a separately reviewed export contract changes that boundary.
+  Update export tests and documentation whenever storage changes.
 - Keep every user-facing settings control and validator on the shared `CoachSettingsBounds`
   contract. Quiet/working-hour controls must preserve one-minute precision.
 
-## Build-variant provider boundary
+## Version 1 provider boundary
 
-The exported xDrip receiver and its receive permission exist only in
-`phone/src/debug/AndroidManifest.xml`, and the release settings UI filters out
-`XDRIP_BROADCAST`. The release data/repository policy also converts a persisted debug xDrip mode to
-Health Connect; keep the release-variant policy test in the verification pipeline. Keep this
-compatibility path debug-only until a sender contract and signing
-identity are documented and verified end to end. Release currently exposes Health Connect and the
-CareSens partner placeholder; the placeholder reports `PARTNER_APPROVAL_REQUIRED` and is not a
-working data source.
+Nightscout is the only active glucose provider in both debug and release builds. Both manifests omit
+the xDrip receiver and receive permission, the Settings UI exposes no alternate glucose selector,
+and the repository policy converts every persisted legacy provider mode to Nightscout. Keep the
+mode-migration policy test in both variant verification paths.
+
+`GlucoseProvider`, normalized `GlucoseReading`, repository contracts, Hilt multibindings, coaching,
+and Wear synchronization remain provider-agnostic. Retained CareSens, Health Connect glucose, and
+xDrip adapter code is an inactive extension boundary, not permission to enable it.
+
+For a new provider:
+
+1. document authorization, units, timestamps, source identity, outage, cache, and secret semantics;
+2. implement the adapter and observable provider state without importing it into coaching or sync;
+3. add explicit configuration/selection and migration policy;
+4. add synthetic parser/network/retry/cache/switching tests;
+5. update privacy, user, integration, release, and test documentation.
+
+Do not register direct CareSens or xDrip components, reverse engineer Bluetooth, or add automatic
+fallback without a separate reviewed design.
 
 ## Adding coaching behavior
 
@@ -252,18 +272,27 @@ Use it only when the data is disposable and the target package/device has been v
 - Inspect Data Layer service logs without printing health payloads.
 - Test disconnect/reconnect; `DataItem` state should synchronize after reconnection.
 
-### Health Connect returns no records
+### Nightscout returns no glucose
 
-- Check SDK availability and permissions.
+- Confirm a nonblank server is selected and Settings validation passes.
+- Inspect the normalized base URL; do not include `/api/v1`, credentials, query parameters, or a
+  fragment.
+- Use MockWebServer for reproducible development before testing a live server.
+- Check DNS, TLS, timeout, HTTP status, and response shape without logging glucose or secrets.
+- Confirm `/api/v1/entries/sgv.json?count=300` returns a JSON array with usable `sgv` and
+  `date`/`dateString` values.
+- Use manual Refresh to isolate foreground retrieval from inexact periodic WorkManager behavior.
+- When testing multiple servers, prove only the selected server is called and source histories do
+  not mix.
+
+### Health Connect returns no activity
+
+- Check SDK availability and the specific activity permissions.
 - Confirm the source app actually writes the requested record type.
 - Inspect Health Connect's data and access screens.
-- Tap manual Refresh, then inspect **Settings → Health Connect glucose source**. If multiple writer
-  packages are listed, select exactly one and save; if the saved package says **no recent records**,
-  verify that source before changing it.
-- Compare measured timestamps and local timezone.
-- Use manual Refresh to prove foreground reading independently of periodic background access.
-- Check whether the device reports background-read support and whether that separate permission is
-  granted before expecting periodic work.
+- Compare source timestamps and local timezone.
+- Check background-read feature support and permission only for activity background behavior;
+  their absence must not cancel Nightscout polling.
 
 ### Watch face shows placeholders
 

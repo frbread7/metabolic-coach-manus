@@ -17,6 +17,6 @@
             android:value="4" />
         <property
             android:name="com.google.wear.watchface.format.publisher"
-            android:value="MetabolicCoach-0.1.0" />
+            android:value="MetabolicCoach-0.2.0" />
     </application>
 </manifest>

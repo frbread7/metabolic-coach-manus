@@ -36,6 +36,34 @@ class ObservationAnalyzerTest {
     }
 
     @Test
+    fun `personal observations never combine sessions from different exact sources`() {
+        val sourceA = listOf(-30, -20, -10).mapIndexed { index, change ->
+            session("source-a-$index", index, change, coached = false)
+        }
+        val sourceB = listOf(30, 40, 50).mapIndexed { index, change ->
+            session("source-b-$index", index + sourceA.size, change, coached = false)
+                .withSource(OTHER_SOURCE_ID)
+        }
+        val settings = DefaultCoachSettings.create().copy(minimumObservationSamples = 3)
+
+        val observationA = analyzer.analyze(
+            sessions = sourceA + sourceB,
+            exactSourceId = SOURCE_ID,
+            settings = settings,
+        ).single()
+        val observationB = analyzer.analyze(
+            sessions = sourceA + sourceB,
+            exactSourceId = OTHER_SOURCE_ID,
+            settings = settings,
+        ).single()
+
+        assertEquals(3, observationA.sampleCount)
+        assertEquals(-20, observationA.medianChangeMgDl)
+        assertEquals(3, observationB.sampleCount)
+        assertEquals(40, observationB.medianChangeMgDl)
+    }
+
+    @Test
     fun `below threshold follow up cannot make an effect cohort sufficient`() {
         val sessions = listOf(-10, -20, -80).mapIndexed { index, change ->
             session(
@@ -161,6 +189,7 @@ class ObservationAnalyzerTest {
 
         val observation = analyzer.analyze(
             sessions = early + later,
+            exactSourceId = SOURCE_ID,
             settings = settings,
         ).single { it.kind == PersonalObservationKind.INTERVENTION_TIMING }
 
@@ -169,6 +198,7 @@ class ObservationAnalyzerTest {
         assertFalse(
             analyzer.analyze(
                 sessions = early + later,
+                exactSourceId = SOURCE_ID,
                 settings = settings.copy(minimumTimingBucketSamples = 5),
             ).any { it.kind == PersonalObservationKind.INTERVENTION_TIMING },
         )
@@ -204,6 +234,7 @@ class ObservationAnalyzerTest {
 
         val observation = analyzer.analyze(
             sessions = sessions,
+            exactSourceId = SOURCE_ID,
             settings = DefaultCoachSettings.create().copy(
                 minimumObservationSamples = 2,
                 minimumTimingBucketSamples = 2,
@@ -232,12 +263,17 @@ class ObservationAnalyzerTest {
         )
 
         assertTrue(
-            analyzer.analyze(sessions = sessions, settings = settings)
+            analyzer.analyze(
+                sessions = sessions,
+                exactSourceId = SOURCE_ID,
+                settings = settings,
+            )
                 .any { it.kind == PersonalObservationKind.INTERVENTION_TIMING },
         )
         assertFalse(
             analyzer.analyze(
                 sessions = sessions,
+                exactSourceId = SOURCE_ID,
                 settings = settings.copy(minimumComparableTimingBuckets = 4),
             ).any { it.kind == PersonalObservationKind.INTERVENTION_TIMING },
         )
@@ -263,18 +299,24 @@ class ObservationAnalyzerTest {
         )
 
         assertTrue(
-            analyzer.analyze(sessions = early + later, settings = settings)
+            analyzer.analyze(
+                sessions = early + later,
+                exactSourceId = SOURCE_ID,
+                settings = settings,
+            )
                 .any { it.kind == PersonalObservationKind.INTERVENTION_TIMING },
         )
         assertFalse(
             analyzer.analyze(
                 sessions = early + later,
+                exactSourceId = SOURCE_ID,
                 settings = settings.copy(followUpDelayBucketMinutes = 5),
             ).any { it.kind == PersonalObservationKind.INTERVENTION_TIMING },
         )
         assertFalse(
             analyzer.analyze(
                 sessions = early + later,
+                exactSourceId = SOURCE_ID,
                 settings = settings.copy(baselineGlucoseBandMgDl = 10),
             ).any { it.kind == PersonalObservationKind.INTERVENTION_TIMING },
         )
@@ -400,6 +442,7 @@ class ObservationAnalyzerTest {
         mealMarkers: List<MealMarker> = emptyList(),
     ) = analyzer.analyze(
         sessions = sessions,
+        exactSourceId = SOURCE_ID,
         settings = DefaultCoachSettings.create().copy(
             minimumObservationSamples = minimumSamples,
         ),
@@ -469,6 +512,11 @@ class ObservationAnalyzerTest {
         )
     }
 
+    private fun InterventionSession.withSource(sourceId: String): InterventionSession = copy(
+        baselineGlucoseSourceId = sourceId,
+        followUpGlucoseSourceId = sourceId,
+    )
+
     private fun assertCautiousCopy(text: String) {
         val lower = text.lowercase()
         assertTrue(lower.contains("observed"))
@@ -484,5 +532,6 @@ class ObservationAnalyzerTest {
         const val MILLIS_PER_MINUTE = 60_000L
         const val SESSION_SPACING_MILLIS = 3 * 60 * MILLIS_PER_MINUTE
         const val SOURCE_ID = "health-connect:source-a"
+        const val OTHER_SOURCE_ID = "nightscout:server-b:fingerprint"
     }
 }

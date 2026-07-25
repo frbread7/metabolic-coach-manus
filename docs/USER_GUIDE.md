@@ -18,12 +18,13 @@ safety-critical reliance.
 - Android phone paired to a Galaxy Watch8 or other Wear OS 6 watch;
 - Metabolic Coach phone, Wear, and watch-face packages installed;
 - Google Play services on both phone and watch;
-- a supported source that places glucose in Health Connect; debug developers may deliberately
-  enable the separate xDrip compatibility path;
+- a reachable Nightscout server that contains current glucose from the existing CGM pipeline;
 - health and notification permissions you choose to grant.
 
-CareSens Air direct integration is not included. Verify CareSens device/app compatibility in your
-country using the official [CareSens compatibility page](https://caresensair.com/en_US/content/compatibility/).
+Version 1 expects `CareSens Air → CareSens Air app → xDrip+ → Nightscout`. Metabolic Coach does not
+connect directly to CareSens or receive xDrip broadcasts. Verify CareSens device/app compatibility
+in your country using the official
+[CareSens compatibility page](https://caresensair.com/en_US/content/compatibility/).
 
 ## Install a development build
 
@@ -38,50 +39,51 @@ artifacts/metabolic-coach-watchface-debug.apk
 
 Install the phone APK on the phone. Install the Wear and watch-face APKs on the watch. All debug
 packages should come from the same trusted checkout/build. Do not install APKs received from an
-unverified source. The current artifact hashes and local verification date are recorded in
-[Testing](TESTING.md#latest-local-verification); regenerate them after any source/build change.
+unverified source. Current debug hashes are recorded in
+[Testing](TESTING.md#current-local-verification); regenerate them after every later source/build
+change.
 
 For a distributed release, follow the store/install instructions supplied with that signed build
 rather than sideloading.
 
 ## First-time setup
 
-### 1. Prepare the source
+### 1. Prepare the sources
 
-For Health Connect:
+For Nightscout glucose:
 
-1. Confirm Health Connect is available.
-2. In the CGM/Samsung Health ecosystem, enable only the supported sharing options you intend to
-   use.
-3. Open Health Connect and confirm a recent blood glucose record is actually present.
-4. Check that steps, floors, heart rate, exercise, and active calories are present if you want those
-   fields.
+1. Confirm the normal CareSens app → xDrip+ → Nightscout pipeline is updating.
+2. Open Nightscout in a trusted browser and verify a recent reading and trend are present.
+3. Record only the base URL, such as `https://example.fly.dev`. Do not append `/api/v1`, a query
+   string, username, password, token, or `API_SECRET`.
+4. Use HTTPS for any internet-hosted or daily-use server.
 
-CareSens-to-Samsung-to-Health-Connect transfer is not guaranteed. If no blood glucose record appears
-in Health Connect, Metabolic Coach cannot retrieve it through this route.
+Version 1 supports public Nightscout endpoints. Authenticated-server credential setup is not yet
+implemented. Do not weaken a private server's security merely to connect this alpha.
 
-For debug xDrip testing, read [xDrip compatibility](INTEGRATIONS.md#xdrip-compatibility) before
-enabling it. The receiver and provider selection are absent from release builds because the sender
-contract is not verified. The debug path is unofficial, requires Android 14+, verifies the
-platform-reported xDrip package, and does not pin the app's signing certificate.
+For Health Connect activity, confirm Health Connect is available and that steps, floors, heart
+rate, exercise, and active calories are present if you want those fields. Health Connect is not the
+Version 1 glucose source.
 
 ### 2. Open the phone app
 
-1. Tap **Connect Health Connect**.
-2. Review and grant only the desired read permissions.
-3. Return to **Today** and tap **Refresh** so the phone can discover glucose-writing packages.
-4. Open **Settings** and select the intended glucose provider.
-5. If Health Connect lists more than one **Health Connect glucose source**, select exactly one
-   package. Coaching remains paused until that choice is saved.
-6. Tap **Enable coaching notifications** if you want prompts.
-7. Review the user-facing threshold and time-window settings; defaults are not medical
+1. Tap **Connect Health Connect** if you want activity data.
+2. Review and grant only the desired activity read permissions.
+3. Open **Settings → Nightscout glucose**.
+4. Enter a server name and base URL, keep **Require HTTPS** enabled, and tap **Use this server**.
+5. Optionally configure another named server. Exactly one server is active; there is no automatic
+   failover.
+6. Review polling interval, connection timeout, retry interval, and retry-attempt settings.
+7. Tap **Enable coaching notifications** if you want prompts.
+8. Review the user-facing threshold and time-window settings; defaults are not medical
    recommendations.
-8. Tap **Save settings**, return to **Today**, and tap **Refresh**.
+9. Tap **Save settings**, return to **Today**, and tap **Refresh**.
 
 If provider status does not say it is ready, resolve that status before relying on watch data.
-When only one recent Health Connect writer exists, the app saves it automatically. A saved package
-remains pinned if it stops writing temporarily; it appears as **no recent records** instead of
-silently switching to another app.
+If the active server stops responding, the app retains cached data and displays its age; it does not
+switch to another configured server. Select another server only as an intentional source change.
+Disabling **Require HTTPS** allows cleartext HTTP for a local/test server and can expose glucose on
+the network.
 
 ### 3. Open the Wear app
 
@@ -229,7 +231,8 @@ to avoid the phone notification being mirrored as an additional bridge notificat
 
 All coaching thresholds are configurable on the phone:
 
-- provider and glucose display unit;
+- Nightscout server names/URLs, explicit active server, HTTPS policy, polling interval, connection
+  timeout, retry interval/count, and glucose display unit;
 - low and target glucose thresholds;
 - rapid-rise threshold, exercise-pause fall rate, and stale age;
 - walk duration and stair target;
@@ -258,10 +261,10 @@ Compose applications. Watch-face accent remains a separate WFF configuration.
 
 “N min” is measured from the source sample timestamp, not from when it reached the watch.
 
-- Periodic phone work is scheduled every 15 minutes only when Health Connect reports background
-  support and its separate permission is granted; Android may still defer it.
+- Periodic phone work is scheduled at the configured Nightscout polling interval when an active
+  server exists. WorkManager enforces a 15-minute minimum and Android may still defer it.
 - Manual Refresh directly runs a foreground provider read and does not require background access.
-- Debug-only xDrip ingestion schedules a refresh after an accepted broadcast.
+- Missing Health Connect background activity permission does not cancel Nightscout polling.
 - The Data Layer buffers state during disconnection and sends it after reconnection.
 
 Always look at sample age. A later arrival does not make an old sample current.
@@ -271,16 +274,16 @@ Always look at sample age. A later arrival does not make an old sample current.
 ### No glucose
 
 - Open the phone app and read provider status.
-- Confirm the chosen provider in Settings.
-- For Health Connect, confirm a recent glucose record exists and permission is granted. After
-  Refresh, choose one listed writer package if status says configuration is required.
-- If the saved writer says **no recent records**, verify that exact source. Select a different
-  package only as an intentional source change; Metabolic Coach will not switch automatically.
+- Confirm a configured Nightscout URL is selected as the active server in Settings.
+- Open that server in a trusted browser and confirm it has a recent reading.
+- Confirm the base URL contains no `/api/v1`, query string, fragment, or credentials.
+- Keep **Require HTTPS** enabled for an internet server and check the phone's network/TLS access.
+- If cached data is shown, inspect its age. Select a different configured server only as an
+  intentional source change; Metabolic Coach never switches automatically.
 - Tap Refresh.
 - Check the official CGM app and phone connectivity.
-- Release builds cannot select xDrip and replace any debug selection retained during an upgrade
-  with Health Connect. In debug testing, do not use it merely to bypass an
-  authorization problem without understanding its limitations.
+- Version 1 cannot select direct CareSens, xDrip broadcast, or Health Connect glucose. Any legacy
+  provider selection is migrated to Nightscout.
 
 ### Watch is not updating
 
@@ -304,7 +307,8 @@ Always look at sample age. A later arrival does not make an old sample current.
 - Check notifications and the specific reminder switch in Settings.
 - Check quiet hours, snooze, cooldown, and daily limit.
 - Check sample age, low threshold, and configured exercise-pause fall rate.
-- Confirm Health Connect background-read support and permission before expecting periodic refresh.
+- Confirm an active Nightscout server and phone network access before expecting periodic glucose
+  refresh. Health Connect background permission affects activity, not Nightscout polling.
 - Remember that Android may delay periodic background work even when it is enabled.
 
 ### Settings do not save
@@ -317,17 +321,19 @@ fails, the Settings screen lists the exact invalid bounds so they can be correct
 Open **Settings → Your data** on the phone.
 
 - **Export personal data** opens Android's document picker and writes a versioned JSON document
-  containing current saved settings and all Metabolic Coach phone history. The file is plain text,
-  can contain sensitive health/source data, and is not encrypted by the app. Save it only to a
-  location you trust.
+  containing coaching settings and all Metabolic Coach phone history. Nightscout server
+  configuration is not included, so this is not a connection-settings backup. The file is plain
+  text, can contain sensitive health/source data, and is not encrypted by the app. Save it only to
+  a location you trust.
 - **Erase Metabolic Coach data** shows a confirmation before deleting phone history and resetting
-  saved settings. It also sends a durable reset that clears cached state, pending sessions, and
-  queued actions on the watch when the watch next synchronizes.
+  saved settings and provider memory caches. It also sends a durable reset that clears cached
+  state, pending sessions, and queued actions on the watch when the watch next synchronizes.
 
-Erase does not delete Health Connect, Samsung Health, CareSens, or debug xDrip source records and
-does not revoke permissions. New records can be collected again when you continue using or restart
-the app; revoke source permissions separately if you want collection to stop. If watch delivery is
-temporarily unavailable, the phone keeps the reset token and retries it in later state
+Erase removes saved Nightscout settings from Metabolic Coach but does not delete or reconfigure the
+Nightscout server, Health Connect, Samsung Health, CareSens, or xDrip source records and does not
+revoke permissions. New records can be collected again after the app is reconfigured; revoke
+Health Connect access and change Nightscout access separately if collection should stop. If watch
+delivery is temporarily unavailable, the phone keeps the reset token and retries it in later state
 publications. A delayed watch action from before the erase is rejected.
 
 The JSON export is an engineering data copy, not a medical record or backup of the source system.

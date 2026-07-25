@@ -88,6 +88,42 @@ data class ProviderStatus(
     val detail: String,
 )
 
+enum class GlucoseProviderFailureKind {
+    CONFIGURATION,
+    CONNECTIVITY,
+    TIMEOUT,
+    AUTHENTICATION,
+    SERVER,
+    RESPONSE,
+    UNKNOWN,
+}
+
+data class GlucoseProviderFailure(
+    val kind: GlucoseProviderFailureKind,
+    val detail: String,
+    val retryable: Boolean,
+)
+
+sealed interface GlucoseProviderState {
+    data object Idle : GlucoseProviderState
+
+    data object ConfigurationRequired : GlucoseProviderState
+
+    data class Loading(
+        val cached: GlucoseReading?,
+    ) : GlucoseProviderState
+
+    data class Available(
+        val reading: GlucoseReading,
+        val refreshedAtEpochMillis: Long,
+    ) : GlucoseProviderState
+
+    data class Degraded(
+        val cached: GlucoseReading?,
+        val failure: GlucoseProviderFailure,
+    ) : GlucoseProviderState
+}
+
 data class GlucoseDataOrigin(
     val packageName: String,
     val latestReadingAtEpochMillis: Long,

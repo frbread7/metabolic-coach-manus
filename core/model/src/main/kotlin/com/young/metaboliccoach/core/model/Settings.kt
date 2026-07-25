@@ -7,6 +7,7 @@ enum class CoachTheme {
 }
 
 enum class GlucoseProviderMode {
+    NIGHTSCOUT,
     HEALTH_CONNECT,
     XDRIP_BROADCAST,
     CARESENS_PARTNER,
@@ -55,7 +56,7 @@ data class CoachSettings(
 
 object DefaultCoachSettings {
     fun create() = CoachSettings(
-        glucoseProviderMode = GlucoseProviderMode.HEALTH_CONNECT,
+        glucoseProviderMode = GlucoseProviderMode.NIGHTSCOUT,
         healthConnectGlucoseOriginPackage = null,
         glucoseUnit = GlucoseUnit.MG_DL,
         lowGlucoseThresholdMgDl = 70,

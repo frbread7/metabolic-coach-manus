@@ -13,20 +13,25 @@ dashboard. The architecture therefore optimizes for:
 - replaceable data providers and future cloud or intelligence layers;
 - explicit missing/future/stale/low/fast-fall safety behavior shared by phone and Wear.
 
-The watch never connects to CGM, Health Connect, Samsung Health, or multiple third-party apps
-directly. The phone is the data authority. The watch is a cached view and command surface.
+The watch never connects to Nightscout, a CGM, Health Connect, Samsung Health, or multiple
+third-party apps directly. The phone is the data authority. The watch is a cached view and command
+surface. Nightscout URLs, connectivity policy, and future credentials remain phone-only.
 
 ## System context
 
 ```mermaid
 flowchart LR
-    CA["CareSens / approved source"]
-    HC["Health Connect"]
-    XD["Debug-only xDrip compatibility broadcast"]
-    SH["Future Samsung Health Data SDK"]
+    SENSOR["CareSens Air sensor"]
+    CARESENS["CareSens Air app"]
+    XDRIP["xDrip+"]
+    NS["Selected Nightscout server"]
+    HC["Health Connect activity records"]
+    FUTURE["Future glucose providers"]
 
     subgraph Phone["Android companion: source of truth"]
-        P["GlucoseProvider / activity source"]
+        P["GlucoseProvider registry"]
+        NP["NightscoutProvider"]
+        AP["Activity provider"]
         R["Repositories"]
         DB["Room history"]
         DS["Settings DataStore"]
@@ -46,11 +51,15 @@ flowchart LR
 
     WF["WFF v4 resource-only watch face"]
 
-    CA -. "authorized route required" .-> P
-    HC --> P
-    XD --> P
-    SH -. "future" .-> P
+    SENSOR --> CARESENS
+    CARESENS --> XDRIP
+    XDRIP --> NS
+    NS --> NP
+    NP --> P
+    FUTURE -. "provider adapter" .-> P
+    HC --> AP
     P --> R
+    AP --> R
     R <--> DB
     R <--> DS
     R --> E
@@ -66,7 +75,10 @@ flowchart LR
     UI --> DL2
 ```
 
-Dashed edges are architectural extension points, not implemented production integrations.
+The Nightscout edge is the active Version 1 glucose route. The future-provider edge is an
+architectural extension point, not an implemented Version 1 integration. Configuring several
+Nightscout servers does not create a fallback chain: exactly one server is active and switching is
+an explicit user action.
 
 ## Module dependency rule
 
@@ -93,7 +105,8 @@ Hilt bindings live at infrastructure boundaries so domain code remains construct
 Pure Kotlin models define:
 
 - normalized glucose values in mg/dL with presentation conversion to mmol/L;
-- trend, delta, timestamps, and provider status;
+- trend, delta, timestamps, provider status, and provider loading/degraded state;
+- named Nightscout server entries, explicit active-server selection, and network/retry policy;
 - activity snapshots, daily exercise-session count/duration aggregates, and intervention sessions;
 - meal markers, daily summary, recommendations with stable IDs and validity windows, settings, and
   observations;
@@ -108,6 +121,7 @@ not change stored threshold units.
 The domain module contains no Android dependency. It owns:
 
 - repository interfaces;
+- phone-side Nightscout settings validation, URL normalization, and stable source identity;
 - deterministic coaching-rule evaluation;
 - shared exercise-safety evaluation and effective-recommendation filtering;
 - deterministic follow-up-reading selection;
@@ -122,12 +136,30 @@ The data module adapts Android facilities to domain contracts:
 
 - Room database and DAOs;
 - Preferences DataStore settings;
-- Health Connect glucose and activity readers plus explicit glucose-writer discovery and pinning;
+- an asynchronous OkHttp Nightscout API client, JSON parser, bounded response size, conditional
+  request support, per-server memory cache, bounded retry, and observable provider state;
+- Health Connect activity readers;
 - CareSens partner capability stub and an inactive Samsung Health partner-provider boundary;
-- xDrip broadcast validation and ingestion code, exposed through an exported receiver only in the
-  debug phone variant;
+- retained Health Connect glucose and xDrip adapter code as inactive future-provider boundaries;
 - a bounded-memory, schema-versioned personal-data JSON exporter and local-data eraser;
-- repository implementations and Hilt bindings.
+- repository implementations and Hilt multibindings for the normalized `GlucoseProvider`
+  interface.
+
+Version 1 provider policy always resolves persisted legacy modes to Nightscout. Neither debug nor
+release manifests register the xDrip broadcast receiver. Direct CareSens communication, Bluetooth
+reverse engineering, private-app storage access, and undocumented IPC are intentionally absent.
+
+Nightscout retrieval uses `GET /api/v1/entries/sgv.json?count=300`. Parsed values are normalized to
+`GlucoseReading`; trend comes from Nightscout direction, while delta and rate are calculated from
+ordered readings. Source IDs include the configured server ID and a digest of its normalized URL,
+so histories and caches cannot be mixed when servers change. The provider publishes loading,
+available, configuration-required, or degraded state through `Flow`. A degraded state can carry
+the newest cached reading while Room remains the durable history.
+
+The current authenticator is deliberately a no-op for public Nightscout servers. A separate
+`NightscoutRequestAuthenticator` boundary exists for future credential-backed requests.
+Credentials are invalid inside a URL and must eventually use a phone-only secure credential store;
+they must never enter ordinary DataStore settings, logs, exports, or Wear synchronization.
 
 Room is currently at schema version 7. Exported schemas 1–7 are committed under
 `core/data/schemas/`; migrations 1→2 add follow-up lifecycle fields, 2→3 add query indices, 3→4 add
@@ -149,13 +181,14 @@ The sync module owns a versioned `DataMap` codec and the `/metabolic/v1` path na
 - `/metabolic/v1/action/{uuid}` — watch-to-phone command;
 - deletion of the action data item — terminal transport handling.
 
-State includes glucose, activity, recommendation, settings (including the selected Health Connect
-glucose-writer package), phone battery, active intervention, generation time, a persistent
-phone-instance ID, a monotonically increasing publication revision, the current terminal
-session-command acknowledgement, and an optional durable data-reset token. Unknown schema versions
-are rejected. Commands and intervention sessions use UUIDs. Watch commands echo the current reset
-token; after an erase, a missing or older token is terminally rejected so an offline queued action
-cannot recreate deleted history. Before deleting a terminal command data item, the phone persists `APPLIED`,
+State includes normalized glucose, activity, recommendation, coaching settings, phone battery,
+active intervention, generation time, a persistent phone-instance ID, a monotonically increasing
+publication revision, the current terminal session-command acknowledgement, and an optional durable
+data-reset token. It does not include Nightscout URLs, server choices, timeout/retry settings, or
+credentials. Unknown schema versions are rejected. Commands and intervention sessions use UUIDs.
+Watch commands echo the current reset token; after an erase, a missing or older token is terminally
+rejected so an offline queued action cannot recreate deleted history. Before deleting a terminal
+command data item, the phone persists `APPLIED`,
 `REJECTED_EXPIRED`, `REJECTED_UNSAFE`, or `REJECTED_CONFLICT`, retains a bounded replay history for
 the maximum supported command lifetime, and awaits durable WorkManager enqueue. A replayed terminal
 command triggers required watch-state republication without invoking business mutation again.
@@ -197,30 +230,39 @@ command outbox before caching the empty phone state. Replaying the same token is
 
 ### Refresh and coaching
 
-1. When Health Connect reports and grants background-read support, the phone schedules unique
-   periodic WorkManager work at a 15-minute interval. Otherwise it cancels that periodic work.
-   Foreground manual refresh calls the refresh coordinator directly; startup, settings/meal
-   changes, debug-only xDrip ingestion, and quick actions can also request refresh.
-2. Glucose and activity refresh concurrently.
-3. For Health Connect glucose, the phone groups the last 24 hours by writer package. Exactly one
-   writer is saved automatically. Multiple writers with no saved choice produce
-   `CONFIGURATION_REQUIRED` and no selected glucose; a saved package remains pinned even when it
-   temporarily has no recent records. Only the selected exact source enters glucose history.
-4. Repositories persist normalized selected data.
-5. `CoachRuleEngine` evaluates current state and user settings. Its recommendation flow also
-   reevaluates at minute boundaries so expiry and quiet-hour transitions do not depend on a new
-   provider record.
-6. Before publishing an action, the phone inserts its complete recommendation snapshot if absent
+1. After the user configures and selects a Nightscout server, the phone schedules unique periodic
+   WorkManager work with connected-network constraints at the configured polling interval.
+   WorkManager enforces a 15-minute minimum and execution remains inexact. Foreground manual
+   refresh calls the refresh coordinator directly; startup, settings/meal changes, and quick
+   actions can also request refresh.
+2. Nightscout glucose and Health Connect activity refresh concurrently. Missing Health Connect
+   background access does not cancel Nightscout work; activity can degrade independently.
+3. `NightscoutProvider` loads only the explicitly active server. It makes a cancellable asynchronous
+   API request, reuses `Last-Modified` with `If-Modified-Since`, accepts `304 Not Modified` from the
+   matching server cache, parses up to 300 recent entries, and publishes provider state without
+   blocking the UI.
+4. Transport failures, HTTP 408/429, and server 5xx responses receive bounded exponential retry
+   using the configured base interval and maximum attempts, with every delay capped at 60 seconds.
+   Authentication/configuration/client errors and invalid JSON are not retried. On final failure,
+   per-server memory cache and durable Room history are retained; the provider reports
+   degraded/error state instead of fabricating a reading.
+5. Repositories persist normalized data under the active server's exact source ID. Selecting a
+   different configured server immediately changes the queried source. No automatic failover,
+   history merge, or cache sharing occurs.
+6. `CoachRuleEngine` consumes only normalized `GlucoseReading` values and user settings. It has no
+   Nightscout dependency. Its recommendation flow also reevaluates at minute boundaries so expiry
+   and quiet-hour transitions do not depend on a new provider record.
+7. Before publishing an action, the phone inserts its complete recommendation snapshot if absent
    and reads back that canonical immutable value. A retry with the same stable ID publishes the
    original snapshot rather than regenerated timestamps or dose fields.
-7. The worker publishes a `WatchState`.
-8. A successful persistent watch-state publication is the canonical coaching-prompt delivery and
+8. The worker publishes a provider-agnostic `WatchState`.
+9. A successful persistent watch-state publication is the canonical coaching-prompt delivery and
    is counted using the stable recommendation ID. If notification permission is available, the
    phone also posts an optional local mirror with a timeout bounded by the recommendation validity
    window.
-9. The Wear listener caches accepted revisioned state, reconciles session acknowledgement, refreshes
-   all complications, and may post a watch notification. Wear also reevaluates action validity,
-   quiet hours, active-session state, and shared glucose safety at minute boundaries.
+10. The Wear listener caches accepted revisioned state, reconciles session acknowledgement,
+    refreshes all complications, and may post a watch notification. Wear also reevaluates action
+    validity, quiet hours, active-session state, and shared glucose safety at minute boundaries.
 
 Periodic WorkManager execution is inexact and can be deferred by the operating system. A
 15-minute schedule is not proof of 15-minute end-to-end CGM freshness.
@@ -277,9 +319,8 @@ process-death, and reboot testing.
 
 ### Health data
 
-The phone reads:
+Version 1 glucose is read from Nightscout, not Health Connect. The phone uses Health Connect for:
 
-- `BloodGlucoseRecord`;
 - daily aggregate `StepsRecord`, `FloorsClimbedRecord`, and `ActiveCaloriesBurnedRecord`;
 - latest `HeartRateRecord`;
 - all valid `ExerciseSessionRecord` entries for today's session count, total duration, and latest
@@ -287,17 +328,14 @@ The phone reads:
 - latest step or exercise end time to estimate last movement.
 
 It stores only daily exercise-session count/duration aggregates, not detailed per-session workout
-history, exercise type, or route. Health Connect trend and delta are calculated from successive
-glucose samples from the same writer package because the source record does not provide a CareSens
-trend arrow contract. The Health Connect metadata package name is retained in each glucose
-`sourceId`; repository queries, baselines, follow-ups, daily summaries, and observations use the
-selected exact source rather than mixing records written by different apps.
+history, exercise type, or route. The inactive Health Connect glucose adapter remains isolated
+behind `GlucoseProvider` for possible future use, but Version 1 provider policy does not select it.
 
 Foreground reads require the record permissions selected by the user. Background reads are
 requested only when the device reports
-`FEATURE_READ_HEALTH_DATA_IN_BACKGROUND`; periodic scheduling is additionally gated on the
-background permission being granted. Unsupported or denied background access therefore degrades to
-foreground/manual refresh instead of blocking otherwise usable foreground records.
+`FEATURE_READ_HEALTH_DATA_IN_BACKGROUND`. Unsupported or denied background activity access
+therefore degrades to foreground/manual activity refresh without disabling Nightscout glucose
+polling.
 
 ## Coaching decision order
 
@@ -373,30 +411,39 @@ backend. Wear Data Layer traffic can use Bluetooth or Google infrastructure and 
 encrypted according to the platform documentation. See [Privacy and safety](PRIVACY_AND_SAFETY.md).
 
 The phone Settings screen can stream a schema-versioned JSON export through Android's document
-picker. It contains effective settings and every row from the six application Room tables in stable
-table/row/property order. The writer emits one database row at a time and does not create an extra
-temporary health-data copy.
+picker. It contains coaching settings and every row from the six application Room tables in stable
+table/row/property order; Nightscout connection configuration and future credentials are excluded.
+The writer emits one database row at a time and does not create an extra temporary health-data copy.
 
 Export and confirmed erase share a process-wide `PhoneDataMutationGate` with provider refresh and
 ingestion, follow-up finalization, phone/watch quick actions, meal/settings writes, and state
-publication. The export therefore observes a consistent local snapshot, and a writer cannot
-straddle the local deletion transaction. Erase best-effort cancels periodic/immediate refresh and
-all known/tagged follow-up work, rotates the phone instance and reset token, drains deferred watch
-commands, clears every Room table and the entire settings DataStore, clears the local prompt, and
+publication. Slow provider work is registered as preemptible: an ordinary command, settings write,
+export, or erase cancels its child coroutine before taking the same gate, while the provider's
+cancellable request and any accepted database write still cannot cross the boundary. The export
+therefore observes a consistent local snapshot, and a writer cannot straddle the local deletion
+transaction. Erase best-effort cancels periodic/immediate refresh and all known/tagged follow-up
+work, rotates the phone instance and reset token, drains deferred watch commands, clears every Room
+table, the entire settings DataStore, the local prompt, and provider process-memory caches, then
 publishes an empty revisioned watch state. The reset token remains in all later publications, so an
-offline watch eventually clears when it reconnects. Source records and permissions are outside this
-boundary, and normal use can collect new source data after erase.
+offline watch eventually clears when it reconnects. Source records and permissions are outside
+this boundary, and normal use can collect new source data after erase.
 
 ## Extension patterns
 
 ### Add a glucose provider
 
 1. Implement `GlucoseProvider`.
-2. Normalize data into `GlucoseReading`, preserving measured and received timestamps.
-3. Add a provider mode and explicit status/permission behavior.
-4. Bind it in the data Hilt module.
-5. Add provider parsing, stale-data, duplicate, timezone, and ordering tests.
-6. Add a user-visible source/authorization explanation.
+2. Normalize data into `GlucoseReading`, preserving measured and received timestamps and a stable,
+   exact provider source ID.
+3. Add explicit configuration, authorization, status, and provider-state behavior without leaking
+   provider types into the coaching or sync modules.
+4. Bind it into the Hilt `Set<GlucoseProvider>` registry and update the explicit provider-selection
+   policy.
+5. Keep provider settings and secrets phone-only. Add a secure credential adapter if authentication
+   is required; do not store secrets in ordinary DataStore or URLs.
+6. Add parsing, network-failure, retry, cache isolation, switching, stale-data, duplicate,
+   timezone, and ordering tests using synthetic fixtures.
+7. Add a user-visible source/authorization explanation and an explicit migration path.
 
 Do not add direct sensor BLE, private-storage scraping, accessibility scraping, or undocumented
 vendor IPC.
@@ -450,17 +497,22 @@ describe a timing bucket as medically recommended, causal, best, or ideal.
 
 ## Known architectural release gaps
 
-- CareSens Air data availability and latency are not verified end to end.
-- The Health Connect permission/feature gating and foreground fallback are implemented, but
-  background execution, provider latency, and multi-writer selection/reappearance behavior still
-  require target-phone lifecycle testing.
+- The configured Nightscout route has not yet been validated end to end against the intended
+  production server across outages, server upgrades, authentication changes, phone lifecycle
+  events, and measured sensor-to-watch latency.
+- Version 1 supports public Nightscout endpoints only. The authenticator boundary is present, but
+  secure credential storage and a user-facing authentication flow are future work.
+- Multiple Nightscout servers require explicit selection. There is intentionally no health-data
+  failover, availability probing, or automatic server switch.
+- Allowing HTTP is an explicit local/test escape hatch. The manifest permits cleartext so that
+  setting can function, which makes HTTPS enforcement and release security testing essential.
+- Health Connect activity permission/feature gating and foreground fallback are implemented, but
+  target-phone background behavior and provider latency still require lifecycle testing.
 - The Samsung Health partner-provider boundary is inactive because the partner SDK, approval,
   package registration, and release-certificate registration are not available.
-- xDrip compatibility is confined to debug manifests and debug settings UI because the upstream
-  sender contract and signing identity have not been verified end to end. The release data layer
-  also sanitizes any persisted debug-only xDrip selection to Health Connect, so an upgraded install
-  cannot remain on a hidden receiver-less mode. Release exposes Health Connect and the
-  nonfunctional CareSens partner-approval placeholder instead.
+- Direct CareSens, xDrip broadcast, Health Connect glucose, Dexcom, and Libre providers are inactive
+  in Version 1. Persisted legacy provider modes are migrated to Nightscout, and no xDrip receiver is
+  registered.
 - Watch action and follow-up recovery still require physical disconnect/reconnect, process-death,
   and reboot validation.
 - Prospective timing excludes recorded intervening meals and overlapping intervention sessions,

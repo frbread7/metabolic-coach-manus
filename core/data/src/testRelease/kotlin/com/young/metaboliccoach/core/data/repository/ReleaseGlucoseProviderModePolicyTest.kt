@@ -11,38 +11,55 @@ import org.junit.Test
 
 class ReleaseGlucoseProviderModePolicyTest {
     @Test
-    fun `release build replaces persisted xdrip mode with health connect`() {
+    fun `release build routes every legacy glucose mode to Nightscout`() {
         assertFalse(BuildConfig.DEBUG)
+        GlucoseProviderMode.entries
+            .filterNot { it == GlucoseProviderMode.NIGHTSCOUT }
+            .forEach { legacyMode ->
+                assertEquals(
+                    "Legacy mode $legacyMode",
+                    GlucoseProviderMode.NIGHTSCOUT,
+                    legacyMode.supportedForCurrentBuild(),
+                )
+            }
+    }
+
+    @Test
+    fun `release build preserves Nightscout mode`() {
         assertEquals(
-            GlucoseProviderMode.HEALTH_CONNECT,
-            GlucoseProviderMode.XDRIP_BROADCAST.supportedForCurrentBuild(),
+            GlucoseProviderMode.NIGHTSCOUT,
+            GlucoseProviderMode.NIGHTSCOUT.supportedForCurrentBuild(),
         )
     }
 
     @Test
-    fun `release build preserves supported provider modes`() {
-        assertEquals(
-            GlucoseProviderMode.HEALTH_CONNECT,
-            GlucoseProviderMode.HEALTH_CONNECT.supportedForCurrentBuild(),
-        )
-        assertEquals(
-            GlucoseProviderMode.CARESENS_PARTNER,
-            GlucoseProviderMode.CARESENS_PARTNER.supportedForCurrentBuild(),
-        )
+    fun `release migration rewrites every persisted legacy selection`() = runTest {
+        val migration = GlucoseProviderModeMigration()
+
+        GlucoseProviderMode.entries
+            .filterNot { it == GlucoseProviderMode.NIGHTSCOUT }
+            .forEach { legacyMode ->
+                val original = emptyPreferences().toMutablePreferences().apply {
+                    this[glucoseProviderModePreferenceKey] = legacyMode.name
+                }
+
+                assertTrue("Legacy mode $legacyMode", migration.shouldMigrate(original))
+                assertEquals(
+                    GlucoseProviderMode.NIGHTSCOUT.name,
+                    migration.migrate(original)[glucoseProviderModePreferenceKey],
+                )
+            }
     }
 
     @Test
-    fun `release migration rewrites a persisted debug xdrip selection`() = runTest {
-        val original = emptyPreferences().toMutablePreferences().apply {
-            this[glucoseProviderModePreferenceKey] =
-                GlucoseProviderMode.XDRIP_BROADCAST.name
+    fun `release migration leaves absent and Nightscout selections alone`() = runTest {
+        val absent = emptyPreferences()
+        val selected = emptyPreferences().toMutablePreferences().apply {
+            this[glucoseProviderModePreferenceKey] = GlucoseProviderMode.NIGHTSCOUT.name
         }
         val migration = GlucoseProviderModeMigration()
 
-        assertTrue(migration.shouldMigrate(original))
-        assertEquals(
-            GlucoseProviderMode.HEALTH_CONNECT.name,
-            migration.migrate(original)[glucoseProviderModePreferenceKey],
-        )
+        assertFalse(migration.shouldMigrate(absent))
+        assertFalse(migration.shouldMigrate(selected))
     }
 }

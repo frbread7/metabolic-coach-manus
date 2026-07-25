@@ -12,6 +12,7 @@ import com.young.metaboliccoach.core.data.db.toModel
 import com.young.metaboliccoach.core.domain.CoachRuleEngine
 import com.young.metaboliccoach.core.domain.CoachTimeSource
 import com.young.metaboliccoach.core.domain.CoachingRepository
+import com.young.metaboliccoach.core.domain.GlucoseRepository
 import com.young.metaboliccoach.core.domain.ObservationAnalyzer
 import com.young.metaboliccoach.core.domain.SettingsRepository
 import com.young.metaboliccoach.core.model.CoachContext
@@ -47,6 +48,7 @@ class CoachingRepositoryImpl @Inject constructor(
     private val coachStateDao: CoachStateDao,
     private val recommendationSnapshotDao: RecommendationSnapshotDao,
     private val settingsRepository: SettingsRepository,
+    private val glucoseRepository: GlucoseRepository,
     private val ruleEngine: CoachRuleEngine,
     private val observationAnalyzer: ObservationAnalyzer,
     private val timeSource: CoachTimeSource,
@@ -57,10 +59,11 @@ class CoachingRepositoryImpl @Inject constructor(
         val glucoseSourceId: String?,
     )
 
-    private val selectedGlucoseAndSettings = settingsRepository.observe().flatMapLatest { settings ->
-        settings.selectedGlucoseSourcePrefix()?.let { sourcePrefix ->
-            glucoseDao.observeLatestForSource(sourcePrefix).map { settings to it }
-        } ?: flowOf(settings to null)
+    private val selectedGlucoseAndSettings = combine(
+        settingsRepository.observe(),
+        glucoseRepository.observeLatest(),
+    ) { settings, glucose ->
+        settings to glucose
     }
 
     override fun observeCurrentRecommendation(): Flow<CoachRecommendation?> = combine(
@@ -78,7 +81,7 @@ class CoachingRepositoryImpl @Inject constructor(
                     .atZone(ZoneId.systemDefault())
                     .toLocalTime()
                     .toSecondOfDay() / 60,
-                glucose = glucose?.toModel(),
+                glucose = glucose,
                 activity = activity
                     ?.takeIf { it.dayStartEpochMillis == startOfToday(now) }
                     ?.toModel(),
@@ -140,12 +143,16 @@ class CoachingRepositoryImpl @Inject constructor(
         interventionDao.observeAll(),
         mealDao.observeAll(),
         settingsRepository.observe(),
-    ) { sessions, meals, settings ->
-        observationAnalyzer.analyze(
-            sessions = sessions.map { it.toModel() },
-            settings = settings,
-            mealMarkers = meals.map { it.toModel() },
-        )
+        glucoseRepository.observeLatest(),
+    ) { sessions, meals, settings, latestGlucose ->
+        latestGlucose?.sourceId?.let { exactSourceId ->
+            observationAnalyzer.analyze(
+                sessions = sessions.map { it.toModel() },
+                exactSourceId = exactSourceId,
+                settings = settings,
+                mealMarkers = meals.map { it.toModel() },
+            )
+        }.orEmpty()
     }
 
     override fun observeActiveSession(): Flow<InterventionSession?> =

@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -65,6 +66,7 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import com.young.metaboliccoach.core.data.provider.HealthConnectPermissions
 import com.young.metaboliccoach.core.domain.CoachSettingsBounds
+import com.young.metaboliccoach.core.domain.NightscoutSettingsBounds
 import com.young.metaboliccoach.core.model.CoachRecommendation
 import com.young.metaboliccoach.core.model.CoachSettings
 import com.young.metaboliccoach.core.model.CoachTheme
@@ -73,6 +75,8 @@ import com.young.metaboliccoach.core.model.GlucoseProviderMode
 import com.young.metaboliccoach.core.model.GlucoseUnit
 import com.young.metaboliccoach.core.model.InterventionSession
 import com.young.metaboliccoach.core.model.InterventionType
+import com.young.metaboliccoach.core.model.NightscoutServerConfig
+import com.young.metaboliccoach.core.model.NightscoutSettings
 import com.young.metaboliccoach.core.model.QuickActionType
 import com.young.metaboliccoach.ui.PhoneUiState
 import com.young.metaboliccoach.ui.PhoneViewModel
@@ -178,7 +182,7 @@ private fun MetabolicCoachApp(
     onRefresh: () -> Unit,
     onMarkMeal: () -> Unit,
     onQuickAction: (QuickActionType, String?) -> Unit,
-    onSaveSettings: (CoachSettings) -> Unit,
+    onSaveSettings: (CoachSettings, NightscoutSettings) -> Unit,
     onExportData: () -> Unit,
     onEraseData: () -> Unit,
     onConnectHealth: () -> Unit,
@@ -216,7 +220,7 @@ private fun MetabolicCoachApp(
             )
             PhoneDestination.SETTINGS -> SettingsScreen(
                 settings = uiState.settings,
-                availableGlucoseOrigins = uiState.availableGlucoseOrigins,
+                nightscoutSettings = uiState.nightscoutSettings,
                 operationMessage = uiState.operationMessage,
                 isOperationInProgress = uiState.isOperationInProgress,
                 onSave = onSaveSettings,
@@ -508,15 +512,18 @@ private fun DailySummaryCard(uiState: PhoneUiState) {
 @Composable
 private fun SettingsScreen(
     settings: CoachSettings,
-    availableGlucoseOrigins: List<GlucoseDataOrigin>,
+    nightscoutSettings: NightscoutSettings,
     operationMessage: String?,
     isOperationInProgress: Boolean,
-    onSave: (CoachSettings) -> Unit,
+    onSave: (CoachSettings, NightscoutSettings) -> Unit,
     onExportData: () -> Unit,
     onEraseData: () -> Unit,
     contentPadding: PaddingValues,
 ) {
     var draft by remember(settings) { mutableStateOf(settings) }
+    var nightscoutDraft by remember(nightscoutSettings) {
+        mutableStateOf(nightscoutSettings)
+    }
     var showEraseConfirmation by remember { mutableStateOf(false) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -540,32 +547,10 @@ private fun SettingsScreen(
             }
         }
         item {
-            EnumSetting(
-                title = "Glucose provider",
-                values = GlucoseProviderMode.entries.filter {
-                    BuildConfig.DEBUG || it != GlucoseProviderMode.XDRIP_BROADCAST
-                },
-                selected = draft.glucoseProviderMode,
-                label = {
-                    when (it) {
-                        GlucoseProviderMode.HEALTH_CONNECT -> "Health Connect"
-                        GlucoseProviderMode.XDRIP_BROADCAST -> "xDrip (unofficial)"
-                        GlucoseProviderMode.CARESENS_PARTNER -> "CareSens partner"
-                    }
-                },
-                onSelected = { draft = draft.copy(glucoseProviderMode = it) },
+            NightscoutSettingsCard(
+                settings = nightscoutDraft,
+                onSettingsChanged = { nightscoutDraft = it },
             )
-        }
-        if (draft.glucoseProviderMode == GlucoseProviderMode.HEALTH_CONNECT) {
-            item {
-                HealthConnectOriginSetting(
-                    availableOrigins = availableGlucoseOrigins,
-                    selectedPackageName = draft.healthConnectGlucoseOriginPackage,
-                    onSelected = {
-                        draft = draft.copy(healthConnectGlucoseOriginPackage = it)
-                    },
-                )
-            }
         }
         item {
             EnumSetting(
@@ -861,7 +846,12 @@ private fun SettingsScreen(
         }
         item {
             Button(
-                onClick = { onSave(draft) },
+                onClick = {
+                    onSave(
+                        draft.copy(glucoseProviderMode = GlucoseProviderMode.NIGHTSCOUT),
+                        nightscoutDraft,
+                    )
+                },
                 enabled = !isOperationInProgress,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -937,6 +927,211 @@ private fun SettingsScreen(
             },
         )
     }
+}
+
+@Composable
+private fun NightscoutSettingsCard(
+    settings: NightscoutSettings,
+    onSettingsChanged: (NightscoutSettings) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Nightscout glucose", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "Version 1 reads glucose only from the selected Nightscout server. " +
+                    "Servers are kept separate and are never used as automatic failover.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            settings.servers.forEachIndexed { index, server ->
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = server.displayName,
+                            onValueChange = { value ->
+                                onSettingsChanged(
+                                    settings.copy(
+                                        servers = settings.servers.replaceServer(
+                                            index,
+                                            server.copy(displayName = value),
+                                        ),
+                                    ),
+                                )
+                            },
+                            label = { Text("Server name") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = server.baseUrl,
+                            onValueChange = { value ->
+                                onSettingsChanged(
+                                    settings.copy(
+                                        servers = settings.servers.replaceServer(
+                                            index,
+                                            server.copy(baseUrl = value),
+                                        ),
+                                    ),
+                                )
+                            },
+                            label = { Text("Nightscout URL") },
+                            placeholder = { Text("https://example.fly.dev") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            FilterChip(
+                                selected = settings.activeServerId == server.id,
+                                onClick = {
+                                    onSettingsChanged(
+                                        settings.copy(activeServerId = server.id),
+                                    )
+                                },
+                                enabled = server.baseUrl.isNotBlank(),
+                                label = {
+                                    Text(
+                                        if (settings.activeServerId == server.id) {
+                                            "Active server"
+                                        } else {
+                                            "Use this server"
+                                        },
+                                    )
+                                },
+                            )
+                            if (settings.servers.size > 1) {
+                                OutlinedButton(
+                                    onClick = {
+                                        val remaining = settings.servers
+                                            .filterNot { it.id == server.id }
+                                        val nextActive = if (
+                                            settings.activeServerId == server.id
+                                        ) {
+                                            remaining.firstOrNull {
+                                                it.baseUrl.isNotBlank()
+                                            }?.id ?: remaining.firstOrNull()?.id
+                                        } else {
+                                            settings.activeServerId
+                                        }
+                                        onSettingsChanged(
+                                            settings.copy(
+                                                servers = remaining,
+                                                activeServerId = nextActive,
+                                            ),
+                                        )
+                                    },
+                                ) {
+                                    Text("Remove")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (settings.servers.size < NightscoutSettingsBounds.MAXIMUM_SERVERS) {
+                OutlinedButton(
+                    onClick = {
+                        val id = nextNightscoutServerId(settings.servers)
+                        onSettingsChanged(
+                            settings.copy(
+                                servers = settings.servers + NightscoutServerConfig(
+                                    id = id,
+                                    displayName = "Server ${settings.servers.size + 1}",
+                                    baseUrl = "",
+                                ),
+                            ),
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Add Nightscout server")
+                }
+            }
+            ToggleSetting("Require HTTPS", settings.requireHttps) {
+                onSettingsChanged(settings.copy(requireHttps = it))
+            }
+            Text(
+                if (settings.requireHttps) {
+                    "HTTPS is enforced. This is strongly recommended."
+                } else {
+                    "HTTP is allowed for explicitly configured local/test servers. " +
+                        "Glucose can be exposed on the network."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (settings.requireHttps) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
+            )
+            SliderSetting(
+                title = "Polling interval",
+                value = settings.pollingIntervalMinutes,
+                range = NightscoutSettingsBounds.POLLING_INTERVAL_MINUTES,
+                suffix = "min",
+            ) {
+                onSettingsChanged(settings.copy(pollingIntervalMinutes = it))
+            }
+            SliderSetting(
+                title = "Connection timeout",
+                value = settings.connectionTimeoutSeconds,
+                range = NightscoutSettingsBounds.CONNECTION_TIMEOUT_SECONDS,
+                suffix = "sec",
+            ) {
+                onSettingsChanged(settings.copy(connectionTimeoutSeconds = it))
+            }
+            SliderSetting(
+                title = "Retry interval",
+                value = settings.retryIntervalSeconds,
+                range = NightscoutSettingsBounds.RETRY_INTERVAL_SECONDS,
+                suffix = "sec",
+            ) {
+                onSettingsChanged(settings.copy(retryIntervalSeconds = it))
+            }
+            SliderSetting(
+                title = "Retry attempts",
+                value = settings.maximumRetryAttempts,
+                range = NightscoutSettingsBounds.MAXIMUM_RETRY_ATTEMPTS,
+                suffix = "",
+            ) {
+                onSettingsChanged(settings.copy(maximumRetryAttempts = it))
+            }
+            Text(
+                "Future authenticated servers will use a phone-only credential store. " +
+                    "Credentials are never accepted in the URL or sent to the watch.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun List<NightscoutServerConfig>.replaceServer(
+    index: Int,
+    server: NightscoutServerConfig,
+): List<NightscoutServerConfig> = mapIndexed { currentIndex, current ->
+    if (currentIndex == index) server else current
+}
+
+private fun nextNightscoutServerId(
+    servers: List<NightscoutServerConfig>,
+): String {
+    val existing = servers.mapTo(mutableSetOf(), NightscoutServerConfig::id)
+    return generateSequence(servers.size + 1) { it + 1 }
+        .map { "server-$it" }
+        .first { it !in existing }
 }
 
 @Composable

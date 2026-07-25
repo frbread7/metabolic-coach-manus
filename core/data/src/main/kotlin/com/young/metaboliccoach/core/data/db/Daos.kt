@@ -262,4 +262,7 @@ interface RecommendationSnapshotDao {
             "WHERE validUntilEpochMillis < :cutoffEpochMillis",
     )
     suspend fun deleteExpiredBefore(cutoffEpochMillis: Long)
+
+    @Query("DELETE FROM recommendation_snapshots")
+    suspend fun deleteAll()
 }

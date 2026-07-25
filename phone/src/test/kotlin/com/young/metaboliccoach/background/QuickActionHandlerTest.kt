@@ -519,6 +519,8 @@ class QuickActionHandlerTest {
             .filter { it.sourceId == sourceId }
 
         override suspend fun refresh() = Unit
+        override suspend fun refreshExactSource(sourceId: String) = Unit
+        override suspend fun clearRuntimeCaches() = Unit
     }
 
     private class FakeCoachingRepository(

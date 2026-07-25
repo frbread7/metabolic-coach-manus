@@ -9,6 +9,7 @@ import com.young.metaboliccoach.core.data.db.RecommendationSnapshotDao
 import com.young.metaboliccoach.core.data.db.RecommendationSnapshotEntity
 import com.young.metaboliccoach.core.domain.CoachRuleEngine
 import com.young.metaboliccoach.core.domain.CoachTimeSource
+import com.young.metaboliccoach.core.domain.GlucoseRepository
 import com.young.metaboliccoach.core.domain.ObservationAnalyzer
 import com.young.metaboliccoach.core.domain.SettingsRepository
 import com.young.metaboliccoach.core.model.CoachReason
@@ -31,6 +32,7 @@ class RecommendationSnapshotPersistenceTest {
             coachStateDao = mock(CoachStateDao::class.java),
             recommendationSnapshotDao = snapshots,
             settingsRepository = mock(SettingsRepository::class.java),
+            glucoseRepository = mock(GlucoseRepository::class.java),
             ruleEngine = CoachRuleEngine(),
             observationAnalyzer = ObservationAnalyzer(),
             timeSource = mock(CoachTimeSource::class.java),
@@ -76,6 +78,10 @@ class RecommendationSnapshotPersistenceTest {
             snapshots.entries.removeAll {
                 it.value.validUntilEpochMillis < cutoffEpochMillis
             }
+        }
+
+        override suspend fun deleteAll() {
+            snapshots.clear()
         }
     }
 }

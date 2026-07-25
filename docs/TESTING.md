@@ -6,9 +6,10 @@ Define the claim, run the smallest test that proves it, read the result, and ret
 evidence. Compilation is not functional validation; an emulator run is not Galaxy Watch8
 validation; a displayed glucose value is not proof of reliable coaching latency.
 
-The authoritative `scripts/build-apks.sh` evidence path disables Gradle build-cache reuse and
-Kotlin incremental compilation. This deliberately favors reproducible cross-module ABI validation
-over build speed when shared data classes change.
+The authoritative `scripts/build-apks.sh` evidence path forces every selected task to rerun and
+disables Gradle build-cache reuse and Kotlin incremental compilation. This prevents a prior
+filtered test invocation from being reused as complete-suite evidence and deliberately favors
+reproducible cross-module ABI validation over build speed when shared data classes change.
 
 ## Automated tests
 
@@ -19,22 +20,27 @@ The current source includes these JVM and Android local-test suites:
 | `GlucoseReadingDisplayTest` | Unit-aware glucose rate display and threshold conversion round trips |
 | `CoachRuleEngineTest` | Recommendation IDs/validity, rapid rise, shared missing/future/stale/low/fast-fall safety, post-meal timing, inactivity stair/walk fallback, working/quiet hours, and cooldown |
 | `ExerciseSafetyPolicyTest` | Phone/Wear safety parity, exact action-expiry boundaries, quiet hours, active-session suppression, and falling-rate fallback |
-| `SettingsValidatorTest` | Defaults plus the shared full settings bounds, Health Connect origin-package validation, falling-rate, follow-up, command-expiry, activity goals, and all personal-observation analysis controls |
+| `SettingsValidatorTest` | Defaults plus shared coaching bounds, retained legacy Health Connect-origin validation, falling-rate, follow-up, command-expiry, activity goals, and all personal-observation analysis controls |
 | `FollowUpReadingSelectorTest` | Exact-source filtering, at/after-due preference, pre-deadline waiting, deterministic deadline fallback, and missing finalization |
 | `ObservationAnalyzerTest` | Manual effects, legacy safety-provenance exclusion, below-threshold exclusion for effects/timing, configurable generic/post-meal/follow-up/baseline buckets, configurable sample and comparable-cohort gates, unique separated median, exact-source/follow-up eligibility, meal provenance, and cautious wording |
-| `XdripGlucoseIngestorTest` | Valid ingestion and rejection of wrong mode/action, malformed values, stale/future timestamps, and invalid data |
+| `NightscoutSettingsValidatorTest` | Multiple-server limits and selection, URL normalization, HTTPS enforcement, credential/query/fragment rejection, valid TCP ports, and polling/timeout/retry bounds |
+| `NightscoutJsonParserTest` | Nightscout response parsing, trend mapping, stable IDs, ordering, delta/rate calculation, timestamp fallbacks, malformed/unusable rows, and bounded value/time acceptance |
+| `NightscoutProviderTest` | Provider state flow, success, conditional cache reuse, retry/non-retry and response-size classification, retained cache on failure, cancellation, and per-server isolation/switching |
+| `OkHttpNightscoutApiClientTest` | MockWebServer request path/query/headers, conditional responses, redirect refusal, bounded declared/streamed response size, and future-authenticator hook without a real server |
+| `NightscoutSettingsJsonCodecTest` | Stable multi-server DataStore encoding/decoding and malformed stored-value recovery |
+| `XdripGlucoseIngestorTest` | Retained inactive-adapter input validation; it does not prove or enable a Version 1 broadcast route |
 | `HealthConnectOriginSelectionPolicyTest` | Single-origin auto-pinning, multi-origin configuration gating, exact filtering, unavailable saved-origin retention, and deterministic discovery order |
-| `ReleaseGlucoseProviderModePolicyTest` | Release-variant fallback from persisted debug-only xDrip mode to Health Connect while preserving supported modes |
+| `ReleaseGlucoseProviderModePolicyTest` | Migration and build policy force every persisted legacy provider mode to the Version 1 Nightscout mode |
 | `ExerciseSessionSummaryTest` | Daily valid-session count, total-duration aggregation, latest end time, and reversed-interval rejection |
-| `WatchStateCodecTest` | State/command round trips including selected Health Connect origin, configurable observation analysis, recommendation validity/provenance, phone revision, and session acknowledgement; backward-compatible optional settings plus schema and malformed-payload rejection |
+| `WatchStateCodecTest` | State/command round trips including backward-compatible legacy settings, configurable observation analysis, recommendation validity/provenance, phone revision, and session acknowledgement; Nightscout connection settings remain absent from Wear payloads |
 | `InterventionDaoLifecycleTest` | Idempotent start, one-active-session semantics, and Room follow-up lifecycle persistence |
 | `RecommendationSnapshotMapperTest` / `RecommendationSnapshotPersistenceTest` | Complete snapshot mapping plus immutable canonical retry behavior for a stable recommendation ID |
 | `QuickActionHandlerTest` | Selected-provider baseline provenance, required phone-authored snapshot lookup, echoed-provenance conflict rejection, snapshot-owned intervention dose, complete prospective recommendation/trigger/rate/threshold capture, no invented manual provenance, action-time recommendation/safety boundaries under delayed delivery, generic start expiry, idempotent start, deferred completion, delayed known-session completion, and terminal orphan expiry |
-| `SyncSchedulerTest` | Health Connect background-permission failure fallback and coroutine-cancellation propagation without cancelling periodic work |
+| `SyncSchedulerTest` | Nightscout connected-network scheduling, configured interval and 15-minute minimum, independence from Health Connect background permission, fallback behavior, and coroutine-cancellation propagation |
 | `DeferredCompletionPolicyTest` | Rejected-prerequisite propagation and session matching for completion-first delivery |
 | `PhoneCommandProcessorTest` | Exactly-once terminal replay: a persisted rejected command triggers watch-state republication without invoking mutation logic |
 | `CommandDataEpochPolicyTest` | Legacy compatibility before erase and strict current-reset-token matching afterward |
-| `PhoneDataMutationGateTest` | Process-wide serialization prevents a second phone data operation from crossing an active export/erase/write boundary |
+| `PhoneDataMutationGateTest` | Process-wide serialization prevents boundary crossing; local operations preempt cancellable provider work and retain priority over already queued provider work |
 | `PersonalDataJsonWriterTest` | Deterministic versioned JSON, escaping/control characters, non-finite-number handling, binary encoding, and empty-table separators |
 | `SessionAckOrderingPolicyTest` | Completion-over-start ordering, older replay protection, and the rejected-start/completion/replayed-start chain |
 | `WearSessionReplicaReducerTest` | Persistent pending start/completion, transport state, tombstone protection, and all acknowledgement outcomes |
@@ -70,49 +76,52 @@ Execute the migration suite on an Android runtime with:
 ./gradlew :core:data:connectedDebugAndroidTest
 ```
 
-## Latest local verification
+## Milestone test gates
 
-On 2026-07-23, the current checkout produced this evidence:
+- `v0.2` implementation gate: the full static pipeline, isolated provider/repository tests,
+  parsing, retry, cache, server switching, manifests, documentation, and debug package must pass.
+- `v0.2` live acceptance gate: on the phone, configure a test or personal Nightscout server,
+  confirm current/history normalization and recovery from connectivity loss, and record latency
+  without exposing health data. Do not install the watch package before this gate passes.
+- `v0.3` gate: only after `v0.2`, install matching phone/Wear/watch-face artifacts and validate the
+  existing Data Layer flow, reconnect behavior, stale-state handling, and physical Watch8 UI.
+- `v0.4` coaching work remains frozen until the preceding gates pass. Existing walk/stair behavior
+  may be regression-tested, but no new coaching feature or medical claim belongs in `v0.2`.
 
-- `./scripts/build-apks.sh`: Gradle reported 333 actionable tasks; model/domain/data/sync/phone/Wear
-  tests, Android migration-test source compilation, debug lint, all three debug assemblies, APK
-  signature checks, phone/Wear certificate equality, and WFF v4 schema/memory validation passed.
-- JUnit XML aggregate: 163 executions across build variants, covering 144 distinct test cases, with
-  0 failures, 0 errors, and 0 skipped. The release data suite intentionally re-executes shared data
-  tests in addition to its release-only provider-migration coverage.
-- Release static gate: Gradle reported 243 actionable tasks for all three `lintRelease` and
-  `assembleRelease` targets; R8/minified unsigned APK generation passed and all lint reports say
-  `No issues found`.
-- Release WFF v4 schema/memory validation passed, and both debug and unsigned-release watch-face
-  APKs contain no DEX.
-- Release manifest inspection confirmed the xDrip receiver and permission are absent; the debug
-  manifest contains them as intended.
-- APK inspection confirmed package/minimum/target SDK values of
-  `com.young.metaboliccoach`/28/36 for phone,
-  `com.young.metaboliccoach`/30/36 for Wear, and
-  `com.young.metaboliccoach.watchface`/36/36 for the watch face in both build variants.
-- A host SQLite schema-6→7 smoke applied the exact new table/index shape, preserved a legacy
-  intervention row, found all 12 snapshot columns, and returned `PRAGMA integrity_check = ok`.
-  This supplements migration-source compilation; it does not replace Android instrumentation.
-- Host/toolchain: Linux aarch64, OpenJDK 17.0.19, Gradle 8.13, Android Gradle Plugin 8.11.1,
-  Kotlin plugin 2.2.20, compile/target SDK 36, and WFF validator 1.7.0.
-- Phone/Wear debug signing-certificate SHA-256:
+## Current local verification
+
+The `v0.2` Nightscout milestone was verified locally on 2026-07-25:
+
+- `./scripts/build-apks.sh` completed successfully in 6m58s with all 333 actionable tasks executed.
+  It passed
+  model/domain/data-debug/data-release/sync/phone/Wear tests, Android migration-test source
+  compilation, debug lint, all three debug assemblies, APK signature checks, phone/Wear
+  certificate equality, WFF v4 schema/memory validation, and exact five-file ZIP packaging.
+- The resulting 49 JUnit XML suites contain 249 executions, 0 failures, 0 errors, and 0 skipped.
+  The data tests intentionally execute under both debug and release.
+- Android instrumentation was compiled but not executed; no emulator or physical device was
+  attached.
+- Nightscout provider/client tests used synthetic JSON and MockWebServer. No personal Nightscout
+  URL was queried.
+- Phone, Wear, and watch-face APKs passed APK Signature Scheme v2 verification with one signer.
+  The phone/Wear certificate SHA-256 is
   `7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6667da26c5fad4`.
+- Independent final review returned architecture `CLEAR` and code review `APPROVE`, with no
+  remaining findings.
 
 Current debug artifact SHA-256 values:
 
 ```text
-2151e714f6763230b9f735f5b6dda2e9fe444ee775e50d7ce715cb2993554d81  metabolic-coach-phone-debug.apk
-1a9e888e0ee20f83e843c05edc3c96622c79522e36e172ea9251aba8e6d712c0  metabolic-coach-watchface-debug.apk
-ae962f978a5b1b7c3bdaf593c5f4057a4d90edca10bb7142f7b172eec0c903f9  metabolic-coach-wear-debug.apk
+eb1dc99bd612970b975d17ff6e02e63c3529e38581f8a7d0bd50e7866bd2dbee  metabolic-coach-phone-debug.apk
+e373a79b2dee352d6cc1ea798f32d9c1c8e6eab277a94d155bd8c3673f09e8a6  metabolic-coach-wear-debug.apk
+76b0b050e1a201e41c2ad8185ef0aeaf06a294a20caa2857546059a9a47cd23b  metabolic-coach-watchface-debug.apk
+03ef7df91417243ae4f7862a0608c967d8d6e9d155e1d459c3b35091c8bb3767  MetabolicCoach-v0.2.zip
 ```
 
-Current debug artifact sizes are 40,810,124 bytes for phone, 10,019 bytes for watch face, and
-44,833,728 bytes for Wear. The independently assembled unsigned release APKs are 3,672,542 bytes,
-5,923 bytes, and 3,609,666 bytes respectively. Unsigned release APKs are static evidence only.
-
-These are local debug artifacts, not production-signed releases. Instrumentation and physical
-device results are not implied by this evidence.
+Current artifact sizes are 41,673,623 bytes for phone, 44,620,696 bytes for Wear, and 10,095 bytes
+for the watch face. The five-file ZIP is 29,963,158 bytes. These are debug-signed engineering
+artifacts. Live-server, Android instrumentation, physical-device, production-signing, and
+store/privacy results are not implied.
 
 ## Required static and build checks
 
@@ -219,19 +228,33 @@ Samsung hardware pass.
 
 ## Provider scenarios
 
-For each supported provider:
+Use synthetic Nightscout fixtures and MockWebServer for automated tests; do not require or copy data
+from a real server:
 
 | Scenario | Expected result |
 | --- | --- |
-| No permission/source app | Clear provider status; no fabricated reading |
-| One Health Connect glucose writer | Package is auto-selected, persisted, and used exactly |
-| Multiple Health Connect glucose writers, no selection | `CONFIGURATION_REQUIRED`; no glucose display or coaching until one package is saved |
-| Saved Health Connect writer plus newer competing writer | Saved exact writer remains authoritative; no silent switch or mixed trend |
-| Saved Health Connect writer temporarily absent | Selection is retained and shown as having no recent records; another writer does not take over |
+| No configured Nightscout server | `CONFIGURATION_REQUIRED`; no fabricated reading or periodic network work |
+| One configured active server | Exact normalized URL is queried and readings use that server's source ID |
+| Two configured servers | Only the explicitly active server is queried |
+| Active server unavailable | Retry follows configured bounds; no automatic request to another server |
+| Active server changed | UI/history switches to the selected exact source; old-server cache/history is not displayed |
+| Same server slot URL changed | Source identity changes; readings from the old URL are not merged |
+| HTTPS required with HTTP URL | Settings validation rejects the URL |
+| HTTP explicitly allowed | Local/test URL is accepted with a visible security warning |
+| URL contains credentials, query, or fragment | Settings validation rejects it |
+| Authentication 401/403 | Non-retryable authentication failure; cached reading retained |
+| HTTP 408/429/5xx | Bounded retry with exponential delay capped at 60 seconds |
+| DNS, connection, or timeout failure | Bounded retry; degraded state and cached Room data retained |
+| HTTP 304 | Matching per-server cache reused; no cross-server cache access |
+| Malformed JSON or oversized response | Non-retryable response failure; no partial fabricated state |
+| Empty valid array | No new reading; stale/cached behavior remains explicit |
 | First reading | Value shown; delta/trend unknown until enough ordered data exists |
-| Ordered readings | Delta/rate calculated correctly |
+| Ordered readings | Direction maps and delta/rate calculate correctly |
 | Duplicate record | No duplicate Room history |
 | Out-of-order record | No invalid divide/order result |
+| Missing/invalid individual row | Bad row skipped without corrupting valid rows |
+| Entire response unusable | Parse failure; prior cache retained |
+| Request cancelled | Coroutine cancellation reaches the HTTP call and is not retried |
 | Stale reading | Informational stale state; no exercise action |
 | Future-dated reading | Informational clock warning; no exercise action |
 | Below configured low threshold | Exercise coaching paused |
@@ -242,8 +265,10 @@ For each supported provider:
 | Multiple exercise sessions | Daily count/duration and latest movement aggregate all valid records |
 | Reversed exercise interval | Invalid interval is excluded from activity aggregates |
 
-CareSens-to-Health-Connect testing must compare vendor/source timestamps with import timestamps for
-at least 24 hours. The allowable end-to-end delay must be defined before acceptance.
+End-to-end testing must compare sensor, CareSens app, xDrip, Nightscout, phone-import, and
+watch-display timestamps for at least 24 hours. Define acceptable latency and outage behavior before
+acceptance. This live-server validation is separate from unit tests and must not place private
+glucose data in source control or test reports.
 
 ## Coaching scenarios
 
@@ -355,19 +380,25 @@ or interaction performance warrants them.
 
 - Verify Android backup remains disabled.
 - Verify logs and crash reports contain no glucose values or raw health records.
-- In the debug variant, confirm xDrip is rejected below Android 14, rejects malformed samples, and
-  accepts data only when Android reports `com.eveningoutpost.dexdrip` as the sender package.
-- Verify the release merged manifest has no xDrip receiver or receive permission and the release UI
-  cannot select xDrip; verify the release policy converts a persisted debug xDrip selection to
-  Health Connect before repository access.
-- Threat-test the remaining absence of xDrip certificate pinning before any future production
-  enablement.
+- Verify both debug and release merged manifests contain no xDrip receiver or receive permission,
+  Settings exposes no xDrip selection, and every persisted legacy provider mode migrates to
+  Nightscout before repository access.
+- Verify Nightscout URLs reject embedded credentials, query strings, and fragments.
+- Verify future authentication credentials cannot enter DataStore, Wear Data Layer, export output,
+  logs, errors, or crash reports.
+- Verify HTTPS is the default, HTTP requires an explicit opt-out, and HTTP produces a visible
+  warning. Threat-test cleartext transport before allowing it in any release policy.
+- Verify one configured server can never receive another server's conditional-request metadata,
+  cached reading, history query, or future credential.
+- Threat-test the retained inactive xDrip adapter and its lack of certificate pinning before any
+  future enablement.
 - Verify Data Layer rejects mismatched package/signature installations.
 - Verify permissions can be revoked without crashes.
 - Verify uninstall removes local app data and does not delete source Health Connect records.
 - Export a large synthetic multi-year history through local and cloud-backed document providers;
-  verify bounded memory, valid schema/escaping, all six Room tables, every effective setting,
-  cancellation/error behavior, and no extra cache copy.
+  verify bounded memory, valid schema/escaping, all six Room tables, every exported coaching
+  setting, explicit exclusion of Nightscout configuration, cancellation/error behavior, and no
+  extra cache copy.
 - Confirm erase requires explicit confirmation, empties all Room tables, clears settings to
   defaults, removes phone notifications, and does not alter Health Connect/source records or
   permissions.
@@ -376,7 +407,8 @@ or interaction performance warrants them.
 - Confirm delayed commands from before erase are rejected and deleted while commands created from
   the new watch reset epoch still apply normally.
 - Confirm export, erase, provider ingestion/refresh, follow-up finalization, settings/meal writes,
-  and phone/watch quick actions remain serialized under long-running and cancellation scenarios.
+  and phone/watch quick actions cannot cross the mutation boundary; verify local operations
+  preempt a long-running provider request and canceled WorkManager jobs retry safely.
 - Exercise erase against concurrent refresh, queued/running WorkManager work, process death, reboot,
   unavailable Google Play services, and a watch that reconnects days later.
 - Perform dependency, manifest-export, PendingIntent, and release-signing review.
@@ -387,24 +419,27 @@ A release candidate is acceptable only when:
 
 - all unit, lint, compile, assemble, WFF, and memory checks are green;
 - signed phone and Wear builds synchronize on the final certificate;
-- Health Connect manual foreground and gated background behavior is proven on target devices;
-- Health Connect multi-writer discovery, explicit selection, persistence, and missing-source
-  behavior are proven on target phones;
-- at least one authorized glucose route meets a written latency/reliability target;
+- Nightscout configuration, active-server switching, isolated cache/history, bounded retry,
+  recovery, HTTPS behavior, and public-endpoint compatibility are proven on target phones;
+- the complete CareSens app → xDrip → Nightscout → phone → watch route meets a written
+  latency/reliability target;
+- Health Connect activity foreground and gated background behavior is proven on target devices;
 - Galaxy Watch8 touch, AOD, complication, and battery tests pass;
 - medical/wellness wording and privacy disclosures are reviewed;
-- xDrip remains absent from the release manifest and provider selector until a verified sender
-  contract and explicit security review justify changing that boundary;
+- xDrip broadcast and direct CareSens communication remain absent from both manifests and the
+  provider selector;
 - no known severity-high defect remains;
 - APK/AAB hashes and test evidence are archived.
 
 ## Currently unverified external gates
 
-- authorized CareSens Air data route;
-- CareSens/Samsung Health/Health Connect end-to-end latency;
+- the intended live Nightscout server and its public-access configuration;
+- CareSens app/xDrip/Nightscout/phone/watch end-to-end latency and outage recovery;
+- multi-server switching and isolation on physical phones;
+- TLS, DNS, captive-portal, battery-saver, reboot, and background WorkManager behavior;
 - Galaxy Watch8 compatibility and power behavior;
 - Samsung Health Data SDK partner access;
 - physical Watch8 touch, AOD, reboot, and phone/watch disconnect behavior;
 - Android instrumentation tests on representative devices/emulators;
 - release signing and Google Play policy review;
-- real-device Health Connect background execution after denial, reboot, and process death.
+- real-device Health Connect activity background execution after denial, reboot, and process death.

@@ -17,6 +17,9 @@ import javax.inject.Singleton
 class CareSensAirProvider @Inject constructor() : GlucoseProvider {
     override val id = PROVIDER_ID
 
+    override fun handlesSource(sourceId: String): Boolean =
+        sourceId == PROVIDER_ID || sourceId.startsWith("$PROVIDER_ID:")
+
     override suspend fun status() = ProviderStatus(
         providerId = id,
         displayName = "CareSens Air",
@@ -26,8 +29,14 @@ class CareSensAirProvider @Inject constructor() : GlucoseProvider {
 
     override suspend fun readSince(startEpochMillis: Long): List<GlucoseReading> = emptyList()
 
+    override suspend fun readSinceExactSource(
+        sourceId: String,
+        startEpochMillis: Long,
+    ): List<GlucoseReading> = emptyList()
+
+    override suspend fun clearRuntimeCache() = Unit
+
     companion object {
         const val PROVIDER_ID = "caresens_air"
     }
 }
-

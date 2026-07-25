@@ -1,24 +1,2 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
-
-    <uses-permission
-        android:name="com.eveningoutpost.dexdrip.permissions.RECEIVE_BG_ESTIMATE" />
-
-    <application>
-        <!--
-          Unofficial xDrip compatibility is intentionally debug-only until the sender contract
-          is documented and verified end-to-end. Android 14+ sender attribution is also checked
-          in XdripBroadcastReceiver before any payload is accepted.
-        -->
-        <receiver
-            android:name=".background.XdripBroadcastReceiver"
-            android:exported="true"
-            tools:ignore="ExportedReceiver">
-            <intent-filter>
-                <action android:name="com.eveningoutpost.dexdrip.BgEstimate" />
-            </intent-filter>
-        </receiver>
-    </application>
-</manifest>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

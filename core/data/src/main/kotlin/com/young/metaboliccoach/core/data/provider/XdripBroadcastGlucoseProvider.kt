@@ -2,6 +2,7 @@ package com.young.metaboliccoach.core.data.provider
 
 import android.os.Build
 import com.young.metaboliccoach.core.data.db.GlucoseDao
+import com.young.metaboliccoach.core.data.db.toModel
 import com.young.metaboliccoach.core.model.GlucoseReading
 import com.young.metaboliccoach.core.model.ProviderAvailability
 import com.young.metaboliccoach.core.model.ProviderStatus
@@ -19,6 +20,9 @@ class XdripBroadcastGlucoseProvider @Inject constructor(
     private val glucoseDao: GlucoseDao,
 ) : GlucoseProvider {
     override val id = PROVIDER_ID
+
+    override fun handlesSource(sourceId: String): Boolean =
+        sourceId == PROVIDER_ID || sourceId.startsWith("$PROVIDER_ID:")
 
     override suspend fun status(): ProviderStatus {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -43,6 +47,17 @@ class XdripBroadcastGlucoseProvider @Inject constructor(
     }
 
     override suspend fun readSince(startEpochMillis: Long): List<GlucoseReading> = emptyList()
+
+    override suspend fun readSinceExactSource(
+        sourceId: String,
+        startEpochMillis: Long,
+    ): List<GlucoseReading> = glucoseDao.readingsBetweenExactSource(
+        sourceId = sourceId,
+        startEpochMillis = startEpochMillis,
+        endEpochMillis = System.currentTimeMillis(),
+    ).map { it.toModel() }
+
+    override suspend fun clearRuntimeCache() = Unit
 
     companion object {
         const val PROVIDER_ID = "xdrip_broadcast"

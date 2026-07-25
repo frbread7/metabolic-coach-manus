@@ -18,29 +18,33 @@ and the final privacy policy require qualified legal/regulatory review.
 
 | Category | Examples | Source | Local destination |
 | --- | --- | --- | --- |
-| Glucose | Value, trend/rate, delta, sample/import time, source package | Health Connect or debug-only xDrip broadcast | Phone Room; latest state on watch |
+| Glucose | Value, trend/rate, delta, sample/import time, exact server-derived source ID | Active Nightscout server | Phone Room; latest normalized state on watch |
 | Activity | Steps, floors, heart rate, active calories, last movement, daily exercise-session count/duration | Health Connect | Phone Room; latest state on watch |
 | Behavior | Meal markers, walk/stair sessions, completion, immutable phone-authored recommendation snapshots, and exact trigger/recommendation/activity-dose/baseline/source/follow-up provenance | User actions, coach actions, settings-at-start, and selected glucose source | Phone Room; active/pending session replica and generic command outbox on watch |
-| Preferences | Thresholds, time windows, units, reminders, theme/font, selected Health Connect glucose-writer package, phone sync instance/revision/reset token, and bounded terminal-command history | User and application-generated metadata | Phone DataStore; synchronized watch state |
+| Nightscout configuration | Server names/base URLs, explicit active server, HTTPS policy, polling/timeout/retry values | User | Phone DataStore only; never synchronized to watch |
+| Preferences | Thresholds, time windows, units, reminders, theme/font, phone sync instance/revision/reset token, and bounded terminal-command history | User and application-generated metadata | Phone DataStore; only provider-agnostic display/coaching state is synchronized |
 | Device | Phone/watch battery percentage | Android system | Latest synchronized/display state |
 
-The app requests read-only Health Connect record permissions. It does not write back to Health
-Connect.
+The app requests read-only Health Connect activity-record permissions. It does not request
+Health Connect blood-glucose permission for Version 1 and does not write back to Health Connect.
 
 ## Data movement
 
 ```text
-Authorized source -> phone provider -> local Room/DataStore
-                                    -> Wear Data Layer -> watch local cache
+CareSens app -> xDrip+ -> Nightscout server
+                            -> phone NightscoutProvider -> local Room/DataStore
+                                                        -> Wear Data Layer -> watch local cache
 ```
 
-There is no project cloud account, analytics SDK, advertising SDK, or custom backend in the current
-source. That does not mean all data stays on a direct Bluetooth link: the official Wear OS
+The app makes outbound network requests to the user-configured Nightscout server. There is no
+project-owned cloud account, analytics SDK, advertising SDK, or custom Metabolic Coach backend in
+the current source. That does not mean all data stays on a direct Bluetooth link: Nightscout is
+already a remote service, and the official Wear OS
 [Data Layer overview](https://developer.android.com/training/wearables/data/overview) says traffic
 can route through Google infrastructure when Bluetooth is unavailable and is end-to-end encrypted.
 
-Health Connect, Google Play services, Samsung Health, CareSens, and any xDrip installation used for
-debug testing each have their own privacy behavior and policies. Metabolic Coach documentation
+Nightscout and its hosting provider, Health Connect, Google Play services, Samsung Health,
+CareSens, and xDrip each have their own privacy behavior and policies. Metabolic Coach documentation
 cannot replace those disclosures.
 
 Android backup is disabled in the phone and Wear manifests. The app provides a user-initiated local
@@ -54,21 +58,23 @@ recovery.
 - Continue without crashing when access is denied or revoked.
 - Never infer permission from a manifest declaration.
 - Treat background health access as a separate explicit permission/feature gate.
-- Do not silently select an unofficial provider when an official route is unavailable.
-- Do not silently switch between Health Connect glucose writers. Multiple unconfigured writer
-  packages pause glucose coaching until the user saves one.
+- Require an explicit active Nightscout server; never probe or silently fail over to another
+  configured server.
+- Keep every server's history, conditional-request metadata, cache, and future credential isolated.
+- Default to HTTPS. Allow HTTP only after an explicit warning-bearing opt-out for local/test use.
 
 The current alpha asks for background-read access only when Health Connect reports that feature.
-Periodic work is enabled only after the separate permission is granted; unsupported or denied
-access cancels periodic work while manual foreground Refresh remains available. The permission
-explanation and real-device grant, denial, revocation, reboot, and scheduling behavior still need
-validation before background coaching can be considered reliable.
+That permission affects activity reads. A configured Nightscout server can still schedule
+connected-network periodic work when Health Connect background activity access is unavailable.
+The permission explanation and real-device grant, denial, revocation, reboot, and scheduling
+behavior still need validation before background activity data can be considered reliable.
 
 ## Safety behavior in code
 
 The rule engine:
 
-- receives glucose only from the exact Health Connect writer package selected on the phone;
+- receives only normalized `GlucoseReading` values for the exact Nightscout server selected on the
+  phone and has no Nightscout-specific dependency;
 - displays information instead of an exercise action when glucose is missing, future-dated, or
   stale;
 - pauses exercise coaching below the user-configured low threshold;
@@ -92,14 +98,17 @@ settings, and application execution all being correct.
 ## Known safety limitations
 
 - A 15-minute WorkManager interval is inexact and may be delayed.
-- Health Connect publication latency from CareSens/Samsung is unverified.
-- Health Connect writer-package discovery and persisted selection have not been validated against
-  real CareSens/Samsung duplicate-writer, revocation, or source-reappearance scenarios.
-- No direct CareSens contract supplies vendor trend semantics.
-- Health Connect trends are inferred from consecutive values.
-- The debug-only xDrip sender-package provenance is checked only on Android 14+, no signing
-  certificate is pinned, and the sender contract is not verified end to end. Release builds omit
-  its receiver, permission, and provider selection.
+- CareSens app → xDrip+ → Nightscout → phone → watch publication latency is unverified.
+- A public Nightscout endpoint exposes glucose to anyone who can access its URL unless the server
+  is protected by its own access policy. Version 1 has no credential UI or secure credential store.
+- The app permits cleartext traffic so an explicit HTTP local/test configuration can function.
+  HTTP exposes glucose and should not be used for an internet-hosted or daily-use server.
+- Multiple configured servers do not provide automatic failover. An outage retains cached values,
+  whose age must be checked, rather than silently switching authorities.
+- Nightscout trend depends on upstream `direction`; delta/rate are inferred locally from consecutive
+  valid values and may be unavailable when samples are sparse.
+- Direct CareSens and xDrip broadcast providers are inactive. No Version 1 manifest registers an
+  xDrip receiver.
 - Prospective timing observations require complete trigger/recommendation/activity-dose/baseline/
   source/follow-up provenance, exact-source continuity, the configured sample and comparable-bucket
   gates, and a unique lowest observed median with strict quartile separation. Timing, follow-up,
@@ -121,26 +130,34 @@ settings, and application execution all being correct.
 Until these limitations are resolved or explicitly accepted, do not position the app as stable for
 daily safety-related use.
 
-## xDrip threat boundary
+## Nightscout network and authentication boundary
 
-The xDrip receiver is exported only in the debug phone variant for inter-app delivery. It rejects
-Android versions below 14, requires `BroadcastReceiver.getSentFromPackage()` to report
-`com.eveningoutpost.dexdrip`, and rejects malformed, out-of-range, stale, future, wrong-mode, and
-implausible-rate samples. The release manifest has no xDrip receiver or receive permission, and
-the release UI does not expose the provider. Release repository policy also replaces any xDrip
-selection retained from a debug install with Health Connect before data is read.
+Version 1 accepts public Nightscout base URLs and uses a no-op request authenticator. URLs may not
+contain user information, query parameters, fragments, or credentials. Nightscout URLs and
+connectivity settings stay in phone DataStore and are not sent to the watch, but the URL itself can
+still reveal a host/account identity and must be treated as sensitive configuration.
 
-The package check provides platform-reported provenance, not certificate pinning. A malicious or
-repackaged application occupying that package identity remains a risk, and the upstream sender
-contract is not yet verified. This is why the compatibility path remains debug-only. Any proposal
-to enable it in production requires a documented sender contract, authenticated or
-signature-protected trust decision, and explicit security review.
+HTTPS protects the request in transit subject to normal Android trust-store behavior. Disabling
+**Require HTTPS** allows cleartext HTTP and exposes glucose and response metadata to the local
+network path. The Nightscout client does not follow redirects, preventing a validated request from
+moving to another origin or from HTTPS to cleartext. The application does not implement
+certificate pinning.
+
+Future authenticated support must use the separate request-authenticator boundary with a
+phone-only secure credential store, per-server credential scoping, redacted diagnostics, and
+explicit lifecycle/deletion behavior. Credentials must never enter a URL, ordinary DataStore,
+personal-data export, Wear Data Layer, logs, or crash reports.
+
+The retained inactive xDrip adapter is not a Version 1 trust path. Any proposal to register an
+exported broadcast receiver requires a documented sender contract, authenticated or
+signature-protected trust decision, malformed-input validation, and explicit security review.
 
 ## Logging and diagnostics
 
 Production logging must not include:
 
 - glucose values, trends, or timestamps;
+- Nightscout response bodies, request/response headers, server URLs, tokens, or secrets;
 - raw Health Connect records;
 - broadcast extras;
 - meal or intervention history;
@@ -159,35 +176,38 @@ uninstalled. Expired recommendation snapshots are opportunistically pruned when 
 recommendation is authored once their validity ended more than seven days earlier. There is no
 configurable retention period for glucose, activity, meal, or intervention history.
 
-The phone Settings screen can export effective settings and every application Room row through the
-Android document picker. The schema-versioned JSON is written directly to the selected destination,
-is not encrypted by Metabolic Coach, and may contain sensitive health/source metadata. The user
-must choose and protect an appropriate destination. Technical phone command-history/reset metadata
-is not part of the user data document.
+The phone Settings screen can export coaching settings and every application Room row through the
+Android document picker. Nightscout server configuration and future credentials are excluded. The
+schema-versioned JSON is written directly to the selected destination, is not encrypted by
+Metabolic Coach, and may contain sensitive health/source metadata. The user must choose and protect
+an appropriate destination. Technical phone command-history/reset metadata is not part of the user
+data document.
 
 Confirmed in-app erase:
 
 - serializes with export and all known phone-owned local data writers so no operation crosses the
   deletion boundary;
+- preempts an in-flight coroutine-cancellable provider request before entering that boundary;
 - cancels known Metabolic Coach refresh and intervention follow-up work on a best-effort basis;
 - deletes every application Room table and clears the complete coaching-settings DataStore;
+- clears provider process-memory caches and conditional-request metadata;
 - clears the phone coaching notification;
 - rotates the synchronization instance and durable reset token;
 - publishes an empty state so Wear clears its state/session and queued-command stores, including
   after an offline reconnection;
 - rejects delayed watch commands from the pre-erase data epoch.
 
-Erase does not revoke Health Connect/CGM permissions or delete records in source applications.
-Opening or refreshing the app, receiving supported provider data, or a future scheduled run can
-therefore collect new records again. A user who wants collection to stop must revoke the applicable
-source permissions separately.
+Erase removes saved Nightscout configuration and does not revoke Health Connect/CGM permissions or
+delete records in Nightscout or source applications. After the user reconfigures a server, opening
+or refreshing the app or a scheduled run can collect new records again. A user who wants
+collection to stop must revoke Health Connect access and change Nightscout access separately.
 
 Uninstalling:
 
 - the phone app removes its local database/settings;
 - the Wear app removes its local cache/session;
 - the watch-face package removes face resources;
-- source data in Health Connect/Samsung Health/CareSens, or a debug xDrip source, is not deleted.
+- source data in Nightscout, Health Connect, Samsung Health, CareSens, or xDrip is not deleted.
 
 A production release still needs configurable retention policy, target-device lifecycle testing of
 export/erase, and legal review of the export/deletion disclosures.
@@ -199,7 +219,7 @@ The published policy must accurately describe:
 - legal entity/contact and policy date;
 - health/activity/device data types;
 - purposes for collection and processing;
-- Health Connect and Data Layer use;
+- Nightscout network access, Health Connect activity, and Data Layer use;
 - whether Google infrastructure can relay watch synchronization;
 - local retention, deletion, and any backup behavior;
 - third-party providers and links to their policies;
@@ -215,14 +235,16 @@ medical-device, clinical, or regulatory compliance without a formal assessment.
 
 Before daily-use recommendation:
 
-1. prove one authorized provider's freshness and outage behavior;
-2. validate foreground/background Health Connect behavior through denial, reboot, and process
-   death on target phones;
+1. prove the intended Nightscout deployment's freshness, TLS/access policy, outage behavior,
+   bounded retry, cached/stale behavior, and explicit multi-server switching;
+2. validate Nightscout WorkManager and Health Connect activity behavior through denial, network
+   loss, reboot, battery restrictions, and process death on target phones;
 3. validate intervention/follow-up recovery and observation wording with controlled synthetic
    scenarios;
 4. complete Galaxy Watch8 touch/AOD/battery/reboot/disconnect testing;
-5. verify xDrip remains absent from the release manifest and provider UI, and threat-model exported
-   components plus Data Layer command/revision/acknowledgement handling;
+5. verify direct CareSens and xDrip broadcast remain absent from both manifests and provider UI,
+   and threat-model HTTP opt-out, exported components, and Data Layer
+   command/revision/acknowledgement handling;
 6. perform wellness/medical wording review;
 7. publish user-facing privacy and deletion controls;
 8. complete production signing, instrumentation, and Play policy review;

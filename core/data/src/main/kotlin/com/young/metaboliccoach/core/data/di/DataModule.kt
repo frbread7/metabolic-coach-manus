@@ -5,6 +5,17 @@ import androidx.room.Room
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.young.metaboliccoach.core.data.db.MetabolicCoachDatabase
+import com.young.metaboliccoach.core.data.provider.CareSensAirProvider
+import com.young.metaboliccoach.core.data.provider.GlucoseProvider
+import com.young.metaboliccoach.core.data.provider.HealthConnectGlucoseProvider
+import com.young.metaboliccoach.core.data.provider.XdripBroadcastGlucoseProvider
+import com.young.metaboliccoach.core.data.provider.nightscout.CoroutineNightscoutRetrySleeper
+import com.young.metaboliccoach.core.data.provider.nightscout.NightscoutApiClient
+import com.young.metaboliccoach.core.data.provider.nightscout.NightscoutProvider
+import com.young.metaboliccoach.core.data.provider.nightscout.NightscoutRequestAuthenticator
+import com.young.metaboliccoach.core.data.provider.nightscout.NightscoutRetrySleeper
+import com.young.metaboliccoach.core.data.provider.nightscout.NoOpNightscoutRequestAuthenticator
+import com.young.metaboliccoach.core.data.provider.nightscout.OkHttpNightscoutApiClient
 import com.young.metaboliccoach.core.data.repository.ActivityRepositoryImpl
 import com.young.metaboliccoach.core.data.repository.CoachingRepositoryImpl
 import com.young.metaboliccoach.core.data.repository.GlucoseRepositoryImpl
@@ -17,16 +28,20 @@ import com.young.metaboliccoach.core.domain.CoachRuleEngine
 import com.young.metaboliccoach.core.domain.CoachingRepository
 import com.young.metaboliccoach.core.domain.GlucoseRepository
 import com.young.metaboliccoach.core.domain.ObservationAnalyzer
+import com.young.metaboliccoach.core.domain.NightscoutSettingsRepository
+import com.young.metaboliccoach.core.domain.NightscoutSettingsValidator
 import com.young.metaboliccoach.core.domain.PersonalDataRepository
 import com.young.metaboliccoach.core.domain.SettingsRepository
 import com.young.metaboliccoach.core.domain.SettingsValidator
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
+import dagger.multibindings.IntoSet
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
+import okhttp3.OkHttpClient
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -45,6 +60,12 @@ abstract class RepositoryModule {
 
     @Binds
     @Singleton
+    abstract fun bindNightscoutSettingsRepository(
+        impl: SettingsRepositoryImpl,
+    ): NightscoutSettingsRepository
+
+    @Binds
+    @Singleton
     abstract fun bindCoachingRepository(impl: CoachingRepositoryImpl): CoachingRepository
 
     @Binds
@@ -56,6 +77,46 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindCoachTimeSource(impl: SystemCoachTimeSource): CoachTimeSource
+
+    @Binds
+    @Singleton
+    abstract fun bindNightscoutApiClient(
+        impl: OkHttpNightscoutApiClient,
+    ): NightscoutApiClient
+
+    @Binds
+    @Singleton
+    abstract fun bindNightscoutAuthenticator(
+        impl: NoOpNightscoutRequestAuthenticator,
+    ): NightscoutRequestAuthenticator
+
+    @Binds
+    @Singleton
+    abstract fun bindNightscoutRetrySleeper(
+        impl: CoroutineNightscoutRetrySleeper,
+    ): NightscoutRetrySleeper
+
+    @Binds
+    @IntoSet
+    abstract fun bindNightscoutProvider(impl: NightscoutProvider): GlucoseProvider
+
+    @Binds
+    @IntoSet
+    abstract fun bindHealthConnectGlucoseProvider(
+        impl: HealthConnectGlucoseProvider,
+    ): GlucoseProvider
+
+    @Binds
+    @IntoSet
+    abstract fun bindXdripGlucoseProvider(
+        impl: XdripBroadcastGlucoseProvider,
+    ): GlucoseProvider
+
+    @Binds
+    @IntoSet
+    abstract fun bindCareSensGlucoseProvider(
+        impl: CareSensAirProvider,
+    ): GlucoseProvider
 }
 
 @Module
@@ -98,6 +159,17 @@ object DataModule {
 
     @Provides
     fun provideSettingsValidator() = SettingsValidator()
+
+    @Provides
+    fun provideNightscoutSettingsValidator() = NightscoutSettingsValidator()
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
+        .retryOnConnectionFailure(false)
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .build()
 
 }
 

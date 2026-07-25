@@ -15,6 +15,7 @@ keystore.properties
 *.apk
 *.aab
 !artifacts/.gitkeep
+artifacts/*.zip
 
 # OMX runtime artifacts are local execution state. Keep the durable plan only.
 .omx/state/

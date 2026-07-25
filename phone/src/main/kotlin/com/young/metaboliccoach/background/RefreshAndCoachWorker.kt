@@ -23,6 +23,8 @@ class RefreshAndCoachWorker @AssistedInject constructor(
                 ),
             )
             Result.success()
+        } catch (_: PhoneDataOperationPreemptedException) {
+            Result.retry()
         } catch (cause: CancellationException) {
             throw cause
         } catch (_: Throwable) {

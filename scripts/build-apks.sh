@@ -40,6 +40,7 @@ gradle_args=(
     --max-workers=1
     --no-configuration-cache
     --no-build-cache
+    --rerun-tasks
     -Pkotlin.compiler.execution.strategy=in-process
     -Pkotlin.incremental=false
 )
@@ -125,3 +126,5 @@ install -m 0644 \
     "$repo_root/artifacts/metabolic-coach-watchface-$variant.apk"
 
 sha256sum "$repo_root"/artifacts/metabolic-coach-*-"$variant".apk
+
+MC_BUILD_VARIANT="$variant" ./scripts/package-release.sh

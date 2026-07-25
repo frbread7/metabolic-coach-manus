@@ -12,11 +12,17 @@ import com.young.metaboliccoach.core.model.PersonalObservationKind
 class ObservationAnalyzer {
     fun analyze(
         sessions: List<InterventionSession>,
+        exactSourceId: String,
         settings: CoachSettings,
         mealMarkers: List<MealMarker> = emptyList(),
     ): List<PersonalObservation> {
+        require(exactSourceId.isNotBlank()) { "An exact glucose source is required." }
+        val sourceSessions = sessions.filter {
+            it.baselineGlucoseSourceId == exactSourceId &&
+                it.followUpGlucoseSourceId == exactSourceId
+        }
         val eligibleOutcomes = eligibleOutcomes(
-            sessions = sessions,
+            sessions = sourceSessions,
             mealMarkers = mealMarkers,
         )
         val effectObservations = InterventionType.entries.mapNotNull { type ->
@@ -43,7 +49,7 @@ class ObservationAnalyzer {
             minimumComparableBuckets = settings.minimumComparableTimingBuckets,
             bucketMinutes = settings.interventionTimingBucketMinutes,
             kind = PersonalObservationKind.INTERVENTION_TIMING,
-            totalSessionCount = sessions.size,
+            totalSessionCount = sourceSessions.size,
         )
         val postMealTiming = timingObservations(
             candidates = timingCandidates.filter {
@@ -53,7 +59,7 @@ class ObservationAnalyzer {
             minimumComparableBuckets = settings.minimumComparableTimingBuckets,
             bucketMinutes = settings.postMealTimingBucketMinutes,
             kind = PersonalObservationKind.POST_MEAL_ACTIVITY_TIMING,
-            totalSessionCount = sessions.size,
+            totalSessionCount = sourceSessions.size,
         )
         return effectObservations + interventionTiming + postMealTiming
     }

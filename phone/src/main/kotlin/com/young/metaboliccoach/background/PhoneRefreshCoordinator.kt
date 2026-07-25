@@ -22,10 +22,10 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
 /**
- * Owns the phone's refresh-coach-publish transaction.
+ * Owns the phone's refresh-coach-publish flow.
  *
- * A single process-wide mutex prevents periodic work, foreground refreshes, provider broadcasts,
- * and quick actions from publishing mutually stale snapshots.
+ * Provider retrieval is cancellable and preemptible but still cannot cross an erase boundary.
+ * Snapshot generation and publication remain serialized with commands and other local mutations.
  */
 @Singleton
 class PhoneRefreshCoordinator @Inject constructor(
@@ -43,57 +43,61 @@ class PhoneRefreshCoordinator @Inject constructor(
     private val personalDataRepository: PersonalDataRepository,
     private val mutationGate: PhoneDataMutationGate,
 ) {
-    suspend fun refresh(refreshProviders: Boolean) = mutationGate.withLock {
+    suspend fun refresh(refreshProviders: Boolean) {
         if (refreshProviders) {
-            coroutineScope {
-                val glucoseRefresh = async { glucoseRepository.refresh() }
-                val activityRefresh = async { activityRepository.refresh() }
-                glucoseRefresh.await()
-                activityRefresh.await()
+            mutationGate.withPreemptibleProviderLock {
+                coroutineScope {
+                    val glucoseRefresh = async { glucoseRepository.refresh() }
+                    val activityRefresh = async { activityRepository.refresh() }
+                    glucoseRefresh.await()
+                    activityRefresh.await()
+                }
             }
         }
 
-        followUpScheduler.scheduleAll(coachingRepository.pendingFollowUpSessions())
-        val activeSession = coachingRepository.latestActiveSession()
-        val generatedRecommendation = if (activeSession == null) {
-            coachingRepository.observeCurrentRecommendation().first()
-        } else {
-            null
-        }
-        val recommendation = if (generatedRecommendation is CoachRecommendation.Action) {
-            coachingRepository.rememberRecommendation(generatedRecommendation)
-        } else {
-            generatedRecommendation
-        }
-        val syncMetadata = syncMetadataStore.nextPublication()
-        watchSyncRepository.publish(
-            WatchState(
-                glucose = glucoseRepository.observeLatest().first(),
-                activity = activityRepository.observeToday().first(),
-                recommendation = recommendation,
-                settings = settingsRepository.observe().first(),
-                phoneBatteryPercent = phoneBatteryPercent(),
-                generatedAtEpochMillis = System.currentTimeMillis(),
-                activeSession = activeSession,
-                phoneInstanceId = syncMetadata.phoneInstanceId,
-                stateRevision = syncMetadata.stateRevision,
-                lastSessionCommandAck = syncMetadata.lastSessionCommandAck,
-                dataResetId = syncMetadata.dataResetId,
-            ),
-        )
-
-        if (recommendation is CoachRecommendation.Action) {
-            // The successful persistent watch-state publication is the canonical prompt
-            // delivery. The phone notification below is an optional local mirror.
-            val newlyPublished = coachingRepository.recordRecommendationPublished(
-                recommendationId = recommendation.id,
-                nowEpochMillis = System.currentTimeMillis(),
+        mutationGate.withLock {
+            followUpScheduler.scheduleAll(coachingRepository.pendingFollowUpSessions())
+            val activeSession = coachingRepository.latestActiveSession()
+            val generatedRecommendation = if (activeSession == null) {
+                coachingRepository.observeCurrentRecommendation().first()
+            } else {
+                null
+            }
+            val recommendation = if (generatedRecommendation is CoachRecommendation.Action) {
+                coachingRepository.rememberRecommendation(generatedRecommendation)
+            } else {
+                generatedRecommendation
+            }
+            val syncMetadata = syncMetadataStore.nextPublication()
+            watchSyncRepository.publish(
+                WatchState(
+                    glucose = glucoseRepository.observeLatest().first(),
+                    activity = activityRepository.observeToday().first(),
+                    recommendation = recommendation,
+                    settings = settingsRepository.observe().first(),
+                    phoneBatteryPercent = phoneBatteryPercent(),
+                    generatedAtEpochMillis = System.currentTimeMillis(),
+                    activeSession = activeSession,
+                    phoneInstanceId = syncMetadata.phoneInstanceId,
+                    stateRevision = syncMetadata.stateRevision,
+                    lastSessionCommandAck = syncMetadata.lastSessionCommandAck,
+                    dataResetId = syncMetadata.dataResetId,
+                ),
             )
-            if (newlyPublished) {
-                notificationManager.showCoachPrompt(recommendation)
+
+            if (recommendation is CoachRecommendation.Action) {
+                // The successful persistent watch-state publication is the canonical prompt
+                // delivery. The phone notification below is an optional local mirror.
+                val newlyPublished = coachingRepository.recordRecommendationPublished(
+                    recommendationId = recommendation.id,
+                    nowEpochMillis = System.currentTimeMillis(),
+                )
+                if (newlyPublished) {
+                    notificationManager.showCoachPrompt(recommendation)
+                }
+            } else {
+                notificationManager.clearCoachPrompt()
             }
-        } else {
-            notificationManager.clearCoachPrompt()
         }
     }
 
@@ -117,6 +121,12 @@ class PhoneRefreshCoordinator @Inject constructor(
                 backgroundWorkCancelled = false
             }
 
+            val runtimeCachesCleared = try {
+                glucoseRepository.clearRuntimeCaches()
+                true
+            } catch (_: Exception) {
+                false
+            }
             val resetMetadata = syncMetadataStore.beginDataReset()
             commandProcessor.clearDeferredForDataReset()
             personalDataRepository.eraseAll()
@@ -152,6 +162,7 @@ class PhoneRefreshCoordinator @Inject constructor(
             LocalDataEraseResult(
                 watchResetPublished = watchResetPublished,
                 backgroundWorkCancelled = backgroundWorkCancelled,
+                runtimeCachesCleared = runtimeCachesCleared,
             )
         }
     }
@@ -165,4 +176,5 @@ class PhoneRefreshCoordinator @Inject constructor(
 data class LocalDataEraseResult(
     val watchResetPublished: Boolean,
     val backgroundWorkCancelled: Boolean,
+    val runtimeCachesCleared: Boolean,
 )

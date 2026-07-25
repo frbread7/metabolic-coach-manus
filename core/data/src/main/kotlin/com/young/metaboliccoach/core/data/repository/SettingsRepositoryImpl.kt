@@ -8,17 +8,24 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.young.metaboliccoach.core.data.db.RecommendationSnapshotDao
 import com.young.metaboliccoach.core.domain.SettingsRepository
 import com.young.metaboliccoach.core.domain.SettingsValidator
+import com.young.metaboliccoach.core.domain.NightscoutSettingsRepository
+import com.young.metaboliccoach.core.domain.NightscoutSettingsValidator
+import com.young.metaboliccoach.core.domain.requiresRecommendationInvalidation
 import com.young.metaboliccoach.core.model.CoachSettings
 import com.young.metaboliccoach.core.model.CoachTheme
 import com.young.metaboliccoach.core.model.DefaultCoachSettings
+import com.young.metaboliccoach.core.model.DefaultNightscoutSettings
 import com.young.metaboliccoach.core.model.GlucoseProviderMode
 import com.young.metaboliccoach.core.model.GlucoseUnit
+import com.young.metaboliccoach.core.model.NightscoutSettings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.settingsDataStore by preferencesDataStore(
@@ -30,7 +37,9 @@ private val Context.settingsDataStore by preferencesDataStore(
 class SettingsRepositoryImpl @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val validator: SettingsValidator,
-) : SettingsRepository {
+    private val nightscoutValidator: NightscoutSettingsValidator,
+    private val recommendationSnapshotDao: RecommendationSnapshotDao,
+) : SettingsRepository, NightscoutSettingsRepository {
     override fun observe(): Flow<CoachSettings> = context.settingsDataStore.data.map { values ->
         val defaults = DefaultCoachSettings.create()
         CoachSettings(
@@ -164,7 +173,53 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun observeNightscoutSettings(): Flow<NightscoutSettings> =
+        context.settingsDataStore.data.map { values ->
+            val defaults = DefaultNightscoutSettings.create()
+            NightscoutSettings(
+                servers = NightscoutSettingsJsonCodec.decodeServers(
+                    encoded = values[Keys.nightscoutServers],
+                    defaults = defaults.servers,
+                ),
+                activeServerId = values[Keys.nightscoutActiveServerId]
+                    ?: defaults.activeServerId,
+                pollingIntervalMinutes = values[Keys.nightscoutPollingInterval]
+                    ?: defaults.pollingIntervalMinutes,
+                connectionTimeoutSeconds = values[Keys.nightscoutConnectionTimeout]
+                    ?: defaults.connectionTimeoutSeconds,
+                retryIntervalSeconds = values[Keys.nightscoutRetryInterval]
+                    ?: defaults.retryIntervalSeconds,
+                maximumRetryAttempts = values[Keys.nightscoutMaximumRetryAttempts]
+                    ?: defaults.maximumRetryAttempts,
+                requireHttps = values[Keys.nightscoutRequireHttps]
+                    ?: defaults.requireHttps,
+            )
+        }
+
+    override suspend fun updateNightscoutSettings(settings: NightscoutSettings) {
+        val normalized = nightscoutValidator.normalize(settings)
+        val previous = observeNightscoutSettings().first()
+        if (previous.requiresRecommendationInvalidation(normalized)) {
+            // Delete first: a failed settings write may suppress a prompt, but it cannot leave a
+            // prompt tied to a different glucose source available for execution.
+            recommendationSnapshotDao.deleteAll()
+        }
+        context.settingsDataStore.edit { values ->
+            values[Keys.nightscoutServers] =
+                NightscoutSettingsJsonCodec.encodeServers(normalized.servers)
+            normalized.activeServerId?.let {
+                values[Keys.nightscoutActiveServerId] = it
+            } ?: values.remove(Keys.nightscoutActiveServerId)
+            values[Keys.nightscoutPollingInterval] = normalized.pollingIntervalMinutes
+            values[Keys.nightscoutConnectionTimeout] = normalized.connectionTimeoutSeconds
+            values[Keys.nightscoutRetryInterval] = normalized.retryIntervalSeconds
+            values[Keys.nightscoutMaximumRetryAttempts] = normalized.maximumRetryAttempts
+            values[Keys.nightscoutRequireHttps] = normalized.requireHttps
+        }
+    }
+
     override suspend fun reset() {
+        recommendationSnapshotDao.deleteAll()
         context.settingsDataStore.edit { values ->
             values.clear()
         }
@@ -219,5 +274,14 @@ class SettingsRepositoryImpl @Inject constructor(
         val notificationsEnabled = booleanPreferencesKey("notifications_enabled")
         val theme = stringPreferencesKey("theme")
         val fontScale = floatPreferencesKey("font_scale")
+        val nightscoutServers = stringPreferencesKey("nightscout_servers_json")
+        val nightscoutActiveServerId = stringPreferencesKey("nightscout_active_server_id")
+        val nightscoutPollingInterval = intPreferencesKey("nightscout_polling_interval_minutes")
+        val nightscoutConnectionTimeout =
+            intPreferencesKey("nightscout_connection_timeout_seconds")
+        val nightscoutRetryInterval = intPreferencesKey("nightscout_retry_interval_seconds")
+        val nightscoutMaximumRetryAttempts =
+            intPreferencesKey("nightscout_maximum_retry_attempts")
+        val nightscoutRequireHttps = booleanPreferencesKey("nightscout_require_https")
     }
 }

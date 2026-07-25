@@ -3,16 +3,19 @@ package com.young.metaboliccoach.core.data.repository
 import com.young.metaboliccoach.core.data.db.GlucoseDao
 import com.young.metaboliccoach.core.data.db.toEntity
 import com.young.metaboliccoach.core.data.db.toModel
-import com.young.metaboliccoach.core.data.provider.CareSensAirProvider
 import com.young.metaboliccoach.core.data.provider.GlucoseProvider
 import com.young.metaboliccoach.core.data.provider.HealthConnectGlucoseProvider
-import com.young.metaboliccoach.core.data.provider.XdripBroadcastGlucoseProvider
+import com.young.metaboliccoach.core.data.provider.nightscout.NightscoutProvider
 import com.young.metaboliccoach.core.domain.GlucoseRepository
+import com.young.metaboliccoach.core.domain.NightscoutSettingsRepository
 import com.young.metaboliccoach.core.domain.SettingsRepository
+import com.young.metaboliccoach.core.domain.sourceId
 import com.young.metaboliccoach.core.model.CoachSettings
 import com.young.metaboliccoach.core.model.GlucoseDataOrigin
 import com.young.metaboliccoach.core.model.GlucoseReading
 import com.young.metaboliccoach.core.model.GlucoseProviderMode
+import com.young.metaboliccoach.core.model.GlucoseProviderState
+import com.young.metaboliccoach.core.model.NightscoutSettings
 import com.young.metaboliccoach.core.model.ProviderAvailability
 import com.young.metaboliccoach.core.model.ProviderStatus
 import javax.inject.Inject
@@ -22,6 +25,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -30,34 +34,60 @@ import kotlinx.coroutines.flow.map
 @OptIn(ExperimentalCoroutinesApi::class)
 class GlucoseRepositoryImpl @Inject constructor(
     private val glucoseDao: GlucoseDao,
-    healthConnect: HealthConnectGlucoseProvider,
-    careSensAir: CareSensAirProvider,
-    xdrip: XdripBroadcastGlucoseProvider,
+    providers: Set<@JvmSuppressWildcards GlucoseProvider>,
     private val settingsRepository: SettingsRepository,
+    private val nightscoutSettingsRepository: NightscoutSettingsRepository,
 ) : GlucoseRepository {
-    private val providers: Map<GlucoseProviderMode, GlucoseProvider> = mapOf(
-        GlucoseProviderMode.HEALTH_CONNECT to healthConnect,
-        GlucoseProviderMode.XDRIP_BROADCAST to xdrip,
-        GlucoseProviderMode.CARESENS_PARTNER to careSensAir,
-    )
+    private val providersById = providers.associateBy(GlucoseProvider::id)
+
+    init {
+        require(providersById.size == providers.size) {
+            "Glucose provider IDs must be unique."
+        }
+    }
+
     private val providerStatus = MutableStateFlow(
         ProviderStatus(
-            providerId = HealthConnectGlucoseProvider.PROVIDER_ID,
-            displayName = "Health Connect glucose",
-            availability = ProviderAvailability.PERMISSION_REQUIRED,
-            detail = "Provider status has not been refreshed.",
+            providerId = NightscoutProvider.PROVIDER_ID,
+            displayName = "Nightscout",
+            availability = ProviderAvailability.CONFIGURATION_REQUIRED,
+            detail = "Configure and select a Nightscout server in Settings.",
         ),
     )
     private val availableOrigins = MutableStateFlow<List<GlucoseDataOrigin>>(emptyList())
 
     override fun observeLatest(): Flow<GlucoseReading?> =
-        settingsRepository.observe().flatMapLatest { settings ->
-            settings.selectedGlucoseSourcePrefix()?.let {
+        combine(
+            settingsRepository.observe(),
+            nightscoutSettingsRepository.observeNightscoutSettings(),
+        ) { settings, nightscoutSettings ->
+            settings.selectedGlucoseSourcePrefix(nightscoutSettings)
+        }.flatMapLatest { sourcePrefix ->
+            sourcePrefix?.let {
                 glucoseDao.observeLatestForSource(it)
             } ?: flowOf(null)
         }.map { it?.toModel() }
 
     override fun observeProviderStatus(): Flow<ProviderStatus> = providerStatus
+
+    override fun observeProviderState(): Flow<GlucoseProviderState> =
+        combine(
+            settingsRepository.observe(),
+            nightscoutSettingsRepository.observeNightscoutSettings(),
+        ) { settings, nightscoutSettings ->
+            settings to nightscoutSettings
+        }.flatMapLatest { (settings, nightscoutSettings) ->
+            val provider = providerFor(settings.glucoseProviderMode)
+            provider.observeState().map { providerState ->
+                if (settings.glucoseProviderMode.supportedForCurrentBuild() !=
+                    GlucoseProviderMode.NIGHTSCOUT
+                ) {
+                    providerState
+                } else {
+                    providerState.forSelectedNightscoutSource(nightscoutSettings)
+                }
+            }
+        }
 
     override fun observeAvailableOrigins(): Flow<List<GlucoseDataOrigin>> = availableOrigins
 
@@ -65,8 +95,11 @@ class GlucoseRepositoryImpl @Inject constructor(
         startEpochMillis: Long,
         endEpochMillis: Long,
     ): List<GlucoseReading> {
-        val sourcePrefix = settingsRepository.observe().first()
-            .selectedGlucoseSourcePrefix()
+        val settings = settingsRepository.observe().first()
+        val nightscoutSettings =
+            nightscoutSettingsRepository.observeNightscoutSettings().first()
+        val sourcePrefix = settings
+            .selectedGlucoseSourcePrefix(nightscoutSettings)
             ?: return emptyList()
         return glucoseDao.readingsBetweenForSource(
             sourcePrefix = sourcePrefix,
@@ -88,7 +121,7 @@ class GlucoseRepositoryImpl @Inject constructor(
     override suspend fun refresh() {
         val settings = settingsRepository.observe().first()
         val mode = settings.glucoseProviderMode.supportedForCurrentBuild()
-        val selected = requireNotNull(providers[mode])
+        val selected = providerFor(mode)
         if (mode != GlucoseProviderMode.HEALTH_CONNECT) {
             availableOrigins.value = emptyList()
         }
@@ -134,6 +167,51 @@ class GlucoseRepositoryImpl @Inject constructor(
             )
         } else {
             glucoseDao.insertAll(readings.map { it.toEntity() })
+        }
+    }
+
+    override suspend fun refreshExactSource(sourceId: String) {
+        val matchingProviders = providersById.values.filter {
+            it.handlesSource(sourceId)
+        }
+        require(matchingProviders.size == 1) {
+            "Expected one glucose provider for the requested exact source."
+        }
+        val provider = matchingProviders.single()
+        val readings = provider.readSinceExactSource(
+            sourceId = sourceId,
+            startEpochMillis = System.currentTimeMillis() - HISTORY_LOOKBACK_MILLIS,
+        )
+        if (readings.isNotEmpty()) {
+            glucoseDao.insertAll(readings.map { it.toEntity() })
+        }
+    }
+
+    override suspend fun clearRuntimeCaches() {
+        var firstFailure: Throwable? = null
+        providersById.values.forEach { provider ->
+            try {
+                provider.clearRuntimeCache()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                if (firstFailure == null) firstFailure = error
+            }
+        }
+        availableOrigins.value = emptyList()
+        providerStatus.value = ProviderStatus(
+            providerId = NightscoutProvider.PROVIDER_ID,
+            displayName = "Nightscout",
+            availability = ProviderAvailability.CONFIGURATION_REQUIRED,
+            detail = "Configure and select a Nightscout server in Settings.",
+        )
+        firstFailure?.let { throw it }
+    }
+
+    private fun providerFor(mode: GlucoseProviderMode): GlucoseProvider {
+        val providerId = mode.supportedForCurrentBuild().providerId()
+        return requireNotNull(providersById[providerId]) {
+            "No glucose provider is registered for $providerId."
         }
     }
 
@@ -187,13 +265,25 @@ class GlucoseRepositoryImpl @Inject constructor(
 }
 
 internal fun GlucoseProviderMode.sourcePrefix(): String = when (this) {
+    GlucoseProviderMode.NIGHTSCOUT -> NightscoutProvider.PROVIDER_ID
     GlucoseProviderMode.HEALTH_CONNECT -> HealthConnectGlucoseProvider.PROVIDER_ID
-    GlucoseProviderMode.XDRIP_BROADCAST -> XdripBroadcastGlucoseProvider.PROVIDER_ID
-    GlucoseProviderMode.CARESENS_PARTNER -> CareSensAirProvider.PROVIDER_ID
+    GlucoseProviderMode.XDRIP_BROADCAST -> "xdrip_broadcast"
+    GlucoseProviderMode.CARESENS_PARTNER -> "caresens_air"
 }
 
-internal fun CoachSettings.selectedGlucoseSourcePrefix(): String? =
+private fun GlucoseProviderMode.providerId(): String =
+    supportedForCurrentBuild().sourcePrefix()
+
+internal fun CoachSettings.selectedGlucoseSourcePrefix(
+    nightscoutSettings: NightscoutSettings,
+): String? =
     when (val mode = glucoseProviderMode.supportedForCurrentBuild()) {
+        GlucoseProviderMode.NIGHTSCOUT ->
+            nightscoutSettings.activeServer?.let { server ->
+                runCatching {
+                    server.sourceId(nightscoutSettings.requireHttps)
+                }.getOrNull()
+            }
         GlucoseProviderMode.HEALTH_CONNECT ->
             healthConnectGlucoseOriginPackage?.let {
                 "${mode.sourcePrefix()}:$it"
@@ -202,7 +292,27 @@ internal fun CoachSettings.selectedGlucoseSourcePrefix(): String? =
     }
 
 private fun GlucoseProviderMode.displayName(): String = when (this) {
+    GlucoseProviderMode.NIGHTSCOUT -> "Nightscout"
     GlucoseProviderMode.HEALTH_CONNECT -> "Health Connect glucose"
     GlucoseProviderMode.XDRIP_BROADCAST -> "xDrip broadcast"
     GlucoseProviderMode.CARESENS_PARTNER -> "CareSens Air partner integration"
+}
+
+private fun GlucoseProviderState.forSelectedNightscoutSource(
+    settings: NightscoutSettings,
+): GlucoseProviderState {
+    val selectedSource = settings.activeServer
+        ?.let { runCatching { it.sourceId(settings.requireHttps) }.getOrNull() }
+        ?: return GlucoseProviderState.ConfigurationRequired
+    return when (this) {
+        GlucoseProviderState.Idle -> this
+        GlucoseProviderState.ConfigurationRequired -> this
+        is GlucoseProviderState.Loading ->
+            copy(cached = cached?.takeIf { it.sourceId == selectedSource })
+        is GlucoseProviderState.Available ->
+            takeIf { reading.sourceId == selectedSource }
+                ?: GlucoseProviderState.Loading(cached = null)
+        is GlucoseProviderState.Degraded ->
+            copy(cached = cached?.takeIf { it.sourceId == selectedSource })
+    }
 }

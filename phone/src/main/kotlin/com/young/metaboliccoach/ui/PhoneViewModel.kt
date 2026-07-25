@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.young.metaboliccoach.background.CommandHandlingResult
 import com.young.metaboliccoach.background.PhoneDataMutationGate
+import com.young.metaboliccoach.background.PhoneDataOperationPreemptedException
 import com.young.metaboliccoach.background.PhoneRefreshCoordinator
 import com.young.metaboliccoach.background.QuickActionHandler
 import com.young.metaboliccoach.background.SyncScheduler
@@ -13,6 +14,8 @@ import com.young.metaboliccoach.core.domain.CoachTimeSource
 import com.young.metaboliccoach.core.domain.CoachedExerciseActionPolicy
 import com.young.metaboliccoach.core.domain.CoachingRepository
 import com.young.metaboliccoach.core.domain.GlucoseRepository
+import com.young.metaboliccoach.core.domain.NightscoutSettingsRepository
+import com.young.metaboliccoach.core.domain.NightscoutSettingsValidator
 import com.young.metaboliccoach.core.domain.SettingsRepository
 import com.young.metaboliccoach.core.domain.SettingsValidator
 import com.young.metaboliccoach.core.model.ActivitySnapshot
@@ -20,10 +23,12 @@ import com.young.metaboliccoach.core.model.CoachRecommendation
 import com.young.metaboliccoach.core.model.CoachSettings
 import com.young.metaboliccoach.core.model.DailySummary
 import com.young.metaboliccoach.core.model.DefaultCoachSettings
+import com.young.metaboliccoach.core.model.DefaultNightscoutSettings
 import com.young.metaboliccoach.core.model.GlucoseDataOrigin
 import com.young.metaboliccoach.core.model.GlucoseReading
 import com.young.metaboliccoach.core.model.InterventionSession
 import com.young.metaboliccoach.core.model.MealMarker
+import com.young.metaboliccoach.core.model.NightscoutSettings
 import com.young.metaboliccoach.core.model.PersonalObservation
 import com.young.metaboliccoach.core.model.ProviderStatus
 import com.young.metaboliccoach.core.model.QuickActionCommand
@@ -53,6 +58,7 @@ data class PhoneUiState(
     val recommendation: CoachRecommendation? = null,
     val summary: DailySummary? = null,
     val settings: CoachSettings = DefaultCoachSettings.create(),
+    val nightscoutSettings: NightscoutSettings = DefaultNightscoutSettings.create(),
     val providerStatus: ProviderStatus? = null,
     val availableGlucoseOrigins: List<GlucoseDataOrigin> = emptyList(),
     val observations: List<PersonalObservation> = emptyList(),
@@ -70,6 +76,11 @@ private data class CurrentState(
     val activeSession: InterventionSession?,
 )
 
+private data class PhoneConfiguration(
+    val coach: CoachSettings,
+    val nightscout: NightscoutSettings,
+)
+
 @HiltViewModel
 @OptIn(ExperimentalCoroutinesApi::class)
 class PhoneViewModel @Inject constructor(
@@ -77,11 +88,13 @@ class PhoneViewModel @Inject constructor(
     private val activityRepository: ActivityRepository,
     private val coachingRepository: CoachingRepository,
     private val settingsRepository: SettingsRepository,
+    private val nightscoutSettingsRepository: NightscoutSettingsRepository,
     private val quickActionHandler: QuickActionHandler,
     private val refreshCoordinator: PhoneRefreshCoordinator,
     private val syncScheduler: SyncScheduler,
     private val timeSource: CoachTimeSource,
     private val settingsValidator: SettingsValidator,
+    private val nightscoutSettingsValidator: NightscoutSettingsValidator,
     private val personalDataFileExporter: PersonalDataFileExporter,
     private val mutationGate: PhoneDataMutationGate,
 ) : ViewModel() {
@@ -99,19 +112,27 @@ class PhoneViewModel @Inject constructor(
         CurrentState(glucose, activity, recommendation, summary, activeSession)
     }
 
+    private val configuration = combine(
+        settingsRepository.observe(),
+        nightscoutSettingsRepository.observeNightscoutSettings(),
+    ) { coach, nightscout ->
+        PhoneConfiguration(coach, nightscout)
+    }
+
     private val baseUiState = combine(
         current,
-        settingsRepository.observe(),
+        configuration,
         glucoseRepository.observeProviderStatus(),
         glucoseRepository.observeAvailableOrigins(),
         coachingRepository.observePersonalObservations(),
-    ) { current, settings, provider, origins, observations ->
+    ) { current, configuration, provider, origins, observations ->
         PhoneUiState(
             glucose = current.glucose,
             activity = current.activity,
             recommendation = current.recommendation.takeIf { current.activeSession == null },
             summary = current.summary,
-            settings = settings,
+            settings = configuration.coach,
+            nightscoutSettings = configuration.nightscout,
             providerStatus = provider,
             availableGlucoseOrigins = origins,
             observations = observations,
@@ -185,15 +206,27 @@ class PhoneViewModel @Inject constructor(
         }
     }
 
-    fun saveSettings(settings: CoachSettings) {
+    fun saveSettings(
+        settings: CoachSettings,
+        nightscoutSettings: NightscoutSettings,
+    ) {
         val errors = settingsValidator.validate(settings)
-        if (errors.isNotEmpty()) {
-            operationMessage.value = errors.joinToString(separator = "\n")
+        val nightscoutErrors = nightscoutSettingsValidator.validate(nightscoutSettings)
+        if (errors.isNotEmpty() || nightscoutErrors.isNotEmpty()) {
+            operationMessage.value = (errors + nightscoutErrors).joinToString(separator = "\n")
             return
         }
         runOperation("Settings saved.") {
             mutationGate.withLock {
-                settingsRepository.update(settings)
+                val normalizedNightscout =
+                    nightscoutSettingsValidator.normalize(nightscoutSettings)
+                settingsRepository.update(
+                    settings.copy(
+                        glucoseProviderMode =
+                            com.young.metaboliccoach.core.model.GlucoseProviderMode.NIGHTSCOUT,
+                    ),
+                )
+                nightscoutSettingsRepository.updateNightscoutSettings(normalizedNightscout)
             }
             syncScheduler.configurePeriodic()
             refreshCoordinator.refresh(refreshProviders = true)
@@ -230,6 +263,12 @@ class PhoneViewModel @Inject constructor(
                     append(
                         " Some background cancellation could not be confirmed; " +
                             "new source data may be collected again.",
+                    )
+                }
+                if (!result.runtimeCachesCleared) {
+                    append(
+                        " A provider memory cache could not be confirmed cleared; " +
+                            "close the app before reconfiguring a source.",
                     )
                 }
             }
@@ -304,6 +343,8 @@ class PhoneViewModel @Inject constructor(
             operationMessage.value = "Working…"
             try {
                 operationMessage.value = block()
+            } catch (_: PhoneDataOperationPreemptedException) {
+                operationMessage.value = "Refresh paused for a newer local data operation."
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Throwable) {

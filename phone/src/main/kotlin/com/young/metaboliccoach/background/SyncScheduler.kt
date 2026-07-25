@@ -11,37 +11,49 @@ import androidx.work.WorkManager
 import androidx.work.await
 import androidx.work.workDataOf
 import com.young.metaboliccoach.core.data.provider.HealthConnectPermissions
+import com.young.metaboliccoach.core.domain.NightscoutSettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 
 @Singleton
 class SyncScheduler @Inject constructor(
     @param:ApplicationContext private val context: Context,
+    private val nightscoutSettingsRepository: NightscoutSettingsRepository,
 ) {
     private val workManager by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         WorkManager.getInstance(context)
     }
 
     suspend fun configurePeriodic() {
+        val nightscoutSettings =
+            nightscoutSettingsRepository.observeNightscoutSettings().first()
+        val nightscoutConfigured = nightscoutSettings.activeServer != null
         val backgroundReadsAvailable = backgroundReadAccessOrFalse {
             HealthConnectPermissions.hasBackgroundReadAccess(context)
         }
-        if (!backgroundReadsAvailable) {
+        val policy = periodicRefreshPolicy(
+            nightscoutConfigured = nightscoutConfigured,
+            nightscoutPollingIntervalMinutes =
+                nightscoutSettings.pollingIntervalMinutes.toLong(),
+            healthConnectBackgroundReadsAvailable = backgroundReadsAvailable,
+        )
+        if (!policy.enabled) {
             workManager.cancelUniqueWork(PERIODIC_WORK)
             return
         }
         val request = PeriodicWorkRequestBuilder<RefreshAndCoachWorker>(
-            repeatInterval = PERIODIC_INTERVAL_MINUTES,
+            repeatInterval = policy.intervalMinutes,
             repeatIntervalTimeUnit = TimeUnit.MINUTES,
         ).setConstraints(
             Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+                .setRequiredNetworkType(policy.networkType)
                 .build(),
         ).setInitialDelay(
-            PERIODIC_INTERVAL_MINUTES,
+            policy.intervalMinutes,
             TimeUnit.MINUTES,
         ).setInputData(
             workDataOf(REFRESH_PROVIDERS_INPUT to true),
@@ -57,10 +69,23 @@ class SyncScheduler @Inject constructor(
         refreshProviders: Boolean = false,
         requireDelivery: Boolean = false,
     ) {
+        val networkType = if (
+            refreshProviders &&
+            nightscoutSettingsRepository.observeNightscoutSettings().first().activeServer != null
+        ) {
+            NetworkType.CONNECTED
+        } else {
+            NetworkType.NOT_REQUIRED
+        }
         workManager.enqueueUniqueWork(
             IMMEDIATE_WORK,
             ExistingWorkPolicy.APPEND_OR_REPLACE,
             OneTimeWorkRequestBuilder<RefreshAndCoachWorker>()
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiredNetworkType(networkType)
+                        .build(),
+                )
                 .setInputData(
                     workDataOf(
                         REFRESH_PROVIDERS_INPUT to refreshProviders,
@@ -79,10 +104,37 @@ class SyncScheduler @Inject constructor(
     companion object {
         const val REFRESH_PROVIDERS_INPUT = "refresh_providers"
         const val REQUIRE_DELIVERY_INPUT = "require_delivery"
-        private const val PERIODIC_INTERVAL_MINUTES = 15L
         private const val PERIODIC_WORK = "metabolic_periodic_refresh"
         private const val IMMEDIATE_WORK = "metabolic_immediate_refresh"
     }
+}
+
+internal data class PeriodicRefreshPolicy(
+    val enabled: Boolean,
+    val intervalMinutes: Long,
+    val networkType: NetworkType,
+)
+
+internal fun periodicRefreshPolicy(
+    nightscoutConfigured: Boolean,
+    nightscoutPollingIntervalMinutes: Long,
+    healthConnectBackgroundReadsAvailable: Boolean,
+): PeriodicRefreshPolicy = when {
+    nightscoutConfigured -> PeriodicRefreshPolicy(
+        enabled = true,
+        intervalMinutes = nightscoutPollingIntervalMinutes.coerceAtLeast(15),
+        networkType = NetworkType.CONNECTED,
+    )
+    healthConnectBackgroundReadsAvailable -> PeriodicRefreshPolicy(
+        enabled = true,
+        intervalMinutes = 15,
+        networkType = NetworkType.NOT_REQUIRED,
+    )
+    else -> PeriodicRefreshPolicy(
+        enabled = false,
+        intervalMinutes = 15,
+        networkType = NetworkType.NOT_REQUIRED,
+    )
 }
 
 internal suspend fun backgroundReadAccessOrFalse(

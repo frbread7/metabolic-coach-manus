@@ -1,56 +1,148 @@
 # Data integrations
 
-Evidence in this document was reviewed on 2026-07-23. Vendor and platform behavior can change; recheck
-the linked primary sources before a release.
+Evidence in this document was reviewed on 2026-07-24. Vendor and platform behavior can change;
+recheck the linked primary sources before a release.
 
 ## Provider status
 
-| Route | Code status | Support status | Release conclusion |
-| --- | --- | --- | --- |
-| CareSens Air official SDK/API | Capability stub only | No authorized public contract is configured | Blocked pending an i-SENS-supported interface and authorization |
-| Health Connect blood glucose | Implemented | Public Android API | Preferred current route when the CGM ecosystem writes timely records |
-| CareSens companion-app IPC | Not implemented | No documented contract identified | Do not reverse engineer or scrape |
-| CareSens Broadcast Intent | Not implemented | No documented CareSens contract identified | Do not invent an action/extras schema |
-| xDrip local broadcast | Implemented in debug builds only | Unofficial compatibility path; sender contract not verified end to end | Excluded from release manifest and release provider UI |
-| Samsung Health Data SDK | Inactive provider boundary; SDK not bundled | Official partner SDK | Blocked on approval, package/certificate registration, and hardware testing |
-| Direct CGM Bluetooth | Intentionally absent | Would require vendor authorization and safety validation | Out of scope |
+| Route | Version 1 status | Release conclusion |
+| --- | --- | --- |
+| Nightscout API v1 | Implemented as the active glucose provider | Primary Version 1 route; requires an explicitly configured active server |
+| Additional Nightscout servers | Implemented with separate source IDs and explicit selection | No automatic failover or history/cache mixing |
+| Nightscout authentication | Request-authenticator boundary only | Public endpoints only in Version 1; secure credential UI/storage is future work |
+| Health Connect activity | Implemented | Activity source for steps, floors, heart rate, exercise aggregates, and active calories |
+| Health Connect blood glucose | Retained inactive adapter | Future provider; not selectable in Version 1 |
+| CareSens Air official SDK/API | Capability stub only | No direct communication in Version 1 |
+| CareSens companion-app IPC or broadcast | Not implemented | Do not reverse engineer, scrape, or invent a contract |
+| xDrip local broadcast | Retained inactive adapter code; receiver unregistered | Not a Version 1 source |
+| Samsung Health Data SDK | Inactive provider boundary; SDK not bundled | Blocked on approval, package/certificate registration, and hardware testing |
+| Direct CGM Bluetooth | Intentionally absent | Out of scope |
 
-## CareSens Air investigation
+## Version 1 source decision
 
-The project follows the requested investigation order rather than hard-coding a speculative
-integration:
+The existing daily pipeline is the source of truth:
 
-1. **Official SDK/API:** no authorized public CareSens Air read API is configured. The
-   `CareSensAirProvider` therefore reports `PARTNER_APPROVAL_REQUIRED` and returns no readings.
-2. **Health Connect:** implemented as the public interoperability route. It can read glucose records
-   that another authorized application has written.
-3. **Companion app interface:** no documented CareSens app content provider, bound service, or other
-   stable contract is used.
-4. **Broadcast intent:** no CareSens-defined broadcast is used.
-5. **xDrip compatibility:** implemented only as an explicitly unofficial, debug-build route while
-   the sender contract remains unverified.
-6. **Official alternative:** an inactive `SamsungHealthPartnerDataProvider` keeps approved Samsung
-   activity access behind the provider interface. It reports `PARTNER_APPROVAL_REQUIRED` until an
-   authorized SDK integration, package, and certificate are supplied.
+```text
+CareSens Air sensor
+    -> CareSens Air app
+    -> xDrip+
+    -> Nightscout
+    -> Metabolic Coach phone
+    -> Room -> coaching engine -> Wear Data Layer -> watch
+```
+
+Metabolic Coach joins this pipeline at Nightscout. It does not communicate with the sensor, inspect
+CareSens private storage, call undocumented CareSens IPC, receive an xDrip broadcast, or reverse
+engineer Bluetooth. The watch remains provider-agnostic and never calls Nightscout.
+
+This decision reuses a stable server that can already support several independent clients, avoids a
+new sensor-side integration, and keeps provider-specific failure and authentication behavior on the
+phone. It does not make Nightscout or the upstream apps a medical safety system. The CareSens app
+and its alarms remain authoritative for CGM safety.
 
 The official [CareSens Air compatibility page](https://caresensair.com/en_US/content/compatibility/)
-states general Wear OS requirements and warns that untested models may not work correctly. The
-compatible-model list reviewed for this project did not explicitly establish Galaxy Watch8
-compatibility. That absence is not proof of incompatibility; it makes physical-device and regional
-validation mandatory.
+states general Wear OS requirements and warns that untested models may not work correctly. Its
+ability to display a reading in an official app does not imply a supported API for this project.
 
-An official CareSens Wear app, where available, is separate from this project. Its ability to show a
-reading on a watch does not imply that it exposes the reading to third-party apps.
+## Nightscout
 
-## Health Connect
+### API contract
 
-### Implemented records
+Version 1 requests:
+
+```http
+GET {baseUrl}/api/v1/entries/sgv.json?count=300
+Accept: application/json
+```
+
+The parser accepts Nightscout `sgv`, `date` or ISO `dateString`, `_id`, and `direction`, ignores
+unknown fields, orders entries by measurement time, deduplicates stable records, and normalizes
+values to `GlucoseReading` in mg/dL. Delta and rate are calculated locally between valid ordered
+readings; provider-specific JSON never enters the coaching or synchronization layers.
+
+Each normalized record contains:
+
+- glucose in mg/dL;
+- mapped trend direction;
+- delta and rate when adjacent readings are valid;
+- measurement and import timestamps;
+- a source ID derived from the configured server ID and normalized URL.
+
+The source ID prevents histories, intervention baselines/follow-ups, observations, and caches from
+mixing across servers. Changing a server URL creates a different source identity even when the
+display name and slot ID are unchanged.
+
+Primary references:
+
+- [Nightscout API overview](https://github.com/nightscout/cgm-remote-monitor/blob/7e0e77f88fc113a76fe363504125f5b36b8a3fe3/README.md#L210-L229)
+- [Nightscout API v1 schema](https://github.com/nightscout/cgm-remote-monitor/blob/7e0e77f88fc113a76fe363504125f5b36b8a3fe3/lib/server/swagger.yaml#L655-L710)
+- [Nightscout conditional entry responses](https://github.com/nightscout/cgm-remote-monitor/blob/7e0e77f88fc113a76fe363504125f5b36b8a3fe3/lib/api/entries/index.js#L132-L182)
+
+### Server settings and selection
+
+The phone Settings screen stores:
+
+- up to eight named server URLs;
+- one explicit active server;
+- polling interval from 15 to 1,440 minutes;
+- connection timeout from 2 to 60 seconds;
+- retry interval from 5 to 60 seconds;
+- zero to three retry attempts;
+- whether HTTPS is required.
+
+Two empty server slots are present by default and additional slots can be added. A blank slot is not
+queried. Selecting another server is an explicit action. The application does not probe alternatives
+or silently fail over when the active server is unavailable. That policy prevents a family member,
+test server, or stale replica from unexpectedly becoming the glucose authority.
+
+URLs are normalized before storage. User information, query strings, and fragments are rejected.
+When **Require HTTPS** is enabled, only HTTPS is accepted. When it is disabled, HTTP is also accepted
+for an explicitly configured local or test server. Cleartext traffic can expose glucose to the
+network; internet-hosted and daily-use servers should always use HTTPS.
+Redirects are not followed. Every request stays on the validated scheme, host, port, and base
+path, so a redirect cannot move glucose traffic or future authentication headers to another
+origin.
+
+Nightscout settings stay on the phone. The Wear state contains only normalized glucose and general
+coaching settings, never a Nightscout URL, active-server ID, timeout/retry policy, or credential.
+
+### Connectivity, retry, and cache behavior
+
+The OkHttp call is asynchronous and coroutine-cancellable; UI code observes flows and is never
+blocked by a network request. Responses are capped at 1 MiB. `Last-Modified` is cached per exact
+server source and sent as `If-Modified-Since`; a `304 Not Modified` response reuses only that
+server's memory cache.
+
+Transport errors, timeouts, HTTP 408, HTTP 429, and HTTP 5xx can be retried with exponential delay
+from the configured base interval, capped at 60 seconds per delay and bounded by the configured
+maximum attempts. Invalid configuration or JSON and HTTP 4xx responses such as 401/403 are not
+retried. When all attempts fail, the provider publishes degraded/error state and retains its
+per-server memory cache plus previously persisted Room readings. Cached age remains visible so
+normal stale-reading safety policy can suppress exercise coaching. No synthetic reading or silent
+server switch occurs.
+
+WorkManager uses a connected-network constraint when Nightscout is configured. Android periodic
+work has a 15-minute minimum and is inexact, so the polling interval is a request, not a freshness
+guarantee. Manual foreground refresh remains available.
+
+### Authentication boundary
+
+Version 1 supports public Nightscout endpoints. A no-op
+`NightscoutRequestAuthenticator` is injected separately from the API client so a future adapter can
+add Nightscout access tokens without changing repositories, coaching, or Wear synchronization.
+
+Do not place a token, `API_SECRET`, username, or password in a Nightscout URL. Future authentication
+must use a phone-only secure credential store, redact secrets from logs/errors/exports, scope each
+credential to one server, and avoid Wear Data Layer entirely. Review current
+[Nightscout API security guidance](https://github.com/nightscout/cgm-remote-monitor/wiki/API-v1-Security)
+before implementing it.
+
+## Health Connect activity
 
 The phone requests read access to:
 
 | Health Connect record | Use |
 | --- | --- |
-| `BloodGlucoseRecord` | Current/history glucose; local trend and delta calculation |
 | `StepsRecord` | Daily steps and last-movement estimate |
 | `FloorsClimbedRecord` | Daily floors |
 | `HeartRateRecord` | Latest heart-rate sample |
@@ -58,75 +150,20 @@ The phone requests read access to:
 | `ActiveCaloriesBurnedRecord` | Daily active calories |
 
 The official [Health Connect data type reference](https://developer.android.com/health-and-fitness/health-connect/data-types)
-defines these records and permissions.
+defines these records and permissions. Exercise aggregation pages through the local-day window,
+ignores reversed intervals, and stores only the valid session count, summed whole-minute duration,
+and latest end time; it does not retain route, exercise type, or detailed per-session history.
 
-### Data quality contract
+Manual Refresh performs a foreground activity read. The permission request includes
+`READ_HEALTH_DATA_IN_BACKGROUND` only when the installed provider advertises
+`FEATURE_READ_HEALTH_DATA_IN_BACKGROUND`. Missing or denied background activity access does not
+cancel Nightscout periodic work. The implementation still requires target-device validation of
+feature reporting, grant/denial, revocation, process death, reboot, battery restrictions, and
+actual WorkManager execution.
 
-- `measuredAtEpochMillis` is the source record time.
-- `receivedAtEpochMillis` is when Metabolic Coach imports the record.
-- Health Connect's `DataOrigin.packageName` is retained in `sourceId`.
-- Glucose is normalized to integer mg/dL.
-- A rate/trend is calculated only between increasing timestamps from the same writer package.
-- Duplicate IDs are ignored by Room.
-- The coach stops exercise actions when the latest sample exceeds the configurable stale limit.
-- Intervention sessions retain exact baseline and follow-up reading IDs, values, measurement
-  timestamps, and source IDs. Coached sessions also retain trigger, recommendation/version,
-  activity-dose, baseline-rate/threshold, due-time, and finalization provenance; prospective timing
-  observations require complete provenance and matching exact sources.
-
-### Glucose writer selection
-
-A Health Connect permission grants access to a record type, not necessarily to one CGM writer.
-Metabolic Coach therefore discovers writer packages from blood-glucose record metadata over the
-24-hour import window and applies this contract:
-
-- exactly one discovered package is selected and persisted automatically;
-- two or more discovered packages with no saved selection produce
-  `CONFIGURATION_REQUIRED`; glucose display and coaching remain paused until the user saves one
-  package in Settings;
-- only records from the selected exact package are imported and queried for coaching;
-- a saved package remains pinned if it temporarily disappears, so a newer record from another
-  writer can never silently take over;
-- the unavailable saved package remains visible in Settings as **no recent records**.
-
-Changing the selection is an explicit user action. Existing history remains attributed to its
-original package; daily summaries, baselines, follow-ups, and observations use the currently
-selected exact source and never combine glucose series from different writers.
-
-Health Connect does not guarantee that CareSens or Samsung Health publishes every desired record or
-publishes it with CGM-like latency. Validate the actual source package, timezone, update interval,
-historical gaps, duplicates, and phone restart behavior.
-
-Exercise aggregation pages through all records in the local-day window, ignores reversed intervals,
-and stores only the valid session count, summed whole-minute duration, and latest end time. It does
-not retain per-session exercise type, route, or detailed workout history.
-
-### Foreground and background behavior
-
-Manual Refresh performs a foreground Health Connect read directly. The permission request checks
-`FEATURE_READ_HEALTH_DATA_IN_BACKGROUND` and includes
-`READ_HEALTH_DATA_IN_BACKGROUND` only when the installed provider advertises it. Periodic
-WorkManager refresh is scheduled only when that feature is available and the background permission
-is granted; otherwise periodic work is cancelled and foreground/manual reads remain available.
-
-The implementation still requires target-device validation of feature reporting, grant/denial,
-revocation, process death, reboot, battery restrictions, and actual WorkManager execution. Even
-when granted, Android scheduling is inexact and the source application may publish late.
-
-### Candidate CareSens path
-
-The provisional public path is:
-
-```text
-CareSens Air app or approved service
-        -> Samsung Health and/or Health Connect
-        -> HealthConnectGlucoseProvider
-        -> Room -> coach -> watch
-```
-
-This path is usable only if a test reading appears in Health Connect with acceptable freshness.
-Do not assume that enabling Samsung Health automatically makes CareSens blood glucose available to
-Health Connect.
+The Health Connect glucose adapter and exact-writer selection logic remain isolated behind the
+provider abstraction for future evaluation. Version 1 policy always selects Nightscout and does not
+request Health Connect blood-glucose permission.
 
 ## Samsung Health
 
@@ -163,58 +200,28 @@ Before adding the SDK:
 Floors, per-session exercise details beyond the current daily aggregates, activity classification,
 and source-attribution behavior are priority items for this validation.
 
-## xDrip compatibility
+## Future xDrip provider
 
-xDrip compatibility is a development aid, not a release integration. Only the debug manifest
-declares the exported receiver and xDrip receive permission, and only debug settings expose
-`XDRIP_BROADCAST`. The release data layer also converts any xDrip mode retained from a debug install
-to Health Connect before provider selection. Release builds expose Health Connect and the CareSens
-partner placeholder; the placeholder is nonfunctional until partner approval and an authorized
-contract are supplied.
+xDrip participates upstream of Nightscout in the user's existing pipeline, but Metabolic Coach does
+not receive xDrip broadcasts in Version 1. Neither debug nor release manifests register the
+receiver, Settings does not expose `XDRIP_BROADCAST`, and persisted legacy provider modes migrate to
+Nightscout.
 
-In a debug build, xDrip ingestion is disabled unless the user selects `XDRIP_BROADCAST`. The
-receiver expects:
+The repository retains isolated xDrip adapter and validation code as a future offline-provider
+starting point. Retention is not support or enablement. Before any future xDrip provider is
+activated:
 
-```text
-action: com.eveningoutpost.dexdrip.BgEstimate
-extras:
-  com.eveningoutpost.dexdrip.Extras.BgEstimate   numeric mg/dL
-  com.eveningoutpost.dexdrip.Extras.BgSlope      optional numeric mg/dL/millisecond
-  com.eveningoutpost.dexdrip.Extras.Time         epoch milliseconds
-  com.eveningoutpost.dexdrip.Extras.SourceInfo   optional string
-```
+- verify the upstream action/extras contract against a supported xDrip build;
+- define source identity, duplicate/order, unit, timestamp, and outage semantics;
+- verify the sender beyond a caller-controlled package name, preferably with a
+  signature-protected or explicitly authenticated contract;
+- keep selection explicit and never auto-fallback from Nightscout;
+- add target-version manifest, sender-provenance, malformed-input, and end-to-end tests;
+- preserve the official CGM app as the safety source.
 
-The slope is converted to mg/dL/minute before trend classification and storage.
-
-Samples are rejected when:
-
-- Android is older than 14/API 34;
-- `BroadcastReceiver.getSentFromPackage()` does not report
-  `com.eveningoutpost.dexdrip`;
-- the action is wrong;
-- the selected provider is not xDrip;
-- value/time is missing or nonnumeric;
-- glucose is outside 20–600 mg/dL;
-- the timestamp is older than 24 hours or more than 5 minutes in the future;
-- converted slope is non-finite or outside ±20 mg/dL/minute.
-
-### Security limitation
-
-The Android receiver must be exported to accept a cross-application broadcast. On Android 14+ the
-receiver verifies the sender package reported by the platform; older Android versions are rejected
-because they cannot provide that provenance. Numeric/time/rate validation further reduces malformed
-input.
-
-The route does not pin or verify the xDrip signing certificate, and the expected action/extras
-contract has not been verified end to end against a supported upstream sender. A malicious or
-repackaged application able to occupy the expected package identity remains outside the trust
-model. Use only trusted software in debug testing. A future production proposal must first verify
-the upstream contract and investigate a signature-protected or explicitly authenticated
-alternative.
-
-xDrip is not an i-SENS API, is not endorsed here by i-SENS, and may change independently. Preserve
-the official CGM app as the safety source. Do not describe xDrip as a supported release route while
-the receiver and selector remain intentionally debug-only.
+An exported cross-application receiver expands the attack surface. The previously explored
+package-provenance check is not certificate pinning and does not by itself meet the Version 1 trust
+boundary. xDrip is not an i-SENS API and is not endorsed here by i-SENS.
 
 ## Adding another provider
 
@@ -223,8 +230,13 @@ Every provider must implement:
 ```kotlin
 interface GlucoseProvider {
     val id: String
+    fun observeState(): Flow<GlucoseProviderState>
     suspend fun status(): ProviderStatus
     suspend fun readSince(startEpochMillis: Long): List<GlucoseReading>
+    suspend fun readSinceExactSource(
+        sourceId: String,
+        startEpochMillis: Long,
+    ): List<GlucoseReading>
 }
 ```
 
@@ -238,6 +250,8 @@ A provider implementation must document:
 - update latency and outage behavior;
 - duplicate/order semantics;
 - revocation and data deletion;
+- explicit selection and whether failover is prohibited or supported;
+- cache partitioning and authentication-secret boundaries;
 - test fixtures that contain no real health data.
 
 Provider selection is explicit. There is no silent fallback from an unavailable authorized provider
@@ -247,11 +261,17 @@ to an unofficial one.
 
 For each supported route, capture:
 
-- source app and version;
+- Nightscout version, deployment platform, base URL host without credentials, and whether HTTPS is
+  enforced;
+- upstream source-app versions without copying private health data;
 - phone model, Android version, region, timezone, and locale;
 - Galaxy Watch8 size/model and Wear OS build;
 - consent screenshots and granted permissions;
-- at least 24 hours of source/import timestamps;
+- at least 24 hours of sensor, Nightscout, phone-import, and watch-display timestamps;
+- manual active-server switching with distinct synthetic fixtures and proof that no history or
+  cache crosses sources;
+- timeout, DNS failure, TLS failure, HTTP 304/401/403/408/429/5xx, malformed JSON, empty response,
+  bounded retry, cancellation, and recovery behavior;
 - reconnect, reboot, force-stop, Bluetooth-off, and battery-saver behavior;
 - low, high, rising, falling, duplicate, stale, and missing samples;
 - comparison against the vendor app without copying identifiable health data into bug reports.

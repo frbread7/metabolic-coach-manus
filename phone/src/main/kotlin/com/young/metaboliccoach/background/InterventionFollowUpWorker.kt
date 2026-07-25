@@ -25,10 +25,13 @@ class InterventionFollowUpWorker @AssistedInject constructor(
     private val syncScheduler: SyncScheduler,
     private val mutationGate: PhoneDataMutationGate,
 ) : CoroutineWorker(context, parameters) {
-    override suspend fun doWork(): Result =
-        mutationGate.withLock {
+    override suspend fun doWork(): Result = try {
+        mutationGate.withPreemptibleProviderLock {
             doWorkLocked()
         }
+    } catch (_: PhoneDataOperationPreemptedException) {
+        Result.retry()
+    }
 
     private suspend fun doWorkLocked(): Result {
         return try {
@@ -45,8 +48,13 @@ class InterventionFollowUpWorker @AssistedInject constructor(
             val now = System.currentTimeMillis()
             if (now < dueAt) return Result.retry()
 
+            val baselineSourceId = session.baselineGlucoseSourceId
             try {
-                glucoseRepository.refresh()
+                if (baselineSourceId == null) {
+                    glucoseRepository.refresh()
+                } else {
+                    glucoseRepository.refreshExactSource(baselineSourceId)
+                }
             } catch (cause: CancellationException) {
                 throw cause
             } catch (_: Throwable) {
@@ -55,7 +63,6 @@ class InterventionFollowUpWorker @AssistedInject constructor(
             val settings = settingsRepository.observe().first()
             val toleranceMillis = settings.staleReadingMinutes * MILLIS_PER_MINUTE
             val windowEnd = minOf(now, dueAt + toleranceMillis)
-            val baselineSourceId = session.baselineGlucoseSourceId
             if (baselineSourceId == null) {
                 finalize(sessionId, null)
                 return Result.success()

@@ -25,6 +25,9 @@ class HealthConnectGlucoseProvider @Inject constructor(
     private val client by lazy { HealthConnectClient.getOrCreate(context) }
     private val readPermission = HealthPermission.getReadPermission(BloodGlucoseRecord::class)
 
+    override fun handlesSource(sourceId: String): Boolean =
+        sourceId.startsWith("$PROVIDER_ID:")
+
     override suspend fun status(): ProviderStatus {
         val sdkStatus = HealthConnectClient.getSdkStatus(context)
         if (sdkStatus != HealthConnectClient.SDK_AVAILABLE) {
@@ -100,6 +103,14 @@ class HealthConnectGlucoseProvider @Inject constructor(
                     .thenBy(GlucoseReading::id),
             )
     }
+
+    override suspend fun readSinceExactSource(
+        sourceId: String,
+        startEpochMillis: Long,
+    ): List<GlucoseReading> =
+        readSince(startEpochMillis).filter { it.sourceId == sourceId }
+
+    override suspend fun clearRuntimeCache() = Unit
 
     private fun List<GlucoseReading>.withCalculatedTrends(): List<GlucoseReading> =
         mapIndexed { index, reading ->
