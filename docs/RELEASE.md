@@ -6,10 +6,11 @@ The repository is not release-ready merely because APKs assemble. A production r
 signed bundles, an authorized and measured glucose route, Galaxy Watch8 verification, WFF
 validation, privacy/health policy work, and all gates in [Testing](TESTING.md).
 
-The `v0.2` Nightscout refactor has implementation and static verification complete; evidence is
-recorded in [Testing](TESTING.md#current-local-verification). Production signing, live-server
-validation, Android instrumentation, physical Galaxy Watch8 validation, and store approval remain
-outstanding.
+The `v0.2` Nightscout refactor has implementation/static verification complete and its phone-side
+live gate was accepted by the user on 2026-08-01; evidence boundaries are recorded in
+[Testing](TESTING.md#current-local-verification). Production signing, extended live-server
+lifecycle validation, Android instrumentation, physical Galaxy Watch8 validation, and store
+approval remain outstanding.
 
 Release provider topology is intentionally narrow: Nightscout is the only active Version 1 glucose
 provider, while Health Connect supplies activity data. The phone supports several configured

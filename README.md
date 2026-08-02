@@ -9,13 +9,13 @@ resource-only Watch Face Format (WFF) watch face for Wear OS 6. The primary hard
 Samsung Galaxy Watch8.
 
 > **Development status:** engineering alpha. Version 1 uses a user-configured Nightscout server as
-> its glucose source while Health Connect remains the activity source. The architecture and core
-> coaching flows are implemented, including review-driven safety, provenance, and exactly-once
-> command reconciliation. The Nightscout refactor passed the repository's local static pipeline on
-> 2026-07-25, but has not passed live-server, physical-device, Android instrumentation,
-> production-signing, or store-policy gates required for daily use. It is a wellness tool, not a
-> medical device, and must not replace the CGM vendor app, glucose alarms, professional advice, or
-> a personal care plan.
+> its glucose source while Health Connect remains the activity source. The Nightscout refactor
+> passed the repository's local static pipeline on 2026-07-25. The user accepted the phone-side
+> `v0.2` Nightscout gate on 2026-08-01 after validating URL configuration, current glucose, trend,
+> delta, timestamp, offline cache, retry behavior, and crash-free operation. Physical Galaxy
+> Watch8, Android instrumentation, production-signing, and store-policy gates remain outstanding.
+> It is a wellness tool, not a medical device, and must not replace the CGM vendor app, glucose
+> alarms, professional advice, or a personal care plan.
 
 ## Milestones
 
@@ -25,14 +25,17 @@ synchronization and coaching foundations remain frozen while the current milesto
 | Version | Acceptance milestone | Status |
 | --- | --- | --- |
 | `v0.1` | Infrastructure: phone, Wear app, WFF watch face, shared architecture, persistence, and build/package pipeline | Complete |
-| `v0.2` | Nightscout integration: provider isolation, configuration, retry/cache behavior, normalized repository flow, and phone-first live acceptance | Implementation and static verification complete; live acceptance pending |
-| `v0.3` | Watch synchronization: verify and harden the existing Data Layer path on a physical phone and Galaxy Watch8 | Blocked on `v0.2` live acceptance |
+| `v0.2` | Nightscout integration: provider isolation, configuration, retry/cache behavior, normalized repository flow, and phone-first live acceptance | Accepted 2026-08-01 |
+| `v0.3` | Watch synchronization: validate the existing Data Layer path and packaged watch components on a physical phone and Galaxy Watch8 | Physical acceptance ready; production-code freeze active |
 | `v0.4` | Metabolic Coach: validate and tune the existing walk/stair recommendations without adding medical claims | Blocked on `v0.3` |
 | `v0.5` | One-week personal beta with documented reliability, battery, and safety observations | Planned |
 | `v1.0` | Stable daily-use release with production signing and all release gates complete | Planned |
 
-Do not add coaching behavior while `v0.2` is awaiting live Nightscout acceptance. The next work is
-phone-first integration testing; watch installation begins only after that path is verified.
+Do not add production functionality while the `v0.3` physical gate is open. Work is limited to
+verification, installation documentation, the physical acceptance record, and critical defects
+that would prevent safe installation or synchronization. After the user reports results, stop for
+architecture review before planning `v0.4`. See the [milestone process](docs/MILESTONE_PROCESS.md)
+and [v0.3 Wear acceptance checklist](docs/V0.3_WEAR_ACCEPTANCE.md).
 
 ## What is implemented
 
@@ -132,8 +135,10 @@ engineering artifacts, not production releases. A signed release requires enviro
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Nightscout, Health Connect activity, and future provider integrations](docs/INTEGRATIONS.md)
+- [Milestone development and cross-session handoff process](docs/MILESTONE_PROCESS.md)
+- [v0.3 Galaxy Watch8 physical acceptance checklist](docs/V0.3_WEAR_ACCEPTANCE.md)
 - [Development and build guide](docs/DEVELOPMENT.md)
-- [Testing strategy and release gates](docs/TESTING.md)
+- [Testing strategy, milestone acceptance, and release gates](docs/TESTING.md)
 - [User guide](docs/USER_GUIDE.md)
 - [Privacy and safety](docs/PRIVACY_AND_SAFETY.md)
 - [Release, signing, and distribution](docs/RELEASE.md)

@@ -39,13 +39,22 @@ All notable Metabolic Coach package changes are recorded here.
 - Independent architecture review returned `CLEAR`; independent code review returned `APPROVE`
   with no remaining findings.
 
+### Phone acceptance
+
+- On 2026-08-01, the user accepted the phone-side Nightscout gate after validating URL
+  configuration, current glucose, trend, delta, timestamp, offline cache, retry behavior, and no
+  crashes on the intended phone/server route.
+- A glucose history graph was not implemented and was explicitly excluded from `v0.2` acceptance.
+  Stored recent history and provider normalization remain covered by automated tests.
+
 ### Known acceptance gaps
 
 - `v0.2` is a debug-signed engineering milestone unless its embedded `INSTALL.md` explicitly
   identifies a signed release build.
-- Live Nightscout compatibility and latency, Android instrumentation, physical phone/Galaxy Watch8
-  behavior, production signing, and store/privacy review remain required.
-- Additional coaching work is frozen until the phone-first Nightscout live acceptance gate passes.
+- Physical Galaxy Watch8 synchronization, Android instrumentation, production signing, and
+  store/privacy review remain required.
+- Production functionality is frozen until the `v0.3` physical Watch8 results are reviewed. The
+  `v0.3` gate uses the unchanged `v0.2.0` APKs and must not be represented as a new binary release.
 
 ## v0.1 — 2026-07-24 — Infrastructure
 

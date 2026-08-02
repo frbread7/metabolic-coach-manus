@@ -497,9 +497,9 @@ describe a timing bucket as medically recommended, causal, best, or ideal.
 
 ## Known architectural release gaps
 
-- The configured Nightscout route has not yet been validated end to end against the intended
-  production server across outages, server upgrades, authentication changes, phone lifecycle
-  events, and measured sensor-to-watch latency.
+- The user accepted the configured Nightscout route through the phone for current state, retry,
+  and offline-cache behavior on 2026-08-01. Extended outages, server upgrades, authentication
+  changes, phone lifecycle events, and measured sensor-to-watch latency remain unverified.
 - Version 1 supports public Nightscout endpoints only. The authenticator boundary is present, but
   secure credential storage and a user-facing authentication flow are future work.
 - Multiple Nightscout servers require explicit selection. There is intentionally no health-data

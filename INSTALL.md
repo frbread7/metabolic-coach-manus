@@ -24,24 +24,47 @@ matching package names and signing identities.
 
 ## Requirements
 
-- Android phone with Android 9/API 28 or newer.
+- The Metabolic Coach phone APK supports Android 9/API 28 or newer. For the primary Samsung
+  Galaxy Watch8 target, Samsung requires a compatible Samsung Galaxy phone running Android 12 or
+  newer; the APK minimum and the watch-pairing requirement are different constraints.
 - Samsung Galaxy Watch8 or another Wear OS 6/API 36 device for this WFF v4 watch face.
 - A reachable Nightscout server. Use HTTPS for any internet-hosted or daily-use server.
 - Bugjaeger or an equivalent trusted ADB client if installing the watch APKs from the phone.
 - Developer options and wireless debugging enabled temporarily on the watch.
+- The phone running Bugjaeger and the watch must be on the same Wi-Fi network, and that network
+  must permit device-to-device traffic. Guest networks and access-point isolation can prevent ADB
+  pairing or connection.
+
+Compatibility and wireless-debugging prerequisites are based on Samsung's
+[Galaxy Watch8 specifications](https://www.samsung.com/us/watches/galaxy-watch8/) and Android's
+[Wear OS wireless debugging guide](https://developer.android.com/training/wearables/get-started/debug-wifi).
+
+## v0.3 physical-acceptance preflight
+
+The `v0.3` milestone validates the unchanged `v0.2.0` APKs; it is not a relabeled `v0.3` binary
+release. Before installation, record the ZIP filename and externally published SHA-256, embedded
+APK version/build variant, phone/watch models and OS builds, and test date. Use
+`docs/V0.3_WEAR_ACCEPTANCE.md` from the project as the authoritative result sheet.
+
+If the already accepted phone APK is installed from this same build/signing identity, do not
+uninstall it. Uninstalling would delete its local settings and history. Install only the missing
+Wear and watch-face components unless an intentional same-certificate upgrade is required.
 
 ## Install from a phone with Bugjaeger
 
-1. Download the ZIP from the build VM and verify that its filename and embedded package metadata
-   identify the intended version and build variant.
+1. Download the ZIP from the build VM and verify that its filename, externally recorded SHA-256,
+   and embedded package metadata identify the intended version and build variant.
 2. Extract the ZIP into one folder on the phone.
-3. On the watch, enable developer options, then enable **ADB debugging** and **Wireless debugging**.
+3. Put the phone and watch on the same non-isolated Wi-Fi network. On the watch, enable developer
+   options, then enable **ADB debugging** and **Wireless debugging**.
 4. Use the watch's **Pair new device** screen and pair Bugjaeger using the displayed pairing
-   address, port, and code. Then connect Bugjaeger to the watch's wireless-debugging address.
+   address, port, and code. Then connect Bugjaeger to the separate wireless-debugging address and
+   connection port shown one level above **Pair new device**.
 5. In Bugjaeger, install `wear.apk` on the connected watch and wait for a successful result.
 6. Install `watchface.apk` on the watch and select **Metabolic Coach** in the watch-face picker.
-7. Install `phone.apk` on the phone. Android may require permission for the chosen installer to
-   install unknown applications.
+7. If the matching phone build is not already installed, install `phone.apk` on the phone. Android
+   may require permission for the chosen installer to install unknown applications. Do not
+   uninstall the accepted phone build merely to repeat this step.
 8. Open the phone app, review the safety notice, and grant only the Health Connect activity and
    notification permissions you intend to use.
 9. In phone Settings, enter a name and base URL for Nightscout, keep **Require HTTPS** enabled, and

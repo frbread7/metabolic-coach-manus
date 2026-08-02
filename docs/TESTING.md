@@ -80,13 +80,15 @@ Execute the migration suite on an Android runtime with:
 
 - `v0.2` implementation gate: the full static pipeline, isolated provider/repository tests,
   parsing, retry, cache, server switching, manifests, documentation, and debug package must pass.
-- `v0.2` live acceptance gate: on the phone, configure a test or personal Nightscout server,
-  confirm current/history normalization and recovery from connectivity loss, and record latency
-  without exposing health data. Do not install the watch package before this gate passes.
-- `v0.3` gate: only after `v0.2`, install matching phone/Wear/watch-face artifacts and validate the
-  existing Data Layer flow, reconnect behavior, stale-state handling, and physical Watch8 UI.
+- `v0.2` live acceptance gate: accepted by the user on 2026-08-01 after phone-side validation of
+  configuration, current glucose, trend, delta, timestamp, offline cache, retry, and crash-free
+  behavior. A history graph was outside the milestone and was not required for acceptance.
+- `v0.3` gate: install the unchanged matching `v0.2.0` phone/Wear/watch-face artifacts and validate
+  the existing Data Layer flow, reconnect behavior, stale-state handling, and physical Watch8 UI
+  using [the authoritative result sheet](V0.3_WEAR_ACCEPTANCE.md). Production code remains frozen
+  while this gate is open.
 - `v0.4` coaching work remains frozen until the preceding gates pass. Existing walk/stair behavior
-  may be regression-tested, but no new coaching feature or medical claim belongs in `v0.2`.
+  may be regression-tested, but no new coaching feature or medical claim belongs in `v0.3`.
 
 ## Current local verification
 
@@ -109,19 +111,28 @@ The `v0.2` Nightscout milestone was verified locally on 2026-07-25:
 - Independent final review returned architecture `CLEAR` and code review `APPROVE`, with no
   remaining findings.
 
+On 2026-08-01, the user separately accepted the phone-side live Nightscout behavior listed in the
+milestone gate above. This is user-reported physical evidence; it does not imply Galaxy Watch8,
+Android instrumentation, production-signing, or extended outage/lifecycle acceptance.
+
+The `v0.3` pre-install rerun on 2026-08-01 executed the sync, phone, and Wear unit suites plus
+phone, Wear, and watch-face debug lint with cache/incremental reuse disabled. Gradle reported
+`BUILD SUCCESSFUL` in 9m22s with all 200 selected tasks executed. No source code was changed for
+this gate.
+
 Current debug artifact SHA-256 values:
 
 ```text
 eb1dc99bd612970b975d17ff6e02e63c3529e38581f8a7d0bd50e7866bd2dbee  metabolic-coach-phone-debug.apk
 e373a79b2dee352d6cc1ea798f32d9c1c8e6eab277a94d155bd8c3673f09e8a6  metabolic-coach-wear-debug.apk
 76b0b050e1a201e41c2ad8185ef0aeaf06a294a20caa2857546059a9a47cd23b  metabolic-coach-watchface-debug.apk
-03ef7df91417243ae4f7862a0608c967d8d6e9d155e1d459c3b35091c8bb3767  MetabolicCoach-v0.2.zip
+477b8fd3bc7d9a05f88259d6568cf3cb3377d5ad7eb644b526c015aec9665885  MetabolicCoach-v0.2.zip
 ```
 
 Current artifact sizes are 41,673,623 bytes for phone, 44,620,696 bytes for Wear, and 10,095 bytes
-for the watch face. The five-file ZIP is 29,963,158 bytes. These are debug-signed engineering
-artifacts. Live-server, Android instrumentation, physical-device, production-signing, and
-store/privacy results are not implied.
+for the watch face. The documentation-refreshed five-file ZIP is 29,964,055 bytes. These are
+debug-signed engineering artifacts. Extended live-server lifecycle, Android instrumentation,
+physical-watch, production-signing, and store/privacy results are not implied.
 
 ## Required static and build checks
 
@@ -201,6 +212,9 @@ individual permissions.
 ## Galaxy Watch8 test matrix
 
 Use the actual non-Classic Galaxy Watch8 target and record the model/size and Wear OS build.
+For the current milestone, execute and retain results in
+[the v0.3 physical acceptance checklist](V0.3_WEAR_ACCEPTANCE.md); this general matrix is not a
+substitute for that evidence record.
 
 Verify:
 
@@ -433,7 +447,8 @@ A release candidate is acceptable only when:
 
 ## Currently unverified external gates
 
-- the intended live Nightscout server and its public-access configuration;
+- extended live Nightscout lifecycle behavior across TLS/DNS/captive-portal, server upgrades,
+  authentication changes, and long outages beyond the accepted phone-side v0.2 checks;
 - CareSens app/xDrip/Nightscout/phone/watch end-to-end latency and outage recovery;
 - multi-server switching and isolation on physical phones;
 - TLS, DNS, captive-portal, battery-saver, reboot, and background WorkManager behavior;

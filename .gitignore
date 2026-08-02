@@ -20,3 +20,6 @@ artifacts/*.zip
 # OMX runtime artifacts are local execution state. Keep the durable plan only.
 .omx/state/
 .omx/logs/
+
+# ChatGPT Pro bridge transcripts, receipts, screenshots, and browser-run state stay local.
+.devspace/
