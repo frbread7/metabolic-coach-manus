@@ -1,6 +1,9 @@
 package com.young.metaboliccoach.core.data.repository
 
 import com.young.metaboliccoach.core.model.DefaultCoachSettings
+import com.young.metaboliccoach.core.model.GlycemicTargetProvenance
+import com.young.metaboliccoach.core.model.GlycemicWindow
+import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
 import java.util.Base64
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -16,7 +19,7 @@ class PersonalDataJsonWriterTest {
         assertTrue(
             first.startsWith(
                 "{\"format\":\"metabolic-coach-personal-data\"," +
-                    "\"schemaVersion\":1,\"databaseSchemaVersion\":7," +
+                    "\"schemaVersion\":2,\"databaseSchemaVersion\":7," +
                     "\"exportedAtEpochMillis\":1234,\"settings\":{",
             ),
         )
@@ -43,6 +46,11 @@ class PersonalDataJsonWriterTest {
                 exportedAtEpochMillis = 10,
                 databaseSchemaVersion = 7,
                 settings = DefaultCoachSettings.create(),
+                glycemicPlannerSettings = GlycemicPlannerSettings(
+                    targetGmiPercent = 7.0,
+                    targetProvenance = GlycemicTargetProvenance.CLINICIAN_AGREED,
+                    horizon = GlycemicWindow.DAYS_60,
+                ),
             )
             beginTable("first")
             endTable()
@@ -52,6 +60,8 @@ class PersonalDataJsonWriterTest {
         }
 
         assertTrue(output.endsWith("\"data\":{\"first\":[],\"second\":[]}}"))
+        assertTrue(output.contains("\"glycemicPlanner\":{\"targetGmiPercent\":7.0"))
+        assertTrue(output.contains("\"targetProvenance\":\"CLINICIAN_AGREED\""))
     }
 
     private fun writeSample(): String {

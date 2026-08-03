@@ -13,6 +13,8 @@ import com.young.metaboliccoach.core.domain.SettingsRepository
 import com.young.metaboliccoach.core.domain.SettingsValidator
 import com.young.metaboliccoach.core.domain.NightscoutSettingsRepository
 import com.young.metaboliccoach.core.domain.NightscoutSettingsValidator
+import com.young.metaboliccoach.core.domain.GlycemicGoalRepository
+import com.young.metaboliccoach.core.domain.GlycemicPlannerBounds
 import com.young.metaboliccoach.core.domain.requiresRecommendationInvalidation
 import com.young.metaboliccoach.core.model.CoachSettings
 import com.young.metaboliccoach.core.model.CoachTheme
@@ -20,6 +22,9 @@ import com.young.metaboliccoach.core.model.DefaultCoachSettings
 import com.young.metaboliccoach.core.model.DefaultNightscoutSettings
 import com.young.metaboliccoach.core.model.GlucoseProviderMode
 import com.young.metaboliccoach.core.model.GlucoseUnit
+import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
+import com.young.metaboliccoach.core.model.GlycemicTargetProvenance
+import com.young.metaboliccoach.core.model.GlycemicWindow
 import com.young.metaboliccoach.core.model.NightscoutSettings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -39,7 +44,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val validator: SettingsValidator,
     private val nightscoutValidator: NightscoutSettingsValidator,
     private val recommendationSnapshotDao: RecommendationSnapshotDao,
-) : SettingsRepository, NightscoutSettingsRepository {
+) : SettingsRepository, NightscoutSettingsRepository, GlycemicGoalRepository {
     override fun observe(): Flow<CoachSettings> = context.settingsDataStore.data.map { values ->
         val defaults = DefaultCoachSettings.create()
         CoachSettings(
@@ -218,6 +223,106 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun observeSettings(): Flow<GlycemicPlannerSettings> =
+        context.settingsDataStore.data.map { values ->
+            val target = values[Keys.glycemicTargetGmi]
+                ?.takeIf { it.isFinite() && it in GlycemicPlannerBounds.TARGET_GMI_PERCENT }
+            val veryLow = (values[Keys.glycemicVeryLowThreshold]
+                ?: GlycemicPlannerSettings().veryLowGlucoseThresholdMgDl)
+                .coerceIn(GlycemicPlannerBounds.VERY_LOW_GLUCOSE_MG_DL)
+            val low = maxOf(
+                (values[Keys.glycemicLowThreshold]
+                    ?: GlycemicPlannerSettings().lowGlucoseThresholdMgDl)
+                    .coerceIn(GlycemicPlannerBounds.LOW_GLUCOSE_MG_DL),
+                veryLow + 1,
+            ).coerceAtMost(GlycemicPlannerBounds.LOW_GLUCOSE_MG_DL.last)
+            val maximumLow = values[Keys.glycemicMaximumLowPercent]
+                ?.takeIf { it.isFinite() }
+                ?.coerceIn(
+                    GlycemicPlannerBounds.MAXIMUM_LOW_EXPOSURE_PERCENT.start.toDouble(),
+                    GlycemicPlannerBounds.MAXIMUM_LOW_EXPOSURE_PERCENT.endInclusive.toDouble(),
+                )
+                ?: GlycemicPlannerSettings().maximumLowGlucosePercent
+            val maximumVeryLow = (values[Keys.glycemicMaximumVeryLowPercent]
+                ?.takeIf { it.isFinite() }
+                ?.coerceIn(
+                    GlycemicPlannerBounds.MAXIMUM_VERY_LOW_EXPOSURE_PERCENT.start.toDouble(),
+                    GlycemicPlannerBounds.MAXIMUM_VERY_LOW_EXPOSURE_PERCENT.endInclusive.toDouble(),
+                )
+                ?: GlycemicPlannerSettings().maximumVeryLowGlucosePercent)
+                .coerceAtMost(maximumLow)
+            GlycemicPlannerSettings(
+                targetGmiPercent = target,
+                targetProvenance = values[Keys.glycemicTargetProvenance]
+                    .enumOrNull<GlycemicTargetProvenance>()
+                    ?.takeIf { target != null },
+                horizon = GlycemicWindow.fromDays(values[Keys.glycemicHorizonDays] ?: 30)
+                    ?.takeIf { it in GlycemicPlannerBounds.SCENARIO_HORIZONS }
+                    ?: GlycemicWindow.DAYS_30,
+                lowGlucoseThresholdMgDl = low,
+                veryLowGlucoseThresholdMgDl = veryLow,
+                maximumLowGlucosePercent = maximumLow,
+                maximumVeryLowGlucosePercent = maximumVeryLow,
+            )
+        }
+
+    override suspend fun updateSettings(settings: GlycemicPlannerSettings) {
+        require(settings.lowGlucoseThresholdMgDl > settings.veryLowGlucoseThresholdMgDl) {
+            "The low-glucose threshold must be above the very-low threshold."
+        }
+        require(settings.horizon in GlycemicPlannerBounds.SCENARIO_HORIZONS) {
+            "The planner horizon must be 30, 60, or 90 days."
+        }
+        require(settings.lowGlucoseThresholdMgDl in GlycemicPlannerBounds.LOW_GLUCOSE_MG_DL) {
+            "The planner low-glucose boundary is outside the supported range."
+        }
+        require(
+            settings.veryLowGlucoseThresholdMgDl in GlycemicPlannerBounds.VERY_LOW_GLUCOSE_MG_DL,
+        ) {
+            "The planner very-low boundary is outside the supported range."
+        }
+        require(
+            settings.maximumLowGlucosePercent in
+                GlycemicPlannerBounds.MAXIMUM_LOW_EXPOSURE_PERCENT.start.toDouble()..
+                GlycemicPlannerBounds.MAXIMUM_LOW_EXPOSURE_PERCENT.endInclusive.toDouble(),
+        ) {
+            "The maximum low-glucose percentage must be between 0 and 20."
+        }
+        require(
+            settings.maximumVeryLowGlucosePercent in
+                GlycemicPlannerBounds.MAXIMUM_VERY_LOW_EXPOSURE_PERCENT.start.toDouble()..
+                GlycemicPlannerBounds.MAXIMUM_VERY_LOW_EXPOSURE_PERCENT.endInclusive.toDouble(),
+        ) {
+            "The maximum very-low-glucose percentage must be between 0 and 10."
+        }
+        require(settings.maximumVeryLowGlucosePercent <= settings.maximumLowGlucosePercent) {
+            "The maximum very-low-glucose percentage cannot exceed the maximum low-glucose percentage."
+        }
+        settings.targetGmiPercent?.let { target ->
+            require(target.isFinite() && target in GlycemicPlannerBounds.TARGET_GMI_PERCENT) {
+                "The GMI target must be between 3.5 and 15.0."
+            }
+            requireNotNull(settings.targetProvenance) {
+                "A target provenance is required when a GMI target is set."
+            }
+        } ?: require(settings.targetProvenance == null) {
+            "Target provenance must be cleared when no GMI target is set."
+        }
+        context.settingsDataStore.edit { values ->
+            settings.targetGmiPercent?.let {
+                values[Keys.glycemicTargetGmi] = it
+            } ?: values.remove(Keys.glycemicTargetGmi)
+            settings.targetProvenance?.let {
+                values[Keys.glycemicTargetProvenance] = it.name
+            } ?: values.remove(Keys.glycemicTargetProvenance)
+            values[Keys.glycemicHorizonDays] = settings.horizon.days
+            values[Keys.glycemicLowThreshold] = settings.lowGlucoseThresholdMgDl
+            values[Keys.glycemicVeryLowThreshold] = settings.veryLowGlucoseThresholdMgDl
+            values[Keys.glycemicMaximumLowPercent] = settings.maximumLowGlucosePercent
+            values[Keys.glycemicMaximumVeryLowPercent] = settings.maximumVeryLowGlucosePercent
+        }
+    }
+
     override suspend fun reset() {
         recommendationSnapshotDao.deleteAll()
         context.settingsDataStore.edit { values ->
@@ -283,5 +388,16 @@ class SettingsRepositoryImpl @Inject constructor(
         val nightscoutMaximumRetryAttempts =
             intPreferencesKey("nightscout_maximum_retry_attempts")
         val nightscoutRequireHttps = booleanPreferencesKey("nightscout_require_https")
+        val glycemicTargetGmi = doublePreferencesKey("glycemic_target_gmi")
+        val glycemicTargetProvenance = stringPreferencesKey("glycemic_target_provenance")
+        val glycemicHorizonDays = intPreferencesKey("glycemic_horizon_days")
+        val glycemicLowThreshold = intPreferencesKey("glycemic_low_threshold")
+        val glycemicVeryLowThreshold = intPreferencesKey("glycemic_very_low_threshold")
+        val glycemicMaximumLowPercent = doublePreferencesKey("glycemic_maximum_low_percent")
+        val glycemicMaximumVeryLowPercent =
+            doublePreferencesKey("glycemic_maximum_very_low_percent")
     }
 }
+
+private inline fun <reified T : Enum<T>> String?.enumOrNull(): T? =
+    this?.let { value -> runCatching { enumValueOf<T>(value) }.getOrNull() }

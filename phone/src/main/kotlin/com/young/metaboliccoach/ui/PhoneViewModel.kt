@@ -14,6 +14,8 @@ import com.young.metaboliccoach.core.domain.CoachTimeSource
 import com.young.metaboliccoach.core.domain.CoachedExerciseActionPolicy
 import com.young.metaboliccoach.core.domain.CoachingRepository
 import com.young.metaboliccoach.core.domain.GlucoseRepository
+import com.young.metaboliccoach.core.domain.GlycemicGoalPlanner
+import com.young.metaboliccoach.core.domain.GlycemicGoalRepository
 import com.young.metaboliccoach.core.domain.NightscoutSettingsRepository
 import com.young.metaboliccoach.core.domain.NightscoutSettingsValidator
 import com.young.metaboliccoach.core.domain.SettingsRepository
@@ -26,6 +28,10 @@ import com.young.metaboliccoach.core.model.DefaultCoachSettings
 import com.young.metaboliccoach.core.model.DefaultNightscoutSettings
 import com.young.metaboliccoach.core.model.GlucoseDataOrigin
 import com.young.metaboliccoach.core.model.GlucoseReading
+import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
+import com.young.metaboliccoach.core.model.GlycemicWindow
+import com.young.metaboliccoach.core.model.RollingGlycemicMetrics
+import com.young.metaboliccoach.core.model.GlycemicGoalScenario
 import com.young.metaboliccoach.core.model.InterventionSession
 import com.young.metaboliccoach.core.model.MealMarker
 import com.young.metaboliccoach.core.model.NightscoutSettings
@@ -66,6 +72,9 @@ data class PhoneUiState(
     val operationMessage: String? = null,
     val isOperationInProgress: Boolean = false,
     val nowEpochMillis: Long = 0,
+    val glycemicPlannerSettings: GlycemicPlannerSettings = GlycemicPlannerSettings(),
+    val glycemicMetrics: List<RollingGlycemicMetrics> = emptyList(),
+    val glycemicGoalScenario: GlycemicGoalScenario? = null,
 )
 
 private data class CurrentState(
@@ -81,6 +90,12 @@ private data class PhoneConfiguration(
     val nightscout: NightscoutSettings,
 )
 
+private data class PlannerState(
+    val settings: GlycemicPlannerSettings,
+    val metrics: List<RollingGlycemicMetrics>,
+    val scenario: GlycemicGoalScenario?,
+)
+
 @HiltViewModel
 @OptIn(ExperimentalCoroutinesApi::class)
 class PhoneViewModel @Inject constructor(
@@ -89,6 +104,7 @@ class PhoneViewModel @Inject constructor(
     private val coachingRepository: CoachingRepository,
     private val settingsRepository: SettingsRepository,
     private val nightscoutSettingsRepository: NightscoutSettingsRepository,
+    private val glycemicGoalRepository: GlycemicGoalRepository,
     private val quickActionHandler: QuickActionHandler,
     private val refreshCoordinator: PhoneRefreshCoordinator,
     private val syncScheduler: SyncScheduler,
@@ -140,6 +156,51 @@ class PhoneViewModel @Inject constructor(
         )
     }
 
+    private val plannerState = combine(
+        glucoseRepository.observeLatest(),
+        glycemicGoalRepository.observeSettings(),
+        nightscoutSettingsRepository.observeNightscoutSettings(),
+        settingsRepository.observe(),
+    ) { _, plannerSettings, _, coachSettings -> plannerSettings to coachSettings }
+        .flatMapLatest { (plannerSettings, coachSettings) ->
+            flow {
+                val now = timeSource.nowEpochMillis()
+                val readings = runCatching {
+                    glucoseRepository.readingsBetween(
+                        startEpochMillis = now - GlycemicWindow.DAYS_90.durationMillis - 30 * 60_000L,
+                        endEpochMillis = now,
+                    )
+                }.getOrDefault(emptyList())
+                val metrics = listOf(
+                    GlycemicWindow.DAYS_30,
+                    GlycemicWindow.DAYS_60,
+                    GlycemicWindow.DAYS_90,
+                ).map { window ->
+                    GlycemicGoalPlanner.calculateRollingMetrics(
+                        readings = readings,
+                        window = window,
+                        windowEndEpochMillis = now,
+                        targetLowerMgDl = coachSettings.targetLowerMgDl,
+                        targetUpperMgDl = coachSettings.targetUpperMgDl,
+                        lowGlucoseThresholdMgDl = plannerSettings.lowGlucoseThresholdMgDl,
+                        veryLowGlucoseThresholdMgDl = plannerSettings.veryLowGlucoseThresholdMgDl,
+                    )
+                }
+                val scenario = plannerSettings.targetGmiPercent?.let { target ->
+                    GlycemicGoalPlanner.calculateGoalScenario(
+                        readings = readings,
+                        horizon = plannerSettings.horizon,
+                        windowEndEpochMillis = now,
+                        targetGmiPercent = target,
+                        plannerSettings = plannerSettings,
+                        targetLowerMgDl = coachSettings.targetLowerMgDl,
+                        targetUpperMgDl = coachSettings.targetUpperMgDl,
+                    )
+                }
+                emit(PlannerState(plannerSettings, metrics, scenario))
+            }
+        }
+
     private val uiClock = baseUiState
         .map { (it.recommendation as? CoachRecommendation.Action)?.validUntilEpochMillis }
         .distinctUntilChanged()
@@ -157,10 +218,11 @@ class PhoneViewModel @Inject constructor(
 
     val uiState = combine(
         baseUiState,
+        plannerState,
         operationMessage,
         operationInProgress,
         uiClock,
-    ) { state, message, isWorking, now ->
+    ) { state, planner, message, isWorking, now ->
         val recommendation = state.recommendation
         val effectiveRecommendation = if (
             recommendation is CoachRecommendation.Action &&
@@ -182,6 +244,9 @@ class PhoneViewModel @Inject constructor(
             operationMessage = message,
             isOperationInProgress = isWorking,
             nowEpochMillis = now,
+            glycemicPlannerSettings = planner.settings,
+            glycemicMetrics = planner.metrics,
+            glycemicGoalScenario = planner.scenario,
         )
     }.stateIn(
         viewModelScope,
@@ -203,6 +268,14 @@ class PhoneViewModel @Inject constructor(
         runOperation("Health Connect permissions updated.") {
             syncScheduler.configurePeriodic()
             refreshCoordinator.refresh(refreshProviders = true)
+        }
+    }
+
+    fun saveGlycemicPlannerSettings(settings: GlycemicPlannerSettings) {
+        runOperation("Glycemic planner settings saved.") {
+            mutationGate.withLock {
+                glycemicGoalRepository.updateSettings(settings)
+            }
         }
     }
 
@@ -356,4 +429,5 @@ class PhoneViewModel @Inject constructor(
             }
         }
     }
+
 }

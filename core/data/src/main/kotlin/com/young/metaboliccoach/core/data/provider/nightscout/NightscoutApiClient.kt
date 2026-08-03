@@ -2,6 +2,7 @@ package com.young.metaboliccoach.core.data.provider.nightscout
 
 import com.young.metaboliccoach.core.model.NightscoutServerConfig
 import java.io.IOException
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,6 +31,22 @@ interface NightscoutApiClient {
         connectionTimeoutSeconds: Int,
         ifModifiedSince: String?,
     ): NightscoutHttpResponse
+
+    /**
+     * Fetches a bounded date range. Older test doubles can use the default implementation while
+     * providers progressively adopt historical backfill.
+     */
+    suspend fun fetchEntriesInRange(
+        server: NightscoutServerConfig,
+        connectionTimeoutSeconds: Int,
+        startEpochMillis: Long,
+        endEpochMillis: Long,
+        count: Int,
+    ): NightscoutHttpResponse = fetchEntries(
+        server = server,
+        connectionTimeoutSeconds = connectionTimeoutSeconds,
+        ifModifiedSince = null,
+    )
 }
 
 interface NightscoutRequestAuthenticator {
@@ -57,11 +74,50 @@ class OkHttpNightscoutApiClient @Inject constructor(
         server: NightscoutServerConfig,
         connectionTimeoutSeconds: Int,
         ifModifiedSince: String?,
+    ): NightscoutHttpResponse = executeRequest(
+        server = server,
+        connectionTimeoutSeconds = connectionTimeoutSeconds,
+        ifModifiedSince = ifModifiedSince,
+        startEpochMillis = null,
+        endEpochMillis = null,
+        count = DEFAULT_HISTORY_ENTRY_COUNT,
+    )
+
+    override suspend fun fetchEntriesInRange(
+        server: NightscoutServerConfig,
+        connectionTimeoutSeconds: Int,
+        startEpochMillis: Long,
+        endEpochMillis: Long,
+        count: Int,
+    ): NightscoutHttpResponse = executeRequest(
+        server = server,
+        connectionTimeoutSeconds = connectionTimeoutSeconds,
+        ifModifiedSince = null,
+        startEpochMillis = startEpochMillis,
+        endEpochMillis = endEpochMillis,
+        count = count,
+    )
+
+    private suspend fun executeRequest(
+        server: NightscoutServerConfig,
+        connectionTimeoutSeconds: Int,
+        ifModifiedSince: String?,
+        startEpochMillis: Long?,
+        endEpochMillis: Long?,
+        count: Int,
     ): NightscoutHttpResponse {
         val url = server.baseUrl.toHttpUrl()
             .newBuilder()
             .addPathSegments("api/v1/entries/sgv.json")
-            .addQueryParameter("count", HISTORY_ENTRY_COUNT.toString())
+            .addQueryParameter("count", count.coerceIn(1, MAX_HISTORY_ENTRY_COUNT).toString())
+            .apply {
+                startEpochMillis?.let {
+                    addQueryParameter("find[dateString][${'$'}gte]", Instant.ofEpochMilli(it).toString())
+                }
+                endEpochMillis?.let {
+                    addQueryParameter("find[dateString][${'$'}lte]", Instant.ofEpochMilli(it).toString())
+                }
+            }
             .build()
         val requestBuilder = Request.Builder()
             .url(url)
@@ -126,7 +182,8 @@ class OkHttpNightscoutApiClient @Inject constructor(
     }
 
     private companion object {
-        const val HISTORY_ENTRY_COUNT = 300
+        const val DEFAULT_HISTORY_ENTRY_COUNT = 300
+        const val MAX_HISTORY_ENTRY_COUNT = 2_500
         const val HTTP_NOT_MODIFIED = 304
         const val MAX_RESPONSE_BYTES = 1_048_576L
     }

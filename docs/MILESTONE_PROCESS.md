@@ -103,15 +103,19 @@ non-conflicting earlier constraints, and avoid inferring acceptance that the use
 ## Current gate
 
 - `v0.2` phone-side Nightscout acceptance: accepted by the user on 2026-08-01.
-- `v0.3` physical Galaxy Watch8 acceptance: ready for execution using the unchanged `v0.2.0`
-  engineering APKs.
+- `v0.3` physical Galaxy Watch8 acceptance: the user reported completion on 2026-08-02. The
+  privacy-sanitized record is [V0_3_PHYSICAL_ACCEPTANCE.md](acceptance/V0_3_PHYSICAL_ACCEPTANCE.md);
+  it records user evidence and does not fabricate device logs or private health values.
 - Pre-install review: the continued ChatGPT architecture conversation returned `READY FOR PHYSICAL
   TEST`, and independent repository architecture/package audits returned `CLEAR` / `READY` with no
   critical blocker.
 - Automated preflight: sync, phone, and Wear unit tests plus phone, Wear, and watch-face lint passed
   with all 200 selected Gradle tasks executed.
-- Production-code freeze: active until the user reports `v0.3` results and architecture review
-  determines the next action.
-- `v0.4` planning: locked.
+- Production-code freeze: lifted for the reviewed `v0.4` phone-only planner scope. Wear, watch-face,
+  coaching, and notification behavior remain frozen.
+- `v0.4` planning: active as the Glycemic Goal Planner milestone, with the reviewed conditions that
+  it uses CGM-derived GMI terminology, a 14-day safety baseline with fixed 30/60/90-day windows,
+  source-isolated history,
+  coverage/gap reporting, and no medical or treatment claims.
 
-The current physical test is defined in [V0.3_WEAR_ACCEPTANCE.md](V0.3_WEAR_ACCEPTANCE.md).
+The completed physical test was defined in [V0.3_WEAR_ACCEPTANCE.md](V0.3_WEAR_ACCEPTANCE.md).

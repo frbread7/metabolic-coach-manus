@@ -50,6 +50,14 @@ If the already accepted phone APK is installed from this same build/signing iden
 uninstall it. Uninstalling would delete its local settings and history. Install only the missing
 Wear and watch-face components unless an intentional same-certificate upgrade is required.
 
+## v0.4 CI artifact preflight
+
+The v0.4 package is a debug-signed engineering candidate for phone-only planner acceptance. Verify
+the ZIP SHA-256, commit SHA, and signing certificate recorded in the GitHub Actions run summary
+before installing. It is an in-place update only when its certificate matches the accepted v0.3
+package; otherwise stop and treat it as clean-install-only. Rebuilding the Wear and watch-face APKs
+with v0.4 metadata does not constitute new physical acceptance for those components.
+
 ## Install from a phone with Bugjaeger
 
 1. Download the ZIP from the build VM and verify that its filename, externally recorded SHA-256,

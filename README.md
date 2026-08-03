@@ -13,7 +13,10 @@ Samsung Galaxy Watch8.
 > passed the repository's local static pipeline on 2026-07-25. The user accepted the phone-side
 > `v0.2` Nightscout gate on 2026-08-01 after validating URL configuration, current glucose, trend,
 > delta, timestamp, offline cache, retry behavior, and crash-free operation. Physical Galaxy
-> Watch8, Android instrumentation, production-signing, and store-policy gates remain outstanding.
+> Watch8 `v0.3` acceptance was user-reported complete on 2026-08-02 and is recorded in a
+> privacy-sanitized acceptance record. Android instrumentation, production-signing, and
+> store-policy gates remain outstanding. `v0.4` is now the phone-only Glycemic Goal Planner
+> milestone; Wear, watch-face, coaching, and notification behavior remain unchanged.
 > It is a wellness tool, not a medical device, and must not replace the CGM vendor app, glucose
 > alarms, professional advice, or a personal care plan.
 
@@ -26,22 +29,23 @@ synchronization and coaching foundations remain frozen while the current milesto
 | --- | --- | --- |
 | `v0.1` | Infrastructure: phone, Wear app, WFF watch face, shared architecture, persistence, and build/package pipeline | Complete |
 | `v0.2` | Nightscout integration: provider isolation, configuration, retry/cache behavior, normalized repository flow, and phone-first live acceptance | Accepted 2026-08-01 |
-| `v0.3` | Watch synchronization: validate the existing Data Layer path and packaged watch components on a physical phone and Galaxy Watch8 | Physical acceptance ready; production-code freeze active |
-| `v0.4` | Metabolic Coach: validate and tune the existing walk/stair recommendations without adding medical claims | Blocked on `v0.3` |
+| `v0.3` | Watch synchronization: validate the existing Data Layer path and packaged watch components on a physical phone and Galaxy Watch8 | Accepted by user report 2026-08-02; sanitized record stored |
+| `v0.4` | Glycemic Goal Planner: phone-side 14-day safety baseline, 30/60/90-day CGM-derived metrics, and bounded goal scenarios | Active; phone-only scope |
 | `v0.5` | One-week personal beta with documented reliability, battery, and safety observations | Planned |
 | `v1.0` | Stable daily-use release with production signing and all release gates complete | Planned |
 
-Do not add production functionality while the `v0.3` physical gate is open. Work is limited to
-verification, installation documentation, the physical acceptance record, and critical defects
-that would prevent safe installation or synchronization. After the user reports results, stop for
-architecture review before planning `v0.4`. See the [milestone process](docs/MILESTONE_PROCESS.md)
-and [v0.3 Wear acceptance checklist](docs/V0.3_WEAR_ACCEPTANCE.md).
+The `v0.3` physical gate is closed by the user's report, with the sanitized record retained for
+audit. `v0.4` is deliberately limited to the phone-side planner foundation: bounded Nightscout
+history backfill, provider-independent calculations, configurable targets, and phone UI. It does
+not change Wear synchronization, the watch face, coaching rules, or notifications. See the
+[milestone process](docs/MILESTONE_PROCESS.md), [v0.3 Wear acceptance checklist](docs/V0.3_WEAR_ACCEPTANCE.md),
+and [the v0.3 acceptance record](docs/acceptance/V0_3_PHYSICAL_ACCEPTANCE.md).
 
 ## What is implemented
 
 | Area | Current implementation |
 | --- | --- |
-| Phone hub | Nightscout glucose retrieval with explicit multi-server selection, bounded retry and cache retention; Health Connect activity reads; Room schema v7 history; settings; coaching rules; notifications; daily summary; streaming JSON export; confirmation-gated local erase; and revisioned Wear Data Layer publishing |
+| Phone hub | Nightscout glucose retrieval with explicit multi-server selection, bounded retry/cache retention, and 90-day range backfill; Health Connect activity reads; Room schema v7 history; configurable Glycemic Goal Planner metrics/scenarios; settings; coaching rules; notifications; daily summary; streaming JSON export; confirmation-gated local erase; and revisioned Wear Data Layer publishing |
 | Wear app | Three-page touch-only horizontal pager, glucose/activity display, walk and stair actions, home countdown with completion haptic, explicit queued/rejected action results, durable snooze outbox, pending-session reconciliation, direct watch notifications, and complication providers; no bezel dependency |
 | Watch face | Separate WFF v4 resource-only package with clock, glucose/trend/delta/age, steps/floors, battery, coach action, reduced ambient content, and selectable accent configuration |
 | Coaching | Rapid-rise, post-meal, and inactivity rules with a walk fallback when stair reminders are disabled, stable recommendation IDs, explicit validity windows, minute-boundary reevaluation, quiet/working hours, cooldown, snooze, daily limit, and shared missing/future/stale/low/fast-fall safety policy |
@@ -79,14 +83,19 @@ and [v0.3 Wear acceptance checklist](docs/V0.3_WEAR_ACCEPTANCE.md).
 - **Direct Samsung Health Data SDK access is inactive.** The partner SDK is not bundled. Public
   distribution would require Samsung approval plus final package and signing-certificate
   registration.
+- **Glycemic Goal Planner is phone-only in `v0.4`.** It estimates GMI from time-weighted CGM mean
+  glucose over a 14-day safety baseline and 30/60/90-day rolling windows, and shows mathematical future-mean scenarios for a selected
+  target. It is not a laboratory HbA1c result, treatment instruction, insulin/dose guidance, or a
+  promise that a target will be achieved. Wear synchronization and coaching do not consume planner
+  output in this milestone.
 
 ## Project structure
 
 | Module | Responsibility |
 | --- | --- |
-| `:core:model` | Platform-neutral glucose, activity, settings, coaching, session, and sync models |
-| `:core:domain` | Repository contracts, coaching and shared exercise-safety rules, follow-up selection, settings validation, and personal observation analysis |
-| `:core:data` | Room schema v7 with exported schemas 1–7, DataStore, asynchronous Nightscout client/parser/cache/retry implementation, immutable recommendation snapshots, retained future-provider boundaries, and repository implementations |
+| `:core:model` | Platform-neutral glucose, activity, settings, Glycemic Goal Planner, coaching, session, and sync models |
+| `:core:domain` | Repository contracts, provider-independent time-weighted glycemic calculations/scenarios, coaching and shared exercise-safety rules, follow-up selection, settings validation, and personal observation analysis |
+| `:core:data` | Room schema v7 with exported schemas 1–7, DataStore, asynchronous Nightscout client/parser/cache/retry/range-backfill implementation, planner-settings export, immutable recommendation snapshots, retained future-provider boundaries, and repository implementations |
 | `:core:sync` | Wear Data Layer transport, versioned codec, paths, and sync repository |
 | `:phone` | Android companion UI, permissions, background refresh, notifications, and watch-command handling |
 | `:wear` | Wear OS UI, local state/session storage, notifications, and complication data sources |
@@ -116,14 +125,16 @@ and watch-face lint tasks, assembles all three APKs for that variant (debug by d
 the built watch-face APK, verifies APK signatures, checks that the phone and Wear certificates
 match, copies deliverables into `artifacts/`, and creates a versioned five-file installation ZIP.
 
-The current app version packages as `artifacts/MetabolicCoach-v0.2.zip`, containing `phone.apk`,
+When built, the v0.4 candidate packages as `artifacts/MetabolicCoach-v0.4.zip`, containing `phone.apk`,
 `wear.apk`, `watchface.apk`, `CHANGELOG.md`, and an archive-specific `INSTALL.md`. The version is
 derived from all three APK manifests and packaging fails if they disagree. Run
 `./scripts/package-release.sh` to repackage already-verified artifacts without rebuilding. A
 repeat debug build refreshes its same-version engineering ZIP only while that archive remains a
 debug build. Debug APKs can never replace a same-version release archive. A different release
 archive for an existing version is not overwritten unless `MC_PACKAGE_OVERWRITE=1` is set
-intentionally.
+intentionally. GitHub Actions is the canonical v0.4 build path for this ARM development host;
+the workflow validates the artifact gate and uploads the ZIP plus the three APKs only after all
+checks pass.
 
 The current debug artifacts are generated by the Nightscout milestone verification pipeline;
 exact evidence and hashes are recorded in [Testing](docs/TESTING.md). They remain debug-signed
@@ -137,6 +148,7 @@ engineering artifacts, not production releases. A signed release requires enviro
 - [Nightscout, Health Connect activity, and future provider integrations](docs/INTEGRATIONS.md)
 - [Milestone development and cross-session handoff process](docs/MILESTONE_PROCESS.md)
 - [v0.3 Galaxy Watch8 physical acceptance checklist](docs/V0.3_WEAR_ACCEPTANCE.md)
+- [v0.3 privacy-sanitized physical acceptance record](docs/acceptance/V0_3_PHYSICAL_ACCEPTANCE.md)
 - [Development and build guide](docs/DEVELOPMENT.md)
 - [Testing strategy, milestone acceptance, and release gates](docs/TESTING.md)
 - [User guide](docs/USER_GUIDE.md)

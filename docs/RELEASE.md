@@ -50,6 +50,30 @@ handed off.
 These are debug-signed engineering artifacts, not production releases. Regenerate and rehash them
 after every source/build change.
 
+## v0.4 GitHub Actions engineering artifact
+
+The v0.4 workflow is the reproducible build path for this ARM development host. It runs on an
+x86_64 `ubuntu-latest` runner, keeps the existing test/lint/WFF/release-isolation checks, and then
+requires the three APKs to report `versionName=0.4.0` and `versionCode=4`. It also verifies the
+five-file `MetabolicCoach-v0.4.zip` contract and the signing certificate used by the accepted v0.3
+installation.
+
+Before a push or manual `workflow_dispatch` run, configure the encrypted repository secret from the
+same engineering keystore that signed the accepted v0.3 APKs. Do not commit the keystore or its
+contents:
+
+```bash
+base64 -w0 ~/.android/debug.keystore > /tmp/metabolic-coach-debug.keystore.b64
+gh secret set MC_DEBUG_KEYSTORE_BASE64 < /tmp/metabolic-coach-debug.keystore.b64
+rm /tmp/metabolic-coach-debug.keystore.b64
+```
+
+The workflow intentionally fails closed when this secret is absent, because a newly generated
+runner debug key would make the phone/Wear/watch-face packages clean-install-only and could break
+an in-place update. The uploaded artifact remains debug-signed engineering output, not a production
+release. The run summary records the commit SHA, workflow run ID, certificate digest, and SHA-256
+hashes for the three APKs and ZIP.
+
 ## Versioned ZIP handoff
 
 Every successful `scripts/build-apks.sh` run packages the three verified APKs and handoff

@@ -26,6 +26,7 @@ The current source includes these JVM and Android local-test suites:
 | `NightscoutSettingsValidatorTest` | Multiple-server limits and selection, URL normalization, HTTPS enforcement, credential/query/fragment rejection, valid TCP ports, and polling/timeout/retry bounds |
 | `NightscoutJsonParserTest` | Nightscout response parsing, trend mapping, stable IDs, ordering, delta/rate calculation, timestamp fallbacks, malformed/unusable rows, and bounded value/time acceptance |
 | `NightscoutProviderTest` | Provider state flow, success, conditional cache reuse, retry/non-retry and response-size classification, retained cache on failure, cancellation, and per-server isolation/switching |
+| `GlycemicGoalPlannerTest` | GMI conversion, time-weighted 14/30/60/90-day metrics, coverage and long-gap handling, source discontinuity, horizon equations, and low-glucose-risk suppression |
 | `OkHttpNightscoutApiClientTest` | MockWebServer request path/query/headers, conditional responses, redirect refusal, bounded declared/streamed response size, and future-authenticator hook without a real server |
 | `NightscoutSettingsJsonCodecTest` | Stable multi-server DataStore encoding/decoding and malformed stored-value recovery |
 | `XdripGlucoseIngestorTest` | Retained inactive-adapter input validation; it does not prove or enable a Version 1 broadcast route |
@@ -41,7 +42,7 @@ The current source includes these JVM and Android local-test suites:
 | `PhoneCommandProcessorTest` | Exactly-once terminal replay: a persisted rejected command triggers watch-state republication without invoking mutation logic |
 | `CommandDataEpochPolicyTest` | Legacy compatibility before erase and strict current-reset-token matching afterward |
 | `PhoneDataMutationGateTest` | Process-wide serialization prevents boundary crossing; local operations preempt cancellable provider work and retain priority over already queued provider work |
-| `PersonalDataJsonWriterTest` | Deterministic versioned JSON, escaping/control characters, non-finite-number handling, binary encoding, and empty-table separators |
+| `PersonalDataJsonWriterTest` | Deterministic versioned JSON, planner-settings export, escaping/control characters, non-finite-number handling, binary encoding, and empty-table separators |
 | `SessionAckOrderingPolicyTest` | Completion-over-start ordering, older replay protection, and the rejected-start/completion/replayed-start chain |
 | `WearSessionReplicaReducerTest` | Persistent pending start/completion, transport state, tombstone protection, and all acknowledgement outcomes |
 | `WearCommandOutboxPolicyTest` | Generic command ordering, stable-ID deduplication, and removal |
@@ -83,12 +84,15 @@ Execute the migration suite on an Android runtime with:
 - `v0.2` live acceptance gate: accepted by the user on 2026-08-01 after phone-side validation of
   configuration, current glucose, trend, delta, timestamp, offline cache, retry, and crash-free
   behavior. A history graph was outside the milestone and was not required for acceptance.
-- `v0.3` gate: install the unchanged matching `v0.2.0` phone/Wear/watch-face artifacts and validate
-  the existing Data Layer flow, reconnect behavior, stale-state handling, and physical Watch8 UI
-  using [the authoritative result sheet](V0.3_WEAR_ACCEPTANCE.md). Production code remains frozen
-  while this gate is open.
-- `v0.4` coaching work remains frozen until the preceding gates pass. Existing walk/stair behavior
-  may be regression-tested, but no new coaching feature or medical claim belongs in `v0.3`.
+- `v0.3` gate: the user reported installation, synchronization, reconnect, stale-state, round/AOD,
+  readability, stability, and battery checks complete on 2026-08-02. The report is retained as
+  [the privacy-sanitized acceptance record](acceptance/V0_3_PHYSICAL_ACCEPTANCE.md); it is not a
+  substitute for reproducible device logs.
+- `v0.4` gate: run planner unit tests with synthetic readings, provider-range request tests, settings
+  persistence/export checks, phone UI compile/lint, and a phone-only manual smoke test. Verify that
+  Wear payloads, coaching decisions, notifications, and watch-face resources are unchanged.
+  Validate that the UI labels the result as CGM-derived GMI, exposes coverage/gaps and low-glucose
+  suppression, and never presents a scenario as a treatment recommendation.
 
 ## Current local verification
 
@@ -119,6 +123,38 @@ The `v0.3` pre-install rerun on 2026-08-01 executed the sync, phone, and Wear un
 phone, Wear, and watch-face debug lint with cache/incremental reuse disabled. Gradle reported
 `BUILD SUCCESSFUL` in 9m22s with all 200 selected tasks executed. No source code was changed for
 this gate.
+
+For the current `v0.4` checkout on 2026-08-03:
+
+- `./gradlew :core:domain:test --no-daemon` passed, including 9 `GlycemicGoalPlannerTest` cases;
+- `./gradlew :core:model:test --no-daemon` and `:wear:compileDebugKotlin` passed;
+- `:core:data:compileDebugKotlin`, `:phone:compileDebugKotlin`, and
+  `:core:sync:compileDebugKotlin` passed;
+- `:core:data:testDebugUnitTest` could not start because this host's Android toolchain cannot load
+  `libdl.so.2` for AAPT2. This is an environment blocker, not a test assertion result; rerun the
+  data/provider/export suite on a normal glibc Android build host before calling `v0.4` automated
+  verification complete.
+
+### v0.4 CI engineering artifact gate
+
+The v0.4 debug artifact must be built on GitHub Actions before phone-only physical acceptance.
+The workflow requires the accepted v0.3 engineering keystore through the encrypted
+`MC_DEBUG_KEYSTORE_BASE64` repository secret; it never generates or commits a replacement key.
+The gate records the commit SHA, workflow run ID, signing certificate digest, and SHA-256 hashes,
+and uploads exactly:
+
+```text
+metabolic-coach-phone-debug.apk
+metabolic-coach-wear-debug.apk
+metabolic-coach-watchface-debug.apk
+MetabolicCoach-v0.4.zip
+```
+
+The v0.4 run is accepted only when all automated checks pass, every APK reports version
+`0.4.0`/code `4`, the ZIP contains exactly `CHANGELOG.md`, `INSTALL.md`, `phone.apk`,
+`watchface.apk`, and `wear.apk`, the v0.3 certificate matches, and the credential/privacy audit is
+clean. A successful artifact build does not claim new Wear, watch-face, synchronization, or
+coaching behavior; those modules are rebuilt only to keep the package metadata aligned.
 
 Current debug artifact SHA-256 values:
 

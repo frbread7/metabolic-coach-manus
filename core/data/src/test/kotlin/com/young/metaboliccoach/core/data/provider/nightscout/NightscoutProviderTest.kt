@@ -66,6 +66,31 @@ class NightscoutProviderTest {
     }
 
     @Test
+    fun `cold recent history fetches bounded ranges and merges normalized readings`() = runTest {
+        val start = NOW - (8 * DAY)
+        val fixture = provider(
+            settings = settings(),
+            responses = listOf(
+                ok(bodyAt(value = 128, remoteId = "history-first", measuredAt = start)),
+                ok(bodyAt(value = 142, remoteId = "history-second", measuredAt = NOW - DAY)),
+            ),
+        )
+
+        val readings = fixture.provider.readSince(start)
+
+        assertEquals(listOf(128, 142), readings.map { it.valueMgDl })
+        assertEquals(2, fixture.apiClient.rangeRequests.size)
+        assertEquals(2_500, fixture.apiClient.rangeRequests.first().count)
+        assertEquals(start, fixture.apiClient.rangeRequests.first().startEpochMillis)
+        assertEquals(
+            fixture.apiClient.rangeRequests.first().endEpochMillis + 1,
+            fixture.apiClient.rangeRequests.last().startEpochMillis,
+        )
+        assertEquals(NOW, fixture.apiClient.rangeRequests.last().endEpochMillis)
+        assertTrue(fixture.apiClient.requests.isEmpty())
+    }
+
+    @Test
     fun `retryable failures use bounded exponential delays before success`() = runTest {
         val fixture = provider(
             settings = settings(
@@ -365,6 +390,21 @@ class NightscoutProviderTest {
         ]
     """.trimIndent()
 
+    private fun bodyAt(
+        value: Int,
+        remoteId: String,
+        measuredAt: Long,
+    ): String = """
+        [
+          {
+            "_id":"$remoteId",
+            "sgv":$value,
+            "date":$measuredAt,
+            "direction":"Flat"
+          }
+        ]
+    """.trimIndent()
+
     private fun ok(
         body: String,
         lastModified: String? = null,
@@ -404,6 +444,7 @@ class NightscoutProviderTest {
     ) : NightscoutApiClient {
         private val remaining = ArrayDeque(responses)
         val requests = mutableListOf<RecordedApiRequest>()
+        val rangeRequests = mutableListOf<RecordedRangeRequest>()
 
         override suspend fun fetchEntries(
             server: NightscoutServerConfig,
@@ -418,7 +459,33 @@ class NightscoutProviderTest {
             check(remaining.isNotEmpty()) { "No fake Nightscout response remains." }
             return remaining.removeFirst().getOrThrow()
         }
+
+        override suspend fun fetchEntriesInRange(
+            server: NightscoutServerConfig,
+            connectionTimeoutSeconds: Int,
+            startEpochMillis: Long,
+            endEpochMillis: Long,
+            count: Int,
+        ): NightscoutHttpResponse {
+            rangeRequests += RecordedRangeRequest(
+                server = server,
+                connectionTimeoutSeconds = connectionTimeoutSeconds,
+                startEpochMillis = startEpochMillis,
+                endEpochMillis = endEpochMillis,
+                count = count,
+            )
+            check(remaining.isNotEmpty()) { "No fake Nightscout response remains." }
+            return remaining.removeFirst().getOrThrow()
+        }
     }
+
+    private data class RecordedRangeRequest(
+        val server: NightscoutServerConfig,
+        val connectionTimeoutSeconds: Int,
+        val startEpochMillis: Long,
+        val endEpochMillis: Long,
+        val count: Int,
+    )
 
     private class RecordingRetrySleeper(
         private val cancelOnSleep: Boolean = false,

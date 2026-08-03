@@ -11,7 +11,9 @@ dashboard. The architecture therefore optimizes for:
 - touch-only operation on a round Galaxy Watch8;
 - low-frequency background work and system-rendered ambient watch-face content;
 - replaceable data providers and future cloud or intelligence layers;
-- explicit missing/future/stale/low/fast-fall safety behavior shared by phone and Wear.
+- explicit missing/future/stale/low/fast-fall safety behavior shared by phone and Wear;
+- phone-side, provider-independent glycemic planning that reports data coverage and mathematical
+  scenarios without changing coaching or treatment behavior.
 
 The watch never connects to Nightscout, a CGM, Health Connect, Samsung Health, or multiple
 third-party apps directly. The phone is the data authority. The watch is a cached view and command
@@ -110,6 +112,8 @@ Pure Kotlin models define:
 - activity snapshots, daily exercise-session count/duration aggregates, and intervention sessions;
 - meal markers, daily summary, recommendations with stable IDs and validity windows, settings, and
   observations;
+- Glycemic Goal Planner windows, GMI-derived metrics, target provenance, coverage/gap status, and
+  low-glucose-risk scenario status;
 - watch state, phone instance/revision metadata, session-command acknowledgements, and quick-action
   commands.
 
@@ -126,6 +130,9 @@ The domain module contains no Android dependency. It owns:
 - shared exercise-safety evaluation and effective-recommendation filtering;
 - deterministic follow-up-reading selection;
 - settings validation;
+- time-weighted 14/30/60/90-day glycemic metrics and target scenarios from normalized
+  `GlucoseReading` values, including source isolation, coverage/gap reporting, and low-glucose-risk
+  suppression;
 - cautious effect summaries and prospective-only timing observations.
 
 This makes the most important logic fast to test on the JVM.
@@ -137,11 +144,13 @@ The data module adapts Android facilities to domain contracts:
 - Room database and DAOs;
 - Preferences DataStore settings;
 - an asynchronous OkHttp Nightscout API client, JSON parser, bounded response size, conditional
-  request support, per-server memory cache, bounded retry, and observable provider state;
+  request support, bounded historical range backfill, per-server memory cache, bounded retry, and
+  observable provider state;
 - Health Connect activity readers;
 - CareSens partner capability stub and an inactive Samsung Health partner-provider boundary;
 - retained Health Connect glucose and xDrip adapter code as inactive future-provider boundaries;
 - a bounded-memory, schema-versioned personal-data JSON exporter and local-data eraser;
+- planner settings persisted in the phone DataStore and included in the user-owned JSON export;
 - repository implementations and Hilt multibindings for the normalized `GlucoseProvider`
   interface.
 
@@ -155,6 +164,15 @@ ordered readings. Source IDs include the configured server ID and a digest of it
 so histories and caches cannot be mixed when servers change. The provider publishes loading,
 available, configuration-required, or degraded state through `Flow`. A degraded state can carry
 the newest cached reading while Room remains the durable history.
+
+When the phone requests a recent historical window (up to 90 days) and the provider cache is cold,
+Nightscout history is fetched in bounded seven-day ranges using `find[dateString][$gte]`,
+`find[dateString][$lte]`, and a capped entry count. Ranges are retried independently and merged by stable
+reading ID. The process-memory cache is bounded to the 90-day planner lookback plus a one-day
+interpolation cushion; Room remains the durable history. The planner then computes
+elapsed-time-weighted means and range exposure from one
+exact source; gaps beyond the interpolation limit reduce coverage instead of being silently
+filled. This backfill is a phone-side data operation and is not sent through Wear.
 
 The current authenticator is deliberately a no-op for public Nightscout servers. A separate
 `NightscoutRequestAuthenticator` boundary exists for future credential-backed requests.
@@ -227,6 +245,19 @@ When Wear first accepts a new non-null data-reset token, it clears the session r
 command outbox before caching the empty phone state. Replaying the same token is idempotent.
 
 ## Runtime flows
+
+### Glycemic Goal Planner
+
+The planner is a phone-only read path layered above `GlucoseRepository`. It requests up to 90 days
+of normalized Nightscout readings, computes 14/30/60/90-day rolling metrics with time weighting,
+uses the 14-day window as a safety baseline and displays 30/60/90-day rolling metrics, then
+converts mean glucose to the published GMI estimate (`GMI = 3.31 + 0.02392 × mean mg/dL`). The
+inverse equation is used only to show a mathematical future mean for a selected target. For a
+30-day horizon the scenario uses the preceding 60-day observed mean; for 60 days it uses the
+preceding 30-day mean; for 90 days it targets the full-window mean directly. Insufficient coverage,
+source changes, long gaps, invalid input, and configured low/very-low exposure suppress or qualify
+the result. Planner output is display-only and does not enter coaching, notifications, Wear state,
+or watch-face complications in `v0.4`.
 
 ### Refresh and coaching
 
@@ -402,7 +433,7 @@ Google requires WFF logic and Wear application logic in separate bundles:
 | Store | Device | Data |
 | --- | --- | --- |
 | Room | Phone | Glucose readings, activity snapshots, intervention sessions, meal markers, coaching state |
-| Preferences DataStore | Phone | Coaching/presentation settings and persistent phone instance, publication revision, data-reset token, and terminal command acknowledgement/history |
+| Preferences DataStore | Phone | Coaching/presentation settings, Glycemic Goal Planner target/provenance/horizon/safety thresholds, and persistent phone instance, publication revision, data-reset token, and terminal command acknowledgement/history |
 | Preferences DataStore | Watch | Latest encoded watch state, active/pending session replica and completion tombstone, plus the bounded generic command outbox |
 | Data Layer | Google Play services | Latest synchronized state and transient action items |
 
@@ -411,8 +442,9 @@ backend. Wear Data Layer traffic can use Bluetooth or Google infrastructure and 
 encrypted according to the platform documentation. See [Privacy and safety](PRIVACY_AND_SAFETY.md).
 
 The phone Settings screen can stream a schema-versioned JSON export through Android's document
-picker. It contains coaching settings and every row from the six application Room tables in stable
-table/row/property order; Nightscout connection configuration and future credentials are excluded.
+picker. It contains coaching settings, planner settings, and every row from the six application
+Room tables in stable table/row/property order; Nightscout connection configuration and future
+credentials are excluded.
 The writer emits one database row at a time and does not create an extra temporary health-data copy.
 
 Export and confirmed erase share a process-wide `PhoneDataMutationGate` with provider refresh and
@@ -519,6 +551,8 @@ describe a timing bucket as medically recommended, causal, best, or ideal.
   but medication, unrecorded behavior, adherence, and selection bias remain uncontrolled.
 - No cloud backup, account recovery, or configurable retention policy exists. The local JSON
   export and confirmed erase flows still require device/document-provider lifecycle testing.
-- No physical Galaxy Watch8 touch, AOD, battery, or burn-in validation has been completed.
+- The user reported the `v0.3` Galaxy Watch8 physical acceptance complete on 2026-08-02; the
+  repository retains only a privacy-sanitized record, so independent device logs, extended battery
+  measurements, and lifecycle retests remain unverified.
 - The migration instrumentation suite has only compiled; no instrumentation execution or
   production-signed/store-policy release has been completed.

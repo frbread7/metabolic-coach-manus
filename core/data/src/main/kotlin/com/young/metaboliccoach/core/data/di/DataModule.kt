@@ -26,6 +26,7 @@ import com.young.metaboliccoach.core.domain.ActivityRepository
 import com.young.metaboliccoach.core.domain.CoachTimeSource
 import com.young.metaboliccoach.core.domain.CoachRuleEngine
 import com.young.metaboliccoach.core.domain.CoachingRepository
+import com.young.metaboliccoach.core.domain.GlycemicGoalRepository
 import com.young.metaboliccoach.core.domain.GlucoseRepository
 import com.young.metaboliccoach.core.domain.ObservationAnalyzer
 import com.young.metaboliccoach.core.domain.NightscoutSettingsRepository
@@ -63,6 +64,12 @@ abstract class RepositoryModule {
     abstract fun bindNightscoutSettingsRepository(
         impl: SettingsRepositoryImpl,
     ): NightscoutSettingsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindGlycemicGoalRepository(
+        impl: SettingsRepositoryImpl,
+    ): GlycemicGoalRepository
 
     @Binds
     @Singleton

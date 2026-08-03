@@ -1,6 +1,7 @@
 package com.young.metaboliccoach.core.data.repository
 
 import com.young.metaboliccoach.core.model.CoachSettings
+import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
 
 internal sealed interface ExportValue {
     data object Null : ExportValue
@@ -28,6 +29,7 @@ internal class PersonalDataJsonWriter(
         exportedAtEpochMillis: Long,
         databaseSchemaVersion: Int,
         settings: CoachSettings,
+        glycemicPlannerSettings: GlycemicPlannerSettings = GlycemicPlannerSettings(),
     ) {
         check(!documentOpen) { "An export document is already open." }
         tableCount = 0
@@ -40,6 +42,8 @@ internal class PersonalDataJsonWriter(
         writeNamedValue("exportedAtEpochMillis", exportedAtEpochMillis)
         destination.append(",\"settings\":")
         writeSettings(settings)
+        destination.append(",\"glycemicPlanner\":")
+        writeGlycemicPlannerSettings(glycemicPlannerSettings)
         destination.append(",\"data\":{")
         documentOpen = true
     }
@@ -141,6 +145,23 @@ internal class PersonalDataJsonWriter(
         destination.append('}')
     }
 
+    private fun writeGlycemicPlannerSettings(settings: GlycemicPlannerSettings) {
+        val values = listOf(
+            "targetGmiPercent" to settings.targetGmiPercent,
+            "targetProvenance" to settings.targetProvenance?.name,
+            "horizonDays" to settings.horizon.days,
+            "lowGlucoseThresholdMgDl" to settings.lowGlucoseThresholdMgDl,
+            "veryLowGlucoseThresholdMgDl" to settings.veryLowGlucoseThresholdMgDl,
+            "maximumLowGlucosePercent" to settings.maximumLowGlucosePercent,
+            "maximumVeryLowGlucosePercent" to settings.maximumVeryLowGlucosePercent,
+        )
+        destination.append('{')
+        values.forEachIndexed { index, (name, value) ->
+            writeNamedValue(name, value, first = index == 0)
+        }
+        destination.append('}')
+    }
+
     private fun writeNamedValue(
         name: String,
         value: Any?,
@@ -219,7 +240,7 @@ internal class PersonalDataJsonWriter(
     }
 
     private companion object {
-        const val EXPORT_SCHEMA_VERSION = 1
+        const val EXPORT_SCHEMA_VERSION = 2
         const val HEX_DIGITS = "0123456789abcdef"
     }
 }

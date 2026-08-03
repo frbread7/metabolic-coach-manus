@@ -3,6 +3,7 @@ package com.young.metaboliccoach.core.data.repository
 import android.database.Cursor
 import androidx.room.withTransaction
 import com.young.metaboliccoach.core.data.db.MetabolicCoachDatabase
+import com.young.metaboliccoach.core.domain.GlycemicGoalRepository
 import com.young.metaboliccoach.core.domain.PersonalDataRepository
 import com.young.metaboliccoach.core.domain.SettingsRepository
 import java.util.Base64
@@ -17,12 +18,14 @@ import kotlinx.coroutines.withContext
 class PersonalDataRepositoryImpl @Inject constructor(
     private val database: MetabolicCoachDatabase,
     private val settingsRepository: SettingsRepository,
+    private val glycemicGoalRepository: GlycemicGoalRepository,
 ) : PersonalDataRepository {
     override suspend fun writeJsonExport(
         exportedAtEpochMillis: Long,
         destination: Appendable,
     ) = withContext(Dispatchers.IO) {
         val settings = settingsRepository.observe().first()
+        val glycemicPlannerSettings = glycemicGoalRepository.observeSettings().first()
         database.withTransaction {
             val readableDatabase = database.openHelper.readableDatabase
             val writer = PersonalDataJsonWriter(destination)
@@ -30,6 +33,7 @@ class PersonalDataRepositoryImpl @Inject constructor(
                 exportedAtEpochMillis = exportedAtEpochMillis,
                 databaseSchemaVersion = readableDatabase.version,
                 settings = settings,
+                glycemicPlannerSettings = glycemicPlannerSettings,
             )
             EXPORT_TABLES.forEach { table ->
                 readableDatabase.query(table.query).use { cursor ->

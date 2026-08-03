@@ -7,6 +7,7 @@ import com.young.metaboliccoach.core.model.DailySummary
 import com.young.metaboliccoach.core.model.GlucoseDataOrigin
 import com.young.metaboliccoach.core.model.GlucoseProviderState
 import com.young.metaboliccoach.core.model.GlucoseReading
+import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
 import com.young.metaboliccoach.core.model.InterventionSession
 import com.young.metaboliccoach.core.model.MealMarker
 import com.young.metaboliccoach.core.model.NightscoutSettings
@@ -48,6 +49,12 @@ interface SettingsRepository {
 interface NightscoutSettingsRepository {
     fun observeNightscoutSettings(): Flow<NightscoutSettings>
     suspend fun updateNightscoutSettings(settings: NightscoutSettings)
+}
+
+interface GlycemicGoalRepository {
+    fun observeSettings(): Flow<GlycemicPlannerSettings>
+    suspend fun updateSettings(settings: GlycemicPlannerSettings)
+    suspend fun reset()
 }
 
 interface PersonalDataRepository {

@@ -13,6 +13,7 @@ import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import kotlinx.coroutines.test.runTest
+import java.time.Instant
 
 class OkHttpNightscoutApiClientTest {
     private lateinit var server: MockWebServer
@@ -58,6 +59,35 @@ class OkHttpNightscoutApiClientTest {
         assertEquals(
             "Wed, 22 Jul 2026 09:55:00 GMT",
             request.headers["If-Modified-Since"],
+        )
+    }
+
+    @Test
+    fun `range fetch adds bounded date filters and a safe count`() = runTest {
+        server.enqueue(
+            MockResponse.Builder()
+                .code(200)
+                .body("[]")
+                .build(),
+        )
+
+        client().fetchEntriesInRange(
+            server = nightscoutServer(),
+            connectionTimeoutSeconds = 10,
+            startEpochMillis = 1_700_000_000_000L,
+            endEpochMillis = 1_700_600_000_000L,
+            count = 2_500,
+        )
+
+        val request = server.takeRequest()
+        assertEquals("2500", request.url.queryParameter("count"))
+        assertEquals(
+            Instant.ofEpochMilli(1_700_000_000_000L).toString(),
+            request.url.queryParameter("find[dateString][${'$'}gte]"),
+        )
+        assertEquals(
+            Instant.ofEpochMilli(1_700_600_000_000L).toString(),
+            request.url.queryParameter("find[dateString][${'$'}lte]"),
         )
     }
 

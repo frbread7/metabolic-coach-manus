@@ -140,6 +140,22 @@ activity, adherence, and the user's choice of which sessions to complete can sti
 result. Observations never change settings, reminders, thresholds, or recommendation timing
 automatically, and must not be read as causal, medical, best, or ideal timing guidance.
 
+### Glycemic Goal Planner
+
+Open **Planner** on the phone to review CGM-derived rolling metrics for 30, 60, and 90 days. The
+planner also evaluates a 14-day recent safety baseline for goal scenarios. It shows mean glucose,
+the GMI estimate, time in range, time below range, very-low
+exposure, covered-time percentage, and the largest unfilled gap. A target is optional. When you
+enter one, record whether it is user-entered or clinician-agreed and select a fixed 30-, 60-, or
+90-day horizon. The scenario answers only: “What future mean glucose would be mathematically
+consistent with this target if the selected window were completed?”
+
+For 30 days, the calculation uses the preceding 60 days; for 60 days, it uses the preceding 30
+days; for 90 days, it uses the full future window. It is a planning scenario, not a prediction,
+medical recommendation, medication instruction, or laboratory HbA1c result. The app may show
+**insufficient coverage**, **source discontinuity**, or **suppressed for low-glucose risk** instead
+of a number. Keep the official CGM app and clinician plan authoritative.
+
 ### Wear app
 
 Use touch scrolling and large buttons:
@@ -246,6 +262,8 @@ All coaching thresholds are configurable on the phone:
 - general and post-meal timing-bucket widths;
 - follow-up-delay matching width and baseline glucose matching band;
 - intervention follow-up delay and quick-action expiry;
+- optional Glycemic Goal Planner target GMI, target provenance, 30/60/90-day horizon, low/very-low
+  boundaries, and maximum low-exposure limits;
 - reminder enable/disable switches;
 - theme and font scale.
 
@@ -321,7 +339,7 @@ fails, the Settings screen lists the exact invalid bounds so they can be correct
 Open **Settings → Your data** on the phone.
 
 - **Export personal data** opens Android's document picker and writes a versioned JSON document
-  containing coaching settings and all Metabolic Coach phone history. Nightscout server
+  containing coaching settings, Glycemic Goal Planner settings, and all Metabolic Coach phone history. Nightscout server
   configuration is not included, so this is not a connection-settings backup. The file is plain
   text, can contain sensitive health/source data, and is not encrypted by the app. Save it only to
   a location you trust.

@@ -1,6 +1,7 @@
 package com.young.metaboliccoach.core.domain
 
 import com.young.metaboliccoach.core.model.CoachSettings
+import com.young.metaboliccoach.core.model.GlycemicWindow
 
 object CoachSettingsBounds {
     val LOW_GLUCOSE_MG_DL = 40..120
@@ -31,6 +32,19 @@ object CoachSettingsBounds {
     val INTERVENTION_FOLLOW_UP_MINUTES = 5..1_440
     val QUICK_ACTION_EXPIRY_MINUTES = 5..10_080
     val FONT_SCALE = 0.8f..1.6f
+}
+
+object GlycemicPlannerBounds {
+    val SCENARIO_HORIZONS = setOf(
+        GlycemicWindow.DAYS_30,
+        GlycemicWindow.DAYS_60,
+        GlycemicWindow.DAYS_90,
+    )
+    val TARGET_GMI_PERCENT = 3.5..15.0
+    val LOW_GLUCOSE_MG_DL = 40..120
+    val VERY_LOW_GLUCOSE_MG_DL = 40..100
+    val MAXIMUM_LOW_EXPOSURE_PERCENT = 0.0f..20.0f
+    val MAXIMUM_VERY_LOW_EXPOSURE_PERCENT = 0.0f..10.0f
 }
 
 class SettingsValidator {

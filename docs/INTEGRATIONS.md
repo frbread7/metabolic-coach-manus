@@ -1,6 +1,6 @@
 # Data integrations
 
-Evidence in this document was reviewed on 2026-07-24. Vendor and platform behavior can change;
+Evidence in this document was reviewed on 2026-08-03. Vendor and platform behavior can change;
 recheck the linked primary sources before a release.
 
 ## Provider status
@@ -55,6 +55,19 @@ GET {baseUrl}/api/v1/entries/sgv.json?count=300
 Accept: application/json
 ```
 
+For a cold-cache historical request the client uses bounded seven-day requests, for example:
+
+```http
+GET {baseUrl}/api/v1/entries/sgv.json?find[dateString][$gte]=<start-iso>&find[dateString][$lte]=<end-iso>&count=2500
+Accept: application/json
+```
+
+The range request is used only for the phone's recent (at most 90-day) history backfill. Each
+response is capped, retried under the configured policy, normalized, and merged by stable reading
+ID. A range failure does not mix another server into the active source and does not fabricate
+missing readings. Nightscout deployments that expose only a different historical query contract
+must be verified with a synthetic or staging server before daily use.
+
 The parser accepts Nightscout `sgv`, `date` or ISO `dateString`, `_id`, and `direction`, ignores
 unknown fields, orders entries by measurement time, deduplicates stable records, and normalizes
 values to `GlucoseReading` in mg/dL. Delta and rate are calculated locally between valid ordered
@@ -71,6 +84,21 @@ Each normalized record contains:
 The source ID prevents histories, intervention baselines/follow-ups, observations, and caches from
 mixing across servers. Changing a server URL creates a different source identity even when the
 display name and slot ID are unchanged.
+
+### Glycemic Goal Planner data contract
+
+The planner consumes only normalized `GlucoseReading` records from the selected Nightscout source.
+It displays rolling 30/60/90-day mean glucose, GMI, time-in-range, time-below-range,
+very-low exposure, coverage, largest gap, and sample count. Means and exposure are weighted by
+elapsed covered time; gaps longer than the configured interpolation bound reduce coverage. A source
+change inside a requested window is a discontinuity, never a concatenation of server histories.
+The 14-day window is used as the recent safety baseline for goal scenarios.
+The UI calls the result **CGM-derived GMI**, not real-time or laboratory HbA1c. The estimate follows
+the published GMI relationship described by Bergenstal et al. (see the
+[GMI publication](https://pubmed.ncbi.nlm.nih.gov/30224348/)); laboratory A1C remains a separate
+clinical test (see [NIDDK's A1C overview](https://www.niddk.nih.gov/health-information/diagnostic-tests/a1c-test)).
+Goal scenarios are mathematical displays only and are suppressed when recent low-glucose exposure
+or the required data coverage makes a lower target unsafe to present.
 
 Primary references:
 
@@ -111,7 +139,8 @@ coaching settings, never a Nightscout URL, active-server ID, timeout/retry polic
 The OkHttp call is asynchronous and coroutine-cancellable; UI code observes flows and is never
 blocked by a network request. Responses are capped at 1 MiB. `Last-Modified` is cached per exact
 server source and sent as `If-Modified-Since`; a `304 Not Modified` response reuses only that
-server's memory cache.
+server's memory cache. Each server's process-memory cache is bounded to the 90-day planner
+lookback plus a one-day interpolation cushion.
 
 Transport errors, timeouts, HTTP 408, HTTP 429, and HTTP 5xx can be retried with exponential delay
 from the configured base interval, capped at 60 seconds per delay and bounded by the configured

@@ -66,6 +66,7 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import com.young.metaboliccoach.core.data.provider.HealthConnectPermissions
 import com.young.metaboliccoach.core.domain.CoachSettingsBounds
+import com.young.metaboliccoach.core.domain.GlycemicPlannerBounds
 import com.young.metaboliccoach.core.domain.NightscoutSettingsBounds
 import com.young.metaboliccoach.core.model.CoachRecommendation
 import com.young.metaboliccoach.core.model.CoachSettings
@@ -73,6 +74,13 @@ import com.young.metaboliccoach.core.model.CoachTheme
 import com.young.metaboliccoach.core.model.GlucoseDataOrigin
 import com.young.metaboliccoach.core.model.GlucoseProviderMode
 import com.young.metaboliccoach.core.model.GlucoseUnit
+import com.young.metaboliccoach.core.model.GlycemicMetricsStatus
+import com.young.metaboliccoach.core.model.GlycemicGoalScenario
+import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
+import com.young.metaboliccoach.core.model.GlycemicScenarioStatus
+import com.young.metaboliccoach.core.model.GlycemicTargetProvenance
+import com.young.metaboliccoach.core.model.GlycemicWindow
+import com.young.metaboliccoach.core.model.RollingGlycemicMetrics
 import com.young.metaboliccoach.core.model.InterventionSession
 import com.young.metaboliccoach.core.model.InterventionType
 import com.young.metaboliccoach.core.model.NightscoutServerConfig
@@ -114,6 +122,7 @@ class MainActivity : ComponentActivity() {
                     onMarkMeal = viewModel::markMeal,
                     onQuickAction = viewModel::quickAction,
                     onSaveSettings = viewModel::saveSettings,
+                    onSaveGlycemicPlannerSettings = viewModel::saveGlycemicPlannerSettings,
                     onExportData = {
                         personalDataExportLauncher.launch(
                             "metabolic-coach-export-${LocalDate.now()}.json",
@@ -173,7 +182,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class PhoneDestination { TODAY, SETTINGS }
+private enum class PhoneDestination { TODAY, PLANNER, SETTINGS }
 
 @Composable
 private fun MetabolicCoachApp(
@@ -183,6 +192,7 @@ private fun MetabolicCoachApp(
     onMarkMeal: () -> Unit,
     onQuickAction: (QuickActionType, String?) -> Unit,
     onSaveSettings: (CoachSettings, NightscoutSettings) -> Unit,
+    onSaveGlycemicPlannerSettings: (GlycemicPlannerSettings) -> Unit,
     onExportData: () -> Unit,
     onEraseData: () -> Unit,
     onConnectHealth: () -> Unit,
@@ -203,6 +213,12 @@ private fun MetabolicCoachApp(
                     onClick = { destination = PhoneDestination.SETTINGS },
                     icon = { Text("⚙") },
                     label = { Text("Settings") },
+                )
+                NavigationBarItem(
+                    selected = destination == PhoneDestination.PLANNER,
+                    onClick = { destination = PhoneDestination.PLANNER },
+                    icon = { Text("◎") },
+                    label = { Text("Planner") },
                 )
             }
         },
@@ -226,6 +242,11 @@ private fun MetabolicCoachApp(
                 onSave = onSaveSettings,
                 onExportData = onExportData,
                 onEraseData = onEraseData,
+                contentPadding = padding,
+            )
+            PhoneDestination.PLANNER -> GlycemicGoalScreen(
+                uiState = uiState,
+                onSave = onSaveGlycemicPlannerSettings,
                 contentPadding = padding,
             )
         }
@@ -506,6 +527,253 @@ private fun DailySummaryCard(uiState: PhoneUiState) {
                     "${summary?.exerciseDurationMinutes ?: 0} min",
             )
         }
+    }
+}
+
+@Composable
+private fun GlycemicGoalScreen(
+    uiState: PhoneUiState,
+    onSave: (GlycemicPlannerSettings) -> Unit,
+    contentPadding: PaddingValues,
+) {
+    var draft by remember(uiState.glycemicPlannerSettings) {
+        mutableStateOf(uiState.glycemicPlannerSettings)
+    }
+    var targetText by remember(uiState.glycemicPlannerSettings.targetGmiPercent) {
+        mutableStateOf(uiState.glycemicPlannerSettings.targetGmiPercent?.toString().orEmpty())
+    }
+    val target = targetText.toDoubleOrNull()
+    val targetProvenance = draft.targetProvenance ?: GlycemicTargetProvenance.USER_ENTERED
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            end = 20.dp,
+            top = contentPadding.calculateTopPadding() + 24.dp,
+            bottom = contentPadding.calculateBottomPadding() + 24.dp,
+        ),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Glycemic Goal Planner", style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    "GMI is calculated from CGM mean glucose. It is not a laboratory HbA1c " +
+                        "measurement, and the two values may differ.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        item {
+            Card {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text("Planning target", style = MaterialTheme.typography.titleLarge)
+                    OutlinedTextField(
+                        value = targetText,
+                        onValueChange = { targetText = it },
+                        label = { Text("Target GMI (%)") },
+                        supportingText = { Text("Enter a user-entered or clinician-agreed target.") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    EnumSetting(
+                        title = "Target provenance",
+                        values = GlycemicTargetProvenance.entries,
+                        selected = targetProvenance,
+                        label = { it.name.lowercase().replace('_', ' ') },
+                        onSelected = { draft = draft.copy(targetProvenance = it) },
+                    )
+                    EnumSetting(
+                        title = "Scenario horizon",
+                        values = listOf(
+                            GlycemicWindow.DAYS_30,
+                            GlycemicWindow.DAYS_60,
+                            GlycemicWindow.DAYS_90,
+                        ),
+                        selected = draft.horizon,
+                        label = { "${it.days} days" },
+                        onSelected = { draft = draft.copy(horizon = it) },
+                    )
+                    GlucoseThresholdSetting(
+                        title = "Planner low-glucose boundary",
+                        valueMgDl = draft.lowGlucoseThresholdMgDl,
+                        rangeMgDl = GlycemicPlannerBounds.LOW_GLUCOSE_MG_DL,
+                        unit = uiState.settings.glucoseUnit,
+                    ) {
+                        draft = draft.copy(
+                            lowGlucoseThresholdMgDl = it.coerceAtLeast(
+                                draft.veryLowGlucoseThresholdMgDl + 1,
+                            ),
+                        )
+                    }
+                    GlucoseThresholdSetting(
+                        title = "Planner very-low boundary",
+                        valueMgDl = draft.veryLowGlucoseThresholdMgDl,
+                        rangeMgDl = GlycemicPlannerBounds.VERY_LOW_GLUCOSE_MG_DL,
+                        unit = uiState.settings.glucoseUnit,
+                    ) {
+                        draft = draft.copy(
+                            veryLowGlucoseThresholdMgDl = it.coerceAtMost(
+                                draft.lowGlucoseThresholdMgDl - 1,
+                            ),
+                        )
+                    }
+                    DecimalSliderSetting(
+                        title = "Maximum low-glucose exposure",
+                        value = draft.maximumLowGlucosePercent,
+                        range = GlycemicPlannerBounds.MAXIMUM_LOW_EXPOSURE_PERCENT,
+                        suffix = "%",
+                    ) {
+                        draft = draft.copy(
+                            maximumLowGlucosePercent = it.coerceAtLeast(
+                                draft.maximumVeryLowGlucosePercent,
+                            ),
+                        )
+                    }
+                    DecimalSliderSetting(
+                        title = "Maximum very-low exposure",
+                        value = draft.maximumVeryLowGlucosePercent,
+                        range = GlycemicPlannerBounds.MAXIMUM_VERY_LOW_EXPOSURE_PERCENT,
+                        suffix = "%",
+                    ) {
+                        draft = draft.copy(
+                            maximumVeryLowGlucosePercent = it.coerceAtMost(
+                                draft.maximumLowGlucosePercent,
+                            ),
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            onSave(
+                                draft.copy(
+                                    targetGmiPercent = target,
+                                    targetProvenance = target?.let {
+                                        targetProvenance
+                                    },
+                                ),
+                            )
+                        },
+                        enabled = targetText.isBlank() || target != null,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(if (targetText.isBlank()) "Clear planner target" else "Save planner target")
+                    }
+                }
+            }
+        }
+        item {
+            Text("Rolling CGM metrics", style = MaterialTheme.typography.titleLarge)
+        }
+        items(uiState.glycemicMetrics) { metrics ->
+            GlycemicMetricsCard(metrics, uiState.settings.glucoseUnit)
+        }
+        item {
+            GlycemicScenarioCard(uiState.glycemicGoalScenario, uiState.settings.glucoseUnit)
+        }
+        item {
+            Text(
+                "Scenarios describe the future-period mean that would satisfy a simplified " +
+                    "rolling CGM model. They are not treatment recommendations, required " +
+                    "glucose levels, or guarantees about laboratory HbA1c.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun GlycemicMetricsCard(
+    metrics: RollingGlycemicMetrics,
+    unit: GlucoseUnit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text("${metrics.window.days}-day average", style = MaterialTheme.typography.titleLarge)
+            if (metrics.status == GlycemicMetricsStatus.AVAILABLE) {
+                Text(
+                    "Mean glucose: ${formatGlucose(metrics.meanGlucoseMgDl, unit)}",
+                    fontWeight = FontWeight.Bold,
+                )
+                Text("CGM-derived GMI: ${formatPercent(metrics.gmiPercent)}")
+                Text(
+                    "TIR: ${formatPercent(metrics.timeInRangePercent)} • " +
+                        "TBR: ${formatPercent(metrics.timeBelowRangePercent)} • " +
+                        "Very low: ${formatPercent(metrics.timeVeryLowPercent)}",
+                )
+                Text("Coverage: ${formatPercent(metrics.coveragePercent)}")
+                Text(
+                    "Missing: ${formatDuration(metrics.missingDurationMillis)} • " +
+                        "Largest gap: ${formatDuration(metrics.largestGapMillis)}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            } else {
+                Text(metrics.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Coverage: ${formatPercent(metrics.coveragePercent)}")
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlycemicScenarioCard(
+    scenario: GlycemicGoalScenario?,
+    unit: GlucoseUnit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text("Goal scenario", style = MaterialTheme.typography.titleLarge)
+            when {
+                scenario == null -> Text("Set a target to calculate a planning scenario.")
+                scenario.status == GlycemicScenarioStatus.AVAILABLE ||
+                    scenario.status == GlycemicScenarioStatus.AVAILABLE_WITH_WARNING -> {
+                    Text(
+                        "Next ${scenario.horizon.days} days: " +
+                            formatGlucose(scenario.scenarioFutureMeanGlucoseMgDl, unit),
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(scenario.detail)
+                    scenario.recentSafety?.let {
+                        Text(
+                            "Recent 14-day TIR ${formatPercent(it.timeInRangePercent)} • " +
+                                "TBR ${formatPercent(it.timeBelowRangePercent)}",
+                        )
+                    }
+                }
+                else -> Text(scenario.detail)
+            }
+        }
+    }
+}
+
+private fun formatGlucose(valueMgDl: Double?, unit: GlucoseUnit): String =
+    valueMgDl?.let {
+        if (unit == GlucoseUnit.MG_DL) "%.0f mg/dL".format(it)
+        else "%.1f mmol/L".format(unit.fromMgDl(it))
+    } ?: "—"
+
+private fun formatPercent(value: Double?): String = value?.let { "%.1f%%".format(it) } ?: "—"
+
+private fun formatDuration(durationMillis: Long): String {
+    val totalMinutes = (durationMillis / 60_000L).coerceAtLeast(0L)
+    return when {
+        totalMinutes < 60L -> "${totalMinutes}m"
+        else -> "${totalMinutes / 60L}h ${totalMinutes % 60L}m"
     }
 }
 

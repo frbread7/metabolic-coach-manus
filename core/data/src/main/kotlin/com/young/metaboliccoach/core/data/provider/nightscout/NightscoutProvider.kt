@@ -153,19 +153,42 @@ class NightscoutProvider @Inject constructor(
             state.value = GlucoseProviderState.Loading(cached.lastOrNull())
         }
         return try {
-            val readings = fetchWithRetry(
-                server = server,
-                sourceId = sourceId,
-                connectionTimeoutSeconds = settings.connectionTimeoutSeconds,
-                retryIntervalSeconds = settings.retryIntervalSeconds,
-                maximumRetryAttempts = settings.maximumRetryAttempts,
-            )
+            val nowEpochMillis = timeSource.nowEpochMillis()
+            val cacheNeedsHistory = cached.isEmpty() ||
+                cached.firstOrNull()?.measuredAtEpochMillis?.let { it > startEpochMillis } == true
+            val fetched = if (
+                cacheNeedsHistory &&
+                    startEpochMillis >= nowEpochMillis - HISTORY_LOOKBACK_MILLIS - DAY_MILLIS
+            ) {
+                fetchHistoryWithRetry(
+                    server = server,
+                    sourceId = sourceId,
+                    connectionTimeoutSeconds = settings.connectionTimeoutSeconds,
+                    retryIntervalSeconds = settings.retryIntervalSeconds,
+                    maximumRetryAttempts = settings.maximumRetryAttempts,
+                    startEpochMillis = startEpochMillis,
+                    endEpochMillis = nowEpochMillis,
+                )
+            } else {
+                fetchWithRetry(
+                    server = server,
+                    sourceId = sourceId,
+                    connectionTimeoutSeconds = settings.connectionTimeoutSeconds,
+                    retryIntervalSeconds = settings.retryIntervalSeconds,
+                    maximumRetryAttempts = settings.maximumRetryAttempts,
+                )
+            }
+            val readings = mergeReadings(cached, fetched)
+                .filter {
+                    it.measuredAtEpochMillis >=
+                        nowEpochMillis - HISTORY_LOOKBACK_MILLIS - DAY_MILLIS
+                }
             if (readings.isNotEmpty()) {
                 cacheBySource[sourceId] = readings
                 if (publishState) {
                     state.value = GlucoseProviderState.Available(
                         reading = readings.last(),
-                        refreshedAtEpochMillis = timeSource.nowEpochMillis(),
+                        refreshedAtEpochMillis = nowEpochMillis,
                     )
                 }
             } else if (publishState) {
@@ -178,8 +201,7 @@ class NightscoutProvider @Inject constructor(
                     ),
                 )
             }
-            (if (readings.isEmpty()) cached else readings)
-                .filter { it.measuredAtEpochMillis >= startEpochMillis }
+            readings.filter { it.measuredAtEpochMillis >= startEpochMillis }
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: Throwable) {
@@ -239,6 +261,88 @@ class NightscoutProvider @Inject constructor(
             }
         }
     }
+
+    private suspend fun fetchHistoryWithRetry(
+        server: NightscoutServerConfig,
+        sourceId: String,
+        connectionTimeoutSeconds: Int,
+        retryIntervalSeconds: Int,
+        maximumRetryAttempts: Int,
+        startEpochMillis: Long,
+        endEpochMillis: Long,
+    ): List<GlucoseReading> {
+        val readings = mutableListOf<GlucoseReading>()
+        var chunkStart = startEpochMillis
+        while (chunkStart < endEpochMillis) {
+            val chunkEnd = minOf(chunkStart + HISTORY_CHUNK_MILLIS, endEpochMillis)
+            readings += fetchRangeWithRetry(
+                server = server,
+                sourceId = sourceId,
+                connectionTimeoutSeconds = connectionTimeoutSeconds,
+                retryIntervalSeconds = retryIntervalSeconds,
+                maximumRetryAttempts = maximumRetryAttempts,
+                startEpochMillis = chunkStart,
+                endEpochMillis = chunkEnd,
+            )
+            chunkStart = chunkEnd + 1L
+        }
+        return readings
+    }
+
+    private suspend fun fetchRangeWithRetry(
+        server: NightscoutServerConfig,
+        sourceId: String,
+        connectionTimeoutSeconds: Int,
+        retryIntervalSeconds: Int,
+        maximumRetryAttempts: Int,
+        startEpochMillis: Long,
+        endEpochMillis: Long,
+    ): List<GlucoseReading> {
+        var retryIndex = 0
+        while (true) {
+            try {
+                val response = apiClient.fetchEntriesInRange(
+                    server = server,
+                    connectionTimeoutSeconds = connectionTimeoutSeconds,
+                    startEpochMillis = startEpochMillis,
+                    endEpochMillis = endEpochMillis,
+                    count = HISTORY_ENTRY_COUNT,
+                )
+                return when (response.statusCode) {
+                    HTTP_OK -> {
+                        val body = response.body
+                            ?: throw NightscoutParseException(
+                                "Nightscout returned an empty response.",
+                            )
+                        parser.parse(
+                            body = body,
+                            sourceId = sourceId,
+                            receivedAtEpochMillis = timeSource.nowEpochMillis(),
+                        )
+                    }
+                    HTTP_NOT_MODIFIED -> emptyList()
+                    else -> throw NightscoutHttpException(response.statusCode)
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                if (!error.isRetryable() || retryIndex >= maximumRetryAttempts) throw error
+                val baseDelay = retryIntervalSeconds * MILLIS_PER_SECOND
+                val delayMillis = (baseDelay shl retryIndex)
+                    .coerceAtMost(MAXIMUM_SINGLE_RETRY_DELAY_MILLIS)
+                retrySleeper.sleep(delayMillis)
+                retryIndex += 1
+            }
+        }
+    }
+
+    private fun mergeReadings(
+        cached: List<GlucoseReading>,
+        fetched: List<GlucoseReading>,
+    ): List<GlucoseReading> = (cached + fetched)
+        .associateBy(GlucoseReading::id)
+        .values
+        .sortedBy(GlucoseReading::measuredAtEpochMillis)
 
     private fun Throwable.isRetryable(): Boolean = when (this) {
         is SSLException -> false
@@ -312,6 +416,10 @@ class NightscoutProvider @Inject constructor(
         private const val DISPLAY_NAME = "Nightscout"
         private const val HTTP_OK = 200
         private const val HTTP_NOT_MODIFIED = 304
+        private const val DAY_MILLIS = 24 * 60 * 60 * 1_000L
+        private const val HISTORY_LOOKBACK_MILLIS = 90 * DAY_MILLIS
+        private const val HISTORY_CHUNK_MILLIS = 7 * DAY_MILLIS
+        private const val HISTORY_ENTRY_COUNT = 2_500
         private const val MILLIS_PER_SECOND = 1_000L
         private const val MILLIS_PER_MINUTE = 60_000L
         private const val MAXIMUM_SINGLE_RETRY_DELAY_MILLIS = MILLIS_PER_MINUTE

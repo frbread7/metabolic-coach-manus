@@ -260,7 +260,7 @@ class GlucoseRepositoryImpl @Inject constructor(
     }
 
     companion object {
-        private const val HISTORY_LOOKBACK_MILLIS = 24 * 60 * 60 * 1_000L
+        private const val HISTORY_LOOKBACK_MILLIS = 90 * 24 * 60 * 60 * 1_000L
     }
 }
 

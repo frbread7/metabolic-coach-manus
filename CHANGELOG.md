@@ -2,6 +2,34 @@
 
 All notable Metabolic Coach package changes are recorded here.
 
+## v0.4 — 2026-08-03 — Glycemic Goal Planner (phone-only)
+
+### Added
+
+- Phone-side Glycemic Goal Planner settings with optional target GMI, target provenance, fixed
+  30/60/90-day horizons, configurable low/very-low boundaries, and low-exposure limits.
+- Provider-independent time-weighted 30/60/90-day metrics plus a 14-day safety baseline for mean
+  glucose, CGM-derived GMI, time in range, time below range, very-low exposure, covered time,
+  missing duration, and largest gap.
+- Mathematical target scenarios that use the observed complementary history (60 days before a
+  30-day horizon, 30 days before a 60-day horizon, and the full 90-day target window) with explicit
+  insufficient-data, source-discontinuity, unattainable, warning, and low-glucose-risk statuses.
+- Bounded Nightscout historical backfill in seven-day ranges for a cold phone cache, capped at the
+  recent 90-day planner window.
+
+### Changed
+
+- Personal-data export now includes planner settings and uses export schema version 2.
+- Phone navigation adds a Planner destination. Planner output remains phone-only and is not sent to
+  Wear, the watch face, coaching rules, or notifications.
+
+### Safety and scope
+
+- The UI and documentation use **CGM-derived GMI** terminology; this is not a laboratory HbA1c
+  result, treatment instruction, insulin/dose recommendation, or promise of target attainment.
+- No direct CareSens integration, new provider, Wear synchronization change, coaching improvement,
+  history graph, analytics, or AI recommendation was added in this milestone.
+
 ## v0.2 — 2026-07-25 — Nightscout integration
 
 ### Added
