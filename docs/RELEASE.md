@@ -50,13 +50,18 @@ handed off.
 These are debug-signed engineering artifacts, not production releases. Regenerate and rehash them
 after every source/build change.
 
-## v0.4 GitHub Actions engineering artifact
+## v0.4.1 GitHub Actions engineering artifact
 
-The v0.4 workflow is the reproducible build path for this ARM development host. It runs on an
+The v0.4.1 workflow is the reproducible build path for this ARM development host. It runs on an
 x86_64 `ubuntu-latest` runner, keeps the existing test/lint/WFF/release-isolation checks, and then
-requires the three APKs to report `versionName=0.4.0` and `versionCode=4`. It also verifies the
-five-file `MetabolicCoach-v0.4.zip` contract and the signing certificate used by the accepted v0.3
+requires the three APKs to report `versionName=0.4.1` and `versionCode=5`. It also verifies the
+five-file `MetabolicCoach-v0.4.1.zip` contract and the signing certificate used by the accepted v0.3
 installation.
+
+The failed v0.4.0 artifact remains preserved as its own workflow run and artifact. It must not be
+overwritten or relabeled as v0.4.1. The v0.4.1 package is for a new phone freshness acceptance;
+rebuilding Wear and the watch face keeps their metadata aligned but does not claim a new physical
+acceptance for those components.
 
 Before a push or manual `workflow_dispatch` run, configure the encrypted repository secret from the
 same engineering keystore that signed the accepted v0.3 APKs. Do not commit the keystore or its

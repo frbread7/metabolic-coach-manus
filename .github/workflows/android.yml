@@ -34,7 +34,7 @@ jobs:
           MC_DEBUG_KEYSTORE_BASE64: ${{ secrets.MC_DEBUG_KEYSTORE_BASE64 }}
         run: |
           if [[ -z "$MC_DEBUG_KEYSTORE_BASE64" ]]; then
-            echo "MC_DEBUG_KEYSTORE_BASE64 must be configured for push/manual v0.4 artifacts." >&2
+            echo "MC_DEBUG_KEYSTORE_BASE64 must be configured for push/manual v0.4.1 artifacts." >&2
             exit 1
           fi
           mkdir -p "$HOME/.android"
@@ -54,10 +54,12 @@ jobs:
       - name: Verify and assemble
         run: ./scripts/build-apks.sh
 
-      - name: Verify v0.4 artifact gate
+      - name: Verify v0.4.1 artifact gate
         if: github.event_name != 'pull_request'
         env:
           MC_EXPECTED_V03_CERT_SHA256: 7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6667da26c5fad4
+          MC_EXPECTED_VERSION_NAME: 0.4.1
+          MC_EXPECTED_VERSION_CODE: 5
         run: ./scripts/verify-v04-artifact.sh
 
       - name: Verify unsigned release variants and debug-only xDrip isolation
@@ -94,7 +96,7 @@ jobs:
             exit 1
           fi
 
-      - name: Record v0.4 artifact metadata
+      - name: Record v0.4.1 artifact metadata
         if: github.event_name != 'pull_request'
         run: |
           apksigner="$ANDROID_HOME/build-tools/36.0.0/apksigner"
@@ -104,7 +106,7 @@ jobs:
           certificate="$($apksigner verify --verbose --print-certs "$phone_apk" 2>&1 |
             sed -n 's/.*Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
           {
-            echo "### v0.4 debug artifact"
+            echo "### v0.4.1 debug artifact"
             echo
             echo "- Commit: \`$GITHUB_SHA\`"
             echo "- Workflow run: \`$GITHUB_RUN_ID\`"
@@ -112,18 +114,18 @@ jobs:
             echo
             echo '```text'
             sha256sum "$phone_apk" "$wear_apk" "$watchface_apk" \
-              artifacts/MetabolicCoach-v0.4.zip
+              artifacts/MetabolicCoach-v0.4.1.zip
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload v0.4 debug artifact
+      - name: Upload v0.4.1 debug artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: metabolic-coach-v0.4-debug-${{ github.sha }}
+          name: metabolic-coach-v0.4.1-debug-${{ github.sha }}
           path: |
             artifacts/metabolic-coach-phone-debug.apk
             artifacts/metabolic-coach-wear-debug.apk
             artifacts/metabolic-coach-watchface-debug.apk
-            artifacts/MetabolicCoach-v0.4.zip
+            artifacts/MetabolicCoach-v0.4.1.zip
           if-no-files-found: error

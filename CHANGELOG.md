@@ -2,6 +2,27 @@
 
 All notable Metabolic Coach package changes are recorded here.
 
+## v0.4.1 — 2026-08-03 — Current glucose freshness hotfix
+
+### Fixed
+
+- Current Nightscout data is fetched and persisted before any 90-day historical backfill.
+- Historical backfill is best effort and can no longer block, overwrite, or regress the current
+  reading when a range request fails or completes later.
+- Current refreshes no longer use conditional `If-Modified-Since` validators; an unexpected `304`
+  is treated as a failed current refresh instead of silently presenting an old cache.
+- Provider merges and Room latest-reading queries now use deterministic source- and timestamp-aware
+  ordering, preserving source isolation and accurate stale-age reporting.
+
+### Scope and verification
+
+- This is a critical-defect hotfix only. Wear synchronization, watch-face resources, coaching,
+  notifications, and quick actions are unchanged.
+- The failed `v0.4.0` engineering artifact and its evidence remain preserved. This release uses
+  versionName `0.4.1`, versionCode `5`, and a separate GitHub Actions artifact.
+- The next required step after CI is a new phone physical acceptance test; no later milestone is
+  unlocked by this hotfix.
+
 ## v0.4 — 2026-08-03 — Glycemic Goal Planner (phone-only)
 
 ### Added

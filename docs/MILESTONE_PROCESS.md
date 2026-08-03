@@ -111,11 +111,11 @@ non-conflicting earlier constraints, and avoid inferring acceptance that the use
   critical blocker.
 - Automated preflight: sync, phone, and Wear unit tests plus phone, Wear, and watch-face lint passed
   with all 200 selected Gradle tasks executed.
-- Production-code freeze: lifted for the reviewed `v0.4` phone-only planner scope. Wear, watch-face,
-  coaching, and notification behavior remain frozen.
-- `v0.4` planning: active as the Glycemic Goal Planner milestone, with the reviewed conditions that
-  it uses CGM-derived GMI terminology, a 14-day safety baseline with fixed 30/60/90-day windows,
-  source-isolated history,
-  coverage/gap reporting, and no medical or treatment claims.
+- Production-code freeze: the reviewed `v0.4` planner scope is implemented, and the current gate is
+  limited to the critical `v0.4.1` freshness hotfix. Wear, watch-face, coaching, and notification
+  behavior remain frozen.
+- `v0.4.1` gate: active until GitHub Actions produces the versionName `0.4.1`/versionCode `5`
+  artifact and the user completes a new phone physical acceptance test. The failed `v0.4.0`
+  artifact remains a separate evidence record.
 
 The completed physical test was defined in [V0.3_WEAR_ACCEPTANCE.md](V0.3_WEAR_ACCEPTANCE.md).

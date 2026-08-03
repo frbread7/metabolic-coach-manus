@@ -88,8 +88,8 @@ Execute the migration suite on an Android runtime with:
   readability, stability, and battery checks complete on 2026-08-02. The report is retained as
   [the privacy-sanitized acceptance record](acceptance/V0_3_PHYSICAL_ACCEPTANCE.md); it is not a
   substitute for reproducible device logs.
-- `v0.4` gate: run planner unit tests with synthetic readings, provider-range request tests, settings
-  persistence/export checks, phone UI compile/lint, and a phone-only manual smoke test. Verify that
+- `v0.4.1` gate: run the planner/provider regression tests, current-first/backfill ordering tests,
+  persistence/status checks, phone UI compile/lint, and a phone-only freshness retest. Verify that
   Wear payloads, coaching decisions, notifications, and watch-face resources are unchanged.
   Validate that the UI labels the result as CGM-derived GMI, exposes coverage/gaps and low-glucose
   suppression, and never presents a scenario as a treatment recommendation.
@@ -124,20 +124,29 @@ phone, Wear, and watch-face debug lint with cache/incremental reuse disabled. Gr
 `BUILD SUCCESSFUL` in 9m22s with all 200 selected tasks executed. No source code was changed for
 this gate.
 
-For the current `v0.4` checkout on 2026-08-03:
+The failed `v0.4.0` CI run and artifact are preserved for comparison: workflow run `30795488452`,
+artifact `8849324941`, with signing certificate SHA-256
+`7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6667da26c5fad4`. They are historical
+evidence and are not overwritten or relabeled.
 
-- `./gradlew :core:domain:test --no-daemon` passed, including 9 `GlycemicGoalPlannerTest` cases;
-- `./gradlew :core:model:test --no-daemon` and `:wear:compileDebugKotlin` passed;
-- `:core:data:compileDebugKotlin`, `:phone:compileDebugKotlin`, and
-  `:core:sync:compileDebugKotlin` passed;
-- `:core:data:testDebugUnitTest` could not start because this host's Android toolchain cannot load
-  `libdl.so.2` for AAPT2. This is an environment blocker, not a test assertion result; rerun the
-  data/provider/export suite on a normal glibc Android build host before calling `v0.4` automated
-  verification complete.
+For the v0.4.1 hotfix checkout on 2026-08-03, the focused provider and repository regression suites
+passed locally with the ARM host's Android linker compatibility prefix:
 
-### v0.4 CI engineering artifact gate
+```text
+QEMU_LD_PREFIX=/usr/x86_64-linux-gnu ./gradlew --no-daemon --no-parallel --max-workers=1 \
+  --no-configuration-cache -Pkotlin.compiler.execution.strategy=in-process \
+  :core:data:testDebugUnitTest \
+  --tests com.young.metaboliccoach.core.data.provider.nightscout.NightscoutProviderTest \
+  --tests com.young.metaboliccoach.core.data.repository.GlucoseRepositoryImplTest
+BUILD SUCCESSFUL
+```
 
-The v0.4 debug artifact must be built on GitHub Actions before phone-only physical acceptance.
+The full v0.4.1 GitHub Actions result and hashes are recorded below after the pushed commit is
+verified. Physical acceptance remains required and is not inferred from these automated checks.
+
+### v0.4.1 CI engineering artifact gate
+
+The v0.4.1 debug artifact must be built on GitHub Actions before the phone freshness retest.
 The workflow requires the accepted v0.3 engineering keystore through the encrypted
 `MC_DEBUG_KEYSTORE_BASE64` repository secret; it never generates or commits a replacement key.
 The gate records the commit SHA, workflow run ID, signing certificate digest, and SHA-256 hashes,
@@ -147,14 +156,15 @@ and uploads exactly:
 metabolic-coach-phone-debug.apk
 metabolic-coach-wear-debug.apk
 metabolic-coach-watchface-debug.apk
-MetabolicCoach-v0.4.zip
+MetabolicCoach-v0.4.1.zip
 ```
 
-The v0.4 run is accepted only when all automated checks pass, every APK reports version
-`0.4.0`/code `4`, the ZIP contains exactly `CHANGELOG.md`, `INSTALL.md`, `phone.apk`,
+The v0.4.1 run is accepted only when all automated checks pass, every APK reports version
+`0.4.1`/code `5`, the ZIP contains exactly `CHANGELOG.md`, `INSTALL.md`, `phone.apk`,
 `watchface.apk`, and `wear.apk`, the v0.3 certificate matches, and the credential/privacy audit is
 clean. A successful artifact build does not claim new Wear, watch-face, synchronization, or
-coaching behavior; those modules are rebuilt only to keep the package metadata aligned.
+coaching behavior; those modules are rebuilt only to keep the package metadata aligned. The failed
+v0.4.0 run and artifact remain unchanged for comparison and audit.
 
 Current debug artifact SHA-256 values:
 

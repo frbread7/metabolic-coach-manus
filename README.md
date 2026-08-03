@@ -15,8 +15,10 @@ Samsung Galaxy Watch8.
 > delta, timestamp, offline cache, retry behavior, and crash-free operation. Physical Galaxy
 > Watch8 `v0.3` acceptance was user-reported complete on 2026-08-02 and is recorded in a
 > privacy-sanitized acceptance record. Android instrumentation, production-signing, and
-> store-policy gates remain outstanding. `v0.4` is now the phone-only Glycemic Goal Planner
-> milestone; Wear, watch-face, coaching, and notification behavior remain unchanged.
+> store-policy gates remain outstanding. The `v0.4.0` phone acceptance exposed a critical
+> current-glucose freshness defect; the scoped `v0.4.1` hotfix is awaiting CI and a new phone
+> physical acceptance test. Wear, watch-face, coaching, and notification behavior remain
+> unchanged.
 > It is a wellness tool, not a medical device, and must not replace the CGM vendor app, glucose
 > alarms, professional advice, or a personal care plan.
 
@@ -30,12 +32,13 @@ synchronization and coaching foundations remain frozen while the current milesto
 | `v0.1` | Infrastructure: phone, Wear app, WFF watch face, shared architecture, persistence, and build/package pipeline | Complete |
 | `v0.2` | Nightscout integration: provider isolation, configuration, retry/cache behavior, normalized repository flow, and phone-first live acceptance | Accepted 2026-08-01 |
 | `v0.3` | Watch synchronization: validate the existing Data Layer path and packaged watch components on a physical phone and Galaxy Watch8 | Accepted by user report 2026-08-02; sanitized record stored |
-| `v0.4` | Glycemic Goal Planner: phone-side 14-day safety baseline, 30/60/90-day CGM-derived metrics, and bounded goal scenarios | Active; phone-only scope |
+| `v0.4` | Glycemic Goal Planner plus current-glucose freshness validation | `v0.4.0` physical acceptance failed; `v0.4.1` hotfix awaiting CI and phone retest |
 | `v0.5` | One-week personal beta with documented reliability, battery, and safety observations | Planned |
 | `v1.0` | Stable daily-use release with production signing and all release gates complete | Planned |
 
 The `v0.3` physical gate is closed by the user's report, with the sanitized record retained for
-audit. `v0.4` is deliberately limited to the phone-side planner foundation: bounded Nightscout
+audit. `v0.4` remains deliberately limited to the phone-side planner foundation plus the scoped
+freshness hotfix: bounded Nightscout
 history backfill, provider-independent calculations, configurable targets, and phone UI. It does
 not change Wear synchronization, the watch face, coaching rules, or notifications. See the
 [milestone process](docs/MILESTONE_PROCESS.md), [v0.3 Wear acceptance checklist](docs/V0.3_WEAR_ACCEPTANCE.md),
@@ -125,14 +128,14 @@ and watch-face lint tasks, assembles all three APKs for that variant (debug by d
 the built watch-face APK, verifies APK signatures, checks that the phone and Wear certificates
 match, copies deliverables into `artifacts/`, and creates a versioned five-file installation ZIP.
 
-When built, the v0.4 candidate packages as `artifacts/MetabolicCoach-v0.4.zip`, containing `phone.apk`,
+The current hotfix packages as `artifacts/MetabolicCoach-v0.4.1.zip`, containing `phone.apk`,
 `wear.apk`, `watchface.apk`, `CHANGELOG.md`, and an archive-specific `INSTALL.md`. The version is
 derived from all three APK manifests and packaging fails if they disagree. Run
 `./scripts/package-release.sh` to repackage already-verified artifacts without rebuilding. A
 repeat debug build refreshes its same-version engineering ZIP only while that archive remains a
 debug build. Debug APKs can never replace a same-version release archive. A different release
 archive for an existing version is not overwritten unless `MC_PACKAGE_OVERWRITE=1` is set
-intentionally. GitHub Actions is the canonical v0.4 build path for this ARM development host;
+intentionally. GitHub Actions is the canonical v0.4.1 build path for this ARM development host;
 the workflow validates the artifact gate and uploads the ZIP plus the three APKs only after all
 checks pass.
 
@@ -149,6 +152,7 @@ engineering artifacts, not production releases. A signed release requires enviro
 - [Milestone development and cross-session handoff process](docs/MILESTONE_PROCESS.md)
 - [v0.3 Galaxy Watch8 physical acceptance checklist](docs/V0.3_WEAR_ACCEPTANCE.md)
 - [v0.3 privacy-sanitized physical acceptance record](docs/acceptance/V0_3_PHYSICAL_ACCEPTANCE.md)
+- [v0.4.1 current-glucose freshness hotfix report](docs/V0.4_1_FRESHNESS_HOTFIX.md)
 - [Development and build guide](docs/DEVELOPMENT.md)
 - [Testing strategy, milestone acceptance, and release gates](docs/TESTING.md)
 - [User guide](docs/USER_GUIDE.md)

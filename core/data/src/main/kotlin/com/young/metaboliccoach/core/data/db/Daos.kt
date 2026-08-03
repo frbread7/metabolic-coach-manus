@@ -10,7 +10,10 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface GlucoseDao {
-    @Query("SELECT * FROM glucose_readings ORDER BY measuredAtEpochMillis DESC LIMIT 1")
+    @Query(
+        "SELECT * FROM glucose_readings " +
+            "ORDER BY measuredAtEpochMillis DESC, sourceId ASC, id ASC LIMIT 1",
+    )
     suspend fun getLatest(): GlucoseReadingEntity?
 
     @Query(
@@ -18,13 +21,16 @@ interface GlucoseDao {
         SELECT * FROM glucose_readings
         WHERE sourceId = :sourcePrefix
            OR substr(sourceId, 1, length(:sourcePrefix) + 1) = :sourcePrefix || ':'
-        ORDER BY measuredAtEpochMillis DESC
+        ORDER BY measuredAtEpochMillis DESC, id ASC
         LIMIT 1
         """,
     )
     suspend fun getLatestForSource(sourcePrefix: String): GlucoseReadingEntity?
 
-    @Query("SELECT * FROM glucose_readings ORDER BY measuredAtEpochMillis DESC LIMIT 1")
+    @Query(
+        "SELECT * FROM glucose_readings " +
+            "ORDER BY measuredAtEpochMillis DESC, sourceId ASC, id ASC LIMIT 1",
+    )
     fun observeLatest(): Flow<GlucoseReadingEntity?>
 
     @Query(
@@ -32,7 +38,7 @@ interface GlucoseDao {
         SELECT * FROM glucose_readings
         WHERE sourceId = :sourcePrefix
            OR substr(sourceId, 1, length(:sourcePrefix) + 1) = :sourcePrefix || ':'
-        ORDER BY measuredAtEpochMillis DESC
+        ORDER BY measuredAtEpochMillis DESC, id ASC
         LIMIT 1
         """,
     )

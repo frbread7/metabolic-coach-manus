@@ -7,6 +7,8 @@ import com.young.metaboliccoach.core.domain.sourceId
 import com.young.metaboliccoach.core.model.DefaultNightscoutSettings
 import com.young.metaboliccoach.core.model.GlucoseProviderFailureKind
 import com.young.metaboliccoach.core.model.GlucoseProviderState
+import com.young.metaboliccoach.core.model.GlucoseReading
+import com.young.metaboliccoach.core.model.GlucoseTrend
 import com.young.metaboliccoach.core.model.NightscoutServerConfig
 import com.young.metaboliccoach.core.model.NightscoutSettings
 import com.young.metaboliccoach.core.model.ProviderAvailability
@@ -66,28 +68,43 @@ class NightscoutProviderTest {
     }
 
     @Test
-    fun `cold recent history fetches bounded ranges and merges normalized readings`() = runTest {
-        val start = NOW - (8 * DAY)
+    fun `current snapshot is fetched before bounded history and survives history failure`() =
+        runTest {
+        val start = NOW - (6 * DAY)
         val fixture = provider(
             settings = settings(),
             responses = listOf(
-                ok(bodyAt(value = 128, remoteId = "history-first", measuredAt = start)),
-                ok(bodyAt(value = 142, remoteId = "history-second", measuredAt = NOW - DAY)),
+                ok(bodyAt(value = 142, remoteId = "current", measuredAt = NOW - FIVE_MINUTES)),
+                Result.failure(NightscoutResponseTooLargeException()),
             ),
         )
 
         val readings = fixture.provider.readSince(start)
 
-        assertEquals(listOf(128, 142), readings.map { it.valueMgDl })
-        assertEquals(2, fixture.apiClient.rangeRequests.size)
-        assertEquals(2_500, fixture.apiClient.rangeRequests.first().count)
-        assertEquals(start, fixture.apiClient.rangeRequests.first().startEpochMillis)
-        assertEquals(
-            fixture.apiClient.rangeRequests.first().endEpochMillis + 1,
-            fixture.apiClient.rangeRequests.last().startEpochMillis,
+        assertEquals(listOf(142), readings.map { it.valueMgDl })
+        assertEquals(listOf("current", "range"), fixture.apiClient.events)
+        assertEquals(1, fixture.apiClient.rangeRequests.size)
+        assertEquals(2_500, fixture.apiClient.rangeRequests.single().count)
+        assertEquals(start, fixture.apiClient.rangeRequests.single().startEpochMillis)
+    }
+
+    @Test
+    fun `older backfill completion cannot regress the current provider state`() = runTest {
+        val start = NOW - (6 * DAY)
+        val fixture = provider(
+            settings = settings(),
+            responses = listOf(
+                ok(bodyAt(value = 150, remoteId = "current", measuredAt = NOW)),
+                ok(bodyAt(value = 110, remoteId = "backfill", measuredAt = NOW - DAY)),
+            ),
         )
-        assertEquals(NOW, fixture.apiClient.rangeRequests.last().endEpochMillis)
-        assertTrue(fixture.apiClient.requests.isEmpty())
+
+        val readings = fixture.provider.readSince(start)
+
+        assertEquals(listOf(110, 150), readings.map { it.valueMgDl })
+        val state = fixture.provider.observeState().first()
+        assertTrue(state is GlucoseProviderState.Available)
+        assertEquals(150, (state as GlucoseProviderState.Available).reading.valueMgDl)
     }
 
     @Test
@@ -178,7 +195,8 @@ class NightscoutProviderTest {
     }
 
     @Test
-    fun `not modified response reuses the server cache and conditional timestamp`() = runTest {
+    fun `current refresh does not use conditional validators and rejects an unexpected 304`() =
+        runTest {
         val fixture = provider(
             settings = settings(),
             responses = listOf(
@@ -191,17 +209,16 @@ class NightscoutProviderTest {
         )
 
         val initial = fixture.provider.readSince(0)
-        val cached = fixture.provider.readSince(0)
+        val thrown = expectThrows(NightscoutHttpException::class.java) {
+            fixture.provider.readSince(0)
+        }
 
-        assertEquals(initial, cached)
+        assertEquals(304, thrown.statusCode)
         assertNull(fixture.apiClient.requests.first().ifModifiedSince)
-        assertEquals(
-            "Wed, 22 Jul 2026 10:00:00 GMT",
-            fixture.apiClient.requests.last().ifModifiedSince,
-        )
+        assertNull(fixture.apiClient.requests.last().ifModifiedSince)
         val state = fixture.provider.observeState().first()
-        assertTrue(state is GlucoseProviderState.Available)
-        assertEquals(initial.last(), (state as GlucoseProviderState.Available).reading)
+        assertTrue(state is GlucoseProviderState.Degraded)
+        assertEquals(initial.last(), (state as GlucoseProviderState.Degraded).cached)
     }
 
     @Test
@@ -228,7 +245,7 @@ class NightscoutProviderTest {
     }
 
     @Test
-    fun `clearing runtime cache removes readings and conditional request metadata`() = runTest {
+    fun `clearing runtime cache removes readings and current validators`() = runTest {
         val fixture = provider(
             settings = settings(),
             responses = listOf(
@@ -242,9 +259,11 @@ class NightscoutProviderTest {
         fixture.provider.readSince(0)
 
         fixture.provider.clearRuntimeCache()
-        val afterClear = fixture.provider.readSince(0)
+        val thrown = expectThrows(NightscoutHttpException::class.java) {
+            fixture.provider.readSince(0)
+        }
 
-        assertTrue(afterClear.isEmpty())
+        assertEquals(304, thrown.statusCode)
         assertNull(fixture.apiClient.requests.last().ifModifiedSince)
         val state = fixture.provider.observeState().first()
         assertTrue(state is GlucoseProviderState.Degraded)
@@ -282,13 +301,15 @@ class NightscoutProviderTest {
             fixture.settingsRepository.updateNightscoutSettings(
                 fixture.settingsRepository.value.copy(activeServerId = serverA.id),
             )
-            val cachedA = fixture.provider.readSince(0)
+            val thrown = expectThrows(NightscoutHttpException::class.java) {
+                fixture.provider.readSince(0)
+            }
 
             assertEquals(111, fromA.single().valueMgDl)
             assertEquals(222, fromB.single().valueMgDl)
-            assertEquals(fromA, cachedA)
+            assertEquals(304, thrown.statusCode)
             assertEquals(
-                listOf(null, null, "a-last-modified"),
+                listOf(null, null, null),
                 fixture.apiClient.requests.map { it.ifModifiedSince },
             )
             assertEquals(
@@ -297,6 +318,80 @@ class NightscoutProviderTest {
             )
             assertTrue(fromA.single().sourceId != fromB.single().sourceId)
         }
+
+    @Test
+    fun `newest current reading wins regardless of backfill completion order`() {
+        val sourceId = "nightscout:server-1"
+        val current = reading(
+            value = 155,
+            remoteId = "current",
+            measuredAt = NOW,
+            sourceId = sourceId,
+        )
+        val olderBackfill = reading(
+            value = 120,
+            remoteId = "backfill",
+            measuredAt = NOW - DAY,
+            sourceId = sourceId,
+        )
+
+        assertEquals(
+            current,
+            mergeReadingsByNewest(listOf(olderBackfill), listOf(current)).last(),
+        )
+        assertEquals(
+            current,
+            mergeReadingsByNewest(listOf(current), listOf(olderBackfill)).last(),
+        )
+    }
+
+    @Test
+    fun `duplicate and out of order records choose a deterministic newest valid record`() {
+        val sourceId = "nightscout:server-1"
+        val duplicateOlder = reading(
+            value = 140,
+            remoteId = "duplicate",
+            measuredAt = NOW - FIVE_MINUTES,
+            receivedAt = NOW - 4 * FIVE_MINUTES,
+            sourceId = sourceId,
+        )
+        val duplicateNewer = duplicateOlder.copy(
+            valueMgDl = 141,
+            receivedAtEpochMillis = NOW,
+        )
+        val newest = reading(
+            value = 150,
+            remoteId = "newest",
+            measuredAt = NOW,
+            sourceId = sourceId,
+        )
+
+        val merged = mergeReadingsByNewest(
+            listOf(newest, duplicateOlder),
+            listOf(duplicateNewer),
+        )
+
+        assertEquals(listOf(duplicateNewer, newest), merged)
+    }
+
+    @Test
+    fun `successful refresh replaces stale runtime cache immediately`() = runTest {
+        val fixture = provider(
+            settings = settings(),
+            responses = listOf(
+                ok(bodyAt(value = 100, remoteId = "old", measuredAt = NOW - DAY)),
+                ok(bodyAt(value = 160, remoteId = "new", measuredAt = NOW)),
+            ),
+        )
+
+        fixture.provider.readSince(0)
+        val refreshed = fixture.provider.readSince(0)
+
+        assertEquals(160, refreshed.maxByOrNull { it.measuredAtEpochMillis }?.valueMgDl)
+        val state = fixture.provider.observeState().first()
+        assertTrue(state is GlucoseProviderState.Available)
+        assertEquals(160, (state as GlucoseProviderState.Available).reading.valueMgDl)
+    }
 
     @Test
     fun `cancellation propagates without retry or degraded failure state`() = runTest {
@@ -405,6 +500,23 @@ class NightscoutProviderTest {
         ]
     """.trimIndent()
 
+    private fun reading(
+        value: Int,
+        remoteId: String,
+        measuredAt: Long,
+        receivedAt: Long = measuredAt,
+        sourceId: String,
+    ): GlucoseReading = GlucoseReading(
+        id = remoteId,
+        valueMgDl = value,
+        trend = GlucoseTrend.STABLE,
+        deltaMgDl = null,
+        rateMgDlPerMinute = null,
+        measuredAtEpochMillis = measuredAt,
+        receivedAtEpochMillis = receivedAt,
+        sourceId = sourceId,
+    )
+
     private fun ok(
         body: String,
         lastModified: String? = null,
@@ -445,12 +557,14 @@ class NightscoutProviderTest {
         private val remaining = ArrayDeque(responses)
         val requests = mutableListOf<RecordedApiRequest>()
         val rangeRequests = mutableListOf<RecordedRangeRequest>()
+        val events = mutableListOf<String>()
 
         override suspend fun fetchEntries(
             server: NightscoutServerConfig,
             connectionTimeoutSeconds: Int,
             ifModifiedSince: String?,
         ): NightscoutHttpResponse {
+            events += "current"
             requests += RecordedApiRequest(
                 server = server,
                 connectionTimeoutSeconds = connectionTimeoutSeconds,
@@ -467,6 +581,7 @@ class NightscoutProviderTest {
             endEpochMillis: Long,
             count: Int,
         ): NightscoutHttpResponse {
+            events += "range"
             rangeRequests += RecordedRangeRequest(
                 server = server,
                 connectionTimeoutSeconds = connectionTimeoutSeconds,

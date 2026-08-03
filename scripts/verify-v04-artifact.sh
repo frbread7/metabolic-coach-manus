@@ -5,8 +5,9 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 variant="${MC_BUILD_VARIANT:-debug}"
-expected_version_name="${MC_EXPECTED_VERSION_NAME:-0.4.0}"
-expected_version_code="${MC_EXPECTED_VERSION_CODE:-4}"
+release_version="${MC_EXPECTED_VERSION_NAME:-0.4.1}"
+expected_version_name="$release_version"
+expected_version_code="${MC_EXPECTED_VERSION_CODE:-5}"
 expected_certificate="${MC_EXPECTED_V03_CERT_SHA256:-}"
 artifacts_dir="$repo_root/artifacts"
 
@@ -51,7 +52,7 @@ apksigner="$(resolve_tool apksigner)"
 phone_apk="$artifacts_dir/metabolic-coach-phone-$variant.apk"
 wear_apk="$artifacts_dir/metabolic-coach-wear-$variant.apk"
 watchface_apk="$artifacts_dir/metabolic-coach-watchface-$variant.apk"
-archive="$artifacts_dir/MetabolicCoach-v0.4.zip"
+archive="$artifacts_dir/MetabolicCoach-v${release_version}.zip"
 
 for apk in "$phone_apk" "$wear_apk" "$watchface_apk"; do
     if [[ ! -f "$apk" ]]; then
@@ -92,21 +93,21 @@ for apk in "$phone_apk" "$wear_apk" "$watchface_apk"; do
 done
 
 if [[ ! -f "$archive" ]]; then
-    echo "Expected v0.4 archive is missing: $archive" >&2
+    echo "Expected v${release_version} archive is missing: $archive" >&2
     exit 1
 fi
 unzip -tqq "$archive"
 expected_entries=$'CHANGELOG.md\nINSTALL.md\nphone.apk\nwatchface.apk\nwear.apk'
 actual_entries="$(unzip -Z1 "$archive" | LC_ALL=C sort)"
 if [[ "$actual_entries" != "$expected_entries" ]]; then
-    echo "v0.4 archive contents do not match the five-file contract." >&2
+    echo "v${release_version} archive contents do not match the five-file contract." >&2
     printf 'Expected:\n%s\nActual:\n%s\n' "$expected_entries" "$actual_entries" >&2
     exit 1
 fi
 
 archive_text="$(unzip -p "$archive" CHANGELOG.md INSTALL.md)"
 if grep -nE '(NIGHTSCOUT_TOKEN|API_SECRET|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY)' <<<"$archive_text"; then
-    echo "A credential or private key marker was found in the v0.4 archive." >&2
+    echo "A credential or private key marker was found in the v${release_version} archive." >&2
     exit 1
 fi
 
@@ -119,5 +120,5 @@ if git grep -nE 'BEGIN (RSA|OPENSSH|EC) PRIVATE KEY' -- ':!build' ':!artifacts';
     exit 1
 fi
 
-echo "v0.4 artifact metadata, signature continuity, ZIP integrity, and credential audit passed."
+echo "v${release_version} artifact metadata, signature continuity, ZIP integrity, and credential audit passed."
 sha256sum "$phone_apk" "$wear_apk" "$watchface_apk" "$archive"

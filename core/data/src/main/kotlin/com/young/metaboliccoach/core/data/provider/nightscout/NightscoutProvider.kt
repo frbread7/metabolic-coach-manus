@@ -54,7 +54,6 @@ class NightscoutProvider @Inject constructor(
     private val refreshMutex = Mutex()
     private val state = MutableStateFlow<GlucoseProviderState>(GlucoseProviderState.Idle)
     private val cacheBySource = mutableMapOf<String, List<GlucoseReading>>()
-    private val lastModifiedBySource = mutableMapOf<String, String>()
 
     override fun handlesSource(sourceId: String): Boolean =
         sourceId.startsWith("$PROVIDER_ID:")
@@ -87,18 +86,31 @@ class NightscoutProvider @Inject constructor(
         }
     }
 
-    override suspend fun readSince(startEpochMillis: Long): List<GlucoseReading> =
+    override suspend fun readCurrent(): List<GlucoseReading> = refreshMutex.withLock {
+        val settings = normalizedSettings()
+        retainConfiguredSourceCaches(settings)
+        val server = settings.activeServer
+        if (server == null) {
+            state.value = GlucoseProviderState.ConfigurationRequired
+            return@withLock emptyList()
+        }
+        readCurrentLocked(
+            server = server,
+            settings = settings,
+            publishState = true,
+        )
+    }
+
+    override suspend fun readHistorySince(startEpochMillis: Long): List<GlucoseReading> =
         refreshMutex.withLock {
-            val settings = settingsValidator.normalize(
-                settingsRepository.observeNightscoutSettings().first(),
-            )
+            val settings = normalizedSettings()
             retainConfiguredSourceCaches(settings)
             val server = settings.activeServer
             if (server == null) {
                 state.value = GlucoseProviderState.ConfigurationRequired
                 return@withLock emptyList()
             }
-            readServerLocked(
+            readHistoryLocked(
                 server = server,
                 settings = settings,
                 startEpochMillis = startEpochMillis,
@@ -106,18 +118,27 @@ class NightscoutProvider @Inject constructor(
             )
         }
 
+    override suspend fun readSince(startEpochMillis: Long): List<GlucoseReading> {
+        readCurrent()
+        return readHistorySince(startEpochMillis)
+    }
+
     override suspend fun readSinceExactSource(
         sourceId: String,
         startEpochMillis: Long,
     ): List<GlucoseReading> = refreshMutex.withLock {
-        val settings = settingsValidator.normalize(
-            settingsRepository.observeNightscoutSettings().first(),
-        )
+        val settings = normalizedSettings()
         retainConfiguredSourceCaches(settings)
         val server = settings.configuredServers.firstOrNull {
             it.sourceId(settings.requireHttps) == sourceId
         } ?: return@withLock emptyList()
-        readServerLocked(
+        readCurrentLocked(
+            server = server,
+            settings = settings,
+            publishState = settings.activeServer
+                ?.sourceId(settings.requireHttps) == sourceId,
+        )
+        readHistoryLocked(
             server = server,
             settings = settings,
             startEpochMillis = startEpochMillis,
@@ -129,56 +150,113 @@ class NightscoutProvider @Inject constructor(
     override suspend fun clearRuntimeCache() {
         refreshMutex.withLock {
             cacheBySource.clear()
-            lastModifiedBySource.clear()
             state.value = GlucoseProviderState.Idle
         }
     }
+
+    private suspend fun normalizedSettings(): NightscoutSettings = settingsValidator.normalize(
+        settingsRepository.observeNightscoutSettings().first(),
+    )
 
     private fun retainConfiguredSourceCaches(settings: NightscoutSettings) {
         val configuredSourceIds = settings.configuredServers
             .mapTo(mutableSetOf()) { it.sourceId(settings.requireHttps) }
         cacheBySource.keys.retainAll(configuredSourceIds)
-        lastModifiedBySource.keys.retainAll(configuredSourceIds)
     }
 
-    private suspend fun readServerLocked(
+    private suspend fun readCurrentLocked(
+        server: NightscoutServerConfig,
+        settings: NightscoutSettings,
+        publishState: Boolean,
+    ): List<GlucoseReading> {
+        val sourceId = server.sourceId(settings.requireHttps)
+        val cached = cacheBySource[sourceId].orEmpty()
+        if (publishState) {
+            state.value = GlucoseProviderState.Loading(cached.newestOrNull())
+        }
+        return try {
+            val nowEpochMillis = timeSource.nowEpochMillis()
+            val fetched = fetchWithRetry(
+                server = server,
+                sourceId = sourceId,
+                connectionTimeoutSeconds = settings.connectionTimeoutSeconds,
+                retryIntervalSeconds = settings.retryIntervalSeconds,
+                maximumRetryAttempts = settings.maximumRetryAttempts,
+            )
+            if (fetched.isEmpty()) {
+                throw NightscoutParseException(
+                    "The active Nightscout server returned no usable current glucose readings.",
+                )
+            }
+            val readings = mergeReadingsByNewest(cached, fetched)
+                .filter {
+                    it.measuredAtEpochMillis >=
+                        nowEpochMillis - HISTORY_LOOKBACK_MILLIS - DAY_MILLIS
+                }
+            if (readings.isEmpty()) {
+                throw NightscoutParseException(
+                    "The active Nightscout server returned no usable current glucose readings.",
+                )
+            }
+            cacheBySource[sourceId] = readings
+            if (publishState) {
+                state.value = GlucoseProviderState.Available(
+                    reading = readings.newestOrNull()!!,
+                    refreshedAtEpochMillis = nowEpochMillis,
+                )
+            }
+            readings
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Throwable) {
+            if (publishState) {
+                val failure = error.toProviderFailure()
+                state.value = GlucoseProviderState.Degraded(
+                    cached = cached.newestOrNull(),
+                    failure = failure,
+                )
+            }
+            throw error
+        }
+    }
+
+    private suspend fun readHistoryLocked(
         server: NightscoutServerConfig,
         settings: NightscoutSettings,
         startEpochMillis: Long,
         publishState: Boolean,
     ): List<GlucoseReading> {
         val sourceId = server.sourceId(settings.requireHttps)
-        val cached = cacheBySource[sourceId].orEmpty()
-        if (publishState) {
-            state.value = GlucoseProviderState.Loading(cached.lastOrNull())
+        var cached = cacheBySource[sourceId].orEmpty()
+        val nowEpochMillis = timeSource.nowEpochMillis()
+        if (cached.isEmpty()) {
+            cached = readCurrentLocked(
+                server = server,
+                settings = settings,
+                publishState = publishState,
+            )
         }
+        val cacheNeedsHistory = cached.firstOrNull()?.measuredAtEpochMillis
+            ?.let { it > startEpochMillis }
+            ?: true
+        if (
+            !cacheNeedsHistory ||
+            startEpochMillis < nowEpochMillis - HISTORY_LOOKBACK_MILLIS - DAY_MILLIS
+        ) {
+            return cached.filter { it.measuredAtEpochMillis >= startEpochMillis }
+        }
+
         return try {
-            val nowEpochMillis = timeSource.nowEpochMillis()
-            val cacheNeedsHistory = cached.isEmpty() ||
-                cached.firstOrNull()?.measuredAtEpochMillis?.let { it > startEpochMillis } == true
-            val fetched = if (
-                cacheNeedsHistory &&
-                    startEpochMillis >= nowEpochMillis - HISTORY_LOOKBACK_MILLIS - DAY_MILLIS
-            ) {
-                fetchHistoryWithRetry(
-                    server = server,
-                    sourceId = sourceId,
-                    connectionTimeoutSeconds = settings.connectionTimeoutSeconds,
-                    retryIntervalSeconds = settings.retryIntervalSeconds,
-                    maximumRetryAttempts = settings.maximumRetryAttempts,
-                    startEpochMillis = startEpochMillis,
-                    endEpochMillis = nowEpochMillis,
-                )
-            } else {
-                fetchWithRetry(
-                    server = server,
-                    sourceId = sourceId,
-                    connectionTimeoutSeconds = settings.connectionTimeoutSeconds,
-                    retryIntervalSeconds = settings.retryIntervalSeconds,
-                    maximumRetryAttempts = settings.maximumRetryAttempts,
-                )
-            }
-            val readings = mergeReadings(cached, fetched)
+            val history = fetchHistoryWithRetry(
+                server = server,
+                sourceId = sourceId,
+                connectionTimeoutSeconds = settings.connectionTimeoutSeconds,
+                retryIntervalSeconds = settings.retryIntervalSeconds,
+                maximumRetryAttempts = settings.maximumRetryAttempts,
+                startEpochMillis = startEpochMillis,
+                endEpochMillis = nowEpochMillis,
+            )
+            val readings = mergeReadingsByNewest(cached, history)
                 .filter {
                     it.measuredAtEpochMillis >=
                         nowEpochMillis - HISTORY_LOOKBACK_MILLIS - DAY_MILLIS
@@ -187,32 +265,19 @@ class NightscoutProvider @Inject constructor(
                 cacheBySource[sourceId] = readings
                 if (publishState) {
                     state.value = GlucoseProviderState.Available(
-                        reading = readings.last(),
+                        reading = readings.newestOrNull()!!,
                         refreshedAtEpochMillis = nowEpochMillis,
                     )
                 }
-            } else if (publishState) {
-                state.value = GlucoseProviderState.Degraded(
-                    cached = cached.lastOrNull(),
-                    failure = GlucoseProviderFailure(
-                        kind = GlucoseProviderFailureKind.RESPONSE,
-                        detail = "The active Nightscout server returned no glucose readings.",
-                        retryable = false,
-                    ),
-                )
             }
             readings.filter { it.measuredAtEpochMillis >= startEpochMillis }
         } catch (cancellation: CancellationException) {
             throw cancellation
-        } catch (error: Throwable) {
-            if (publishState) {
-                val failure = error.toProviderFailure()
-                state.value = GlucoseProviderState.Degraded(
-                    cached = cached.lastOrNull(),
-                    failure = failure,
-                )
-            }
-            throw error
+        } catch (_: Throwable) {
+            // Historical data is best effort. The current snapshot was already committed to the
+            // runtime cache and (by the repository) to Room, so an oversized or failed range must
+            // never prevent the current reading from being published or regress it.
+            cached.filter { it.measuredAtEpochMillis >= startEpochMillis }
         }
     }
 
@@ -229,8 +294,9 @@ class NightscoutProvider @Inject constructor(
                 val response = apiClient.fetchEntries(
                     server = server,
                     connectionTimeoutSeconds = connectionTimeoutSeconds,
-                    ifModifiedSince = lastModifiedBySource[sourceId]
-                        ?.takeIf { cacheBySource[sourceId].orEmpty().isNotEmpty() },
+                    // Current glucose is time-sensitive. Do not let a stale validator or proxy
+                    // 304 turn an old cache into a successful refresh.
+                    ifModifiedSince = null,
                 )
                 return when (response.statusCode) {
                     HTTP_OK -> {
@@ -243,10 +309,9 @@ class NightscoutProvider @Inject constructor(
                             sourceId = sourceId,
                             receivedAtEpochMillis = timeSource.nowEpochMillis(),
                         )
-                        response.lastModified?.let { lastModifiedBySource[sourceId] = it }
                         parsed
                     }
-                    HTTP_NOT_MODIFIED -> cacheBySource[sourceId].orEmpty()
+                    HTTP_NOT_MODIFIED -> throw NightscoutHttpException(HTTP_NOT_MODIFIED)
                     else -> throw NightscoutHttpException(response.statusCode)
                 }
             } catch (cancellation: CancellationException) {
@@ -336,14 +401,6 @@ class NightscoutProvider @Inject constructor(
         }
     }
 
-    private fun mergeReadings(
-        cached: List<GlucoseReading>,
-        fetched: List<GlucoseReading>,
-    ): List<GlucoseReading> = (cached + fetched)
-        .associateBy(GlucoseReading::id)
-        .values
-        .sortedBy(GlucoseReading::measuredAtEpochMillis)
-
     private fun Throwable.isRetryable(): Boolean = when (this) {
         is SSLException -> false
         is InterruptedIOException -> true
@@ -425,3 +482,50 @@ class NightscoutProvider @Inject constructor(
         private const val MAXIMUM_SINGLE_RETRY_DELAY_MILLIS = MILLIS_PER_MINUTE
     }
 }
+
+/**
+ * Merges provider batches without making request completion order part of current-state selection.
+ * The identity includes the source so a future provider cannot accidentally replace a Nightscout
+ * record with a same-named record from another source.
+ */
+internal fun mergeReadingsByNewest(
+    vararg batches: List<GlucoseReading>,
+): List<GlucoseReading> {
+    val byIdentity = linkedMapOf<Pair<String, String>, GlucoseReading>()
+    batches.asSequence()
+        .flatten()
+        .forEach { candidate ->
+            val key = candidate.sourceId to candidate.id
+            val current = byIdentity[key]
+            if (current == null || candidate.isPreferredOver(current)) {
+                byIdentity[key] = candidate
+            }
+        }
+    return byIdentity.values.sortedWith(
+        compareBy<GlucoseReading> { it.measuredAtEpochMillis }
+            .thenBy { it.sourceId }
+            .thenBy { it.id },
+    )
+}
+
+private fun GlucoseReading.isPreferredOver(other: GlucoseReading): Boolean {
+    if (measuredAtEpochMillis != other.measuredAtEpochMillis) {
+        return measuredAtEpochMillis > other.measuredAtEpochMillis
+    }
+    if (receivedAtEpochMillis != other.receivedAtEpochMillis) {
+        return receivedAtEpochMillis > other.receivedAtEpochMillis
+    }
+    if (valueMgDl != other.valueMgDl) return valueMgDl > other.valueMgDl
+    if (trend.name != other.trend.name) return trend.name > other.trend.name
+    if (deltaMgDl != other.deltaMgDl) {
+        return (deltaMgDl ?: Int.MIN_VALUE) > (other.deltaMgDl ?: Int.MIN_VALUE)
+    }
+    return (rateMgDlPerMinute ?: Double.NEGATIVE_INFINITY) >
+        (other.rateMgDlPerMinute ?: Double.NEGATIVE_INFINITY)
+}
+
+private fun List<GlucoseReading>.newestOrNull(): GlucoseReading? = maxWithOrNull(
+    compareBy<GlucoseReading> { it.measuredAtEpochMillis }
+        .thenBy { it.sourceId }
+        .thenBy { it.id },
+)

@@ -80,6 +80,32 @@ class GlucoseRepositoryImplTest {
     }
 
     @Test
+    fun `current snapshot is persisted before history failure and remains the latest reading`() =
+        runTest {
+            val server = server("primary", "https://primary.example")
+            val sourceId = server.sourceId(requireHttps = true)
+            val stale = reading(120, sourceId, 1_000)
+            val current = reading(180, sourceId, 2_000)
+            val fixture = repository(
+                nightscoutSettings = nightscoutSettings(listOf(server), server.id),
+                existing = listOf(stale.toEntity()),
+                currentResults = listOf(Result.success(listOf(current))),
+                readResults = listOf(Result.failure(IOException("history unavailable"))),
+            )
+
+            fixture.repository.refresh()
+
+            assertEquals(current, fixture.repository.observeLatest().firstValue())
+            assertTrue(fixture.dao.values.contains(current.toEntity()))
+            assertEquals(1, fixture.provider.currentCalls)
+            assertEquals(1, fixture.provider.readCalls)
+            val status = fixture.repository.observeProviderStatus().firstValue()
+            assertEquals(ProviderAvailability.ERROR, status.availability)
+            assertTrue(status.detail.contains("history", ignoreCase = true))
+            assertTrue(status.detail.contains("cached data retained", ignoreCase = true))
+        }
+
+    @Test
     fun `active server switching isolates cached readings by exact source identity`() = runTest {
         val serverA = server("server-a", "https://a.example")
         val serverB = server("server-b", "https://b.example")
@@ -170,10 +196,14 @@ class GlucoseRepositoryImplTest {
     private fun repository(
         nightscoutSettings: NightscoutSettings,
         existing: List<GlucoseReadingEntity> = emptyList(),
+        currentResults: List<Result<List<GlucoseReading>>> = emptyList(),
         readResults: List<Result<List<GlucoseReading>>> = emptyList(),
     ): RepositoryFixture {
         val dao = InMemoryGlucoseDao(existing)
-        val provider = RecordingGlucoseProvider(readResults)
+        val provider = RecordingGlucoseProvider(
+            readResults = readResults,
+            currentResults = currentResults,
+        )
         val nightscoutSettingsRepository =
             MutableNightscoutSettingsRepository(nightscoutSettings)
         return RepositoryFixture(
@@ -230,9 +260,13 @@ class GlucoseRepositoryImplTest {
 
     private class RecordingGlucoseProvider(
         readResults: List<Result<List<GlucoseReading>>>,
+        currentResults: List<Result<List<GlucoseReading>>> = emptyList(),
     ) : GlucoseProvider {
         private val remaining = ArrayDeque(readResults)
+        private val remainingCurrent = ArrayDeque(currentResults)
         var readCalls = 0
+            private set
+        var currentCalls = 0
             private set
         val exactSourceCalls = mutableListOf<String>()
 
@@ -250,6 +284,13 @@ class GlucoseRepositoryImplTest {
             availability = ProviderAvailability.AVAILABLE,
             detail = "Ready",
         )
+
+        override suspend fun readCurrent(): List<GlucoseReading> {
+            if (remainingCurrent.isEmpty()) return emptyList()
+            currentCalls += 1
+            check(remainingCurrent.isNotEmpty()) { "No fake current result remains." }
+            return remainingCurrent.removeFirst().getOrThrow()
+        }
 
         override suspend fun readSince(startEpochMillis: Long): List<GlucoseReading> {
             readCalls += 1
@@ -303,20 +344,20 @@ class GlucoseRepositoryImplTest {
             get() = state.value
 
         override suspend fun getLatest(): GlucoseReadingEntity? =
-            state.value.maxByOrNull { it.measuredAtEpochMillis }
+            state.value.latestOrNull()
 
         override suspend fun getLatestForSource(sourcePrefix: String): GlucoseReadingEntity? =
             state.value.filterSource(sourcePrefix)
-                .maxByOrNull { it.measuredAtEpochMillis }
+                .latestOrNull()
 
         override fun observeLatest(): Flow<GlucoseReadingEntity?> =
-            state.map { readings -> readings.maxByOrNull { it.measuredAtEpochMillis } }
+            state.map { readings -> readings.latestOrNull() }
 
         override fun observeLatestForSource(
             sourcePrefix: String,
         ): Flow<GlucoseReadingEntity?> = state.map { readings ->
             readings.filterSource(sourcePrefix)
-                .maxByOrNull { it.measuredAtEpochMillis }
+                .latestOrNull()
         }
 
         override suspend fun readingsBetween(
@@ -374,6 +415,13 @@ class GlucoseRepositoryImplTest {
         ): List<GlucoseReadingEntity> = filter {
             it.sourceId == sourcePrefix || it.sourceId.startsWith("$sourcePrefix:")
         }
+
+        private fun List<GlucoseReadingEntity>.latestOrNull(): GlucoseReadingEntity? =
+            maxWithOrNull(
+                compareBy<GlucoseReadingEntity> { it.measuredAtEpochMillis }
+                    .thenBy { it.sourceId }
+                    .thenBy { it.id },
+            )
 
         private fun List<GlucoseReadingEntity>.inRange(
             startEpochMillis: Long,

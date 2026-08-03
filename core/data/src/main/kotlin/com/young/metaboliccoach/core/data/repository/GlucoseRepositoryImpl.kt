@@ -145,8 +145,8 @@ class GlucoseRepositoryImpl @Inject constructor(
             return
         }
         val start = System.currentTimeMillis() - HISTORY_LOOKBACK_MILLIS
-        val readings = try {
-            selected.readSince(start)
+        val currentReadings = try {
+            selected.readCurrent()
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: Throwable) {
@@ -155,7 +155,34 @@ class GlucoseRepositoryImpl @Inject constructor(
             }
             providerStatus.value = status.copy(
                 availability = ProviderAvailability.ERROR,
-                detail = "Provider read failed (${error.javaClass.simpleName}); cached data retained.",
+                detail = "Current provider read failed (${error.javaClass.simpleName}); " +
+                    "cached data retained.",
+            )
+            return
+        }
+        if (currentReadings.isNotEmpty()) {
+            if (mode == GlucoseProviderMode.HEALTH_CONNECT) {
+                applyHealthConnectSelection(
+                    settings = settings,
+                    status = status,
+                    readings = currentReadings,
+                )
+            } else {
+                glucoseDao.insertAll(currentReadings.map { it.toEntity() })
+            }
+        }
+        val readings = try {
+            selected.readHistorySince(start)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Throwable) {
+            if (mode == GlucoseProviderMode.HEALTH_CONNECT) {
+                availableOrigins.value = emptyList()
+            }
+            providerStatus.value = status.copy(
+                availability = ProviderAvailability.ERROR,
+                detail = "Provider history read failed (${error.javaClass.simpleName}); " +
+                    "cached data retained.",
             )
             return
         }
@@ -165,7 +192,7 @@ class GlucoseRepositoryImpl @Inject constructor(
                 status = status,
                 readings = readings,
             )
-        } else {
+        } else if (readings.isNotEmpty()) {
             glucoseDao.insertAll(readings.map { it.toEntity() })
         }
     }

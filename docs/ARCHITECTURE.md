@@ -257,7 +257,7 @@ inverse equation is used only to show a mathematical future mean for a selected 
 preceding 30-day mean; for 90 days it targets the full-window mean directly. Insufficient coverage,
 source changes, long gaps, invalid input, and configured low/very-low exposure suppress or qualify
 the result. Planner output is display-only and does not enter coaching, notifications, Wear state,
-or watch-face complications in `v0.4`.
+or watch-face complications in `v0.4`; the v0.4.1 freshness hotfix preserves that boundary.
 
 ### Refresh and coaching
 
