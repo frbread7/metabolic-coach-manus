@@ -22,10 +22,6 @@ esac
 resolve_tool() {
     local command_name="$1"
     local candidate
-    if command -v "$command_name" >/dev/null 2>&1; then
-        command -v "$command_name"
-        return
-    fi
     local sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
     if [[ -n "$sdk_root" ]]; then
         candidate="$(find "$sdk_root/build-tools" -maxdepth 2 -type f -name "$command_name" \
@@ -34,6 +30,10 @@ resolve_tool() {
             printf '%s\n' "$candidate"
             return
         fi
+    fi
+    if command -v "$command_name" >/dev/null 2>&1; then
+        command -v "$command_name"
+        return
     fi
     echo "$command_name was not found; install Android SDK Build Tools." >&2
     exit 2

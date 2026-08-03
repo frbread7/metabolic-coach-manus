@@ -71,11 +71,6 @@ fi
     "$repo_root/watchface/build/outputs/apk/$variant/watchface-$variant.apk"
 
 resolve_apksigner() {
-    if command -v apksigner >/dev/null 2>&1; then
-        command -v apksigner
-        return
-    fi
-
     local sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
     if [[ -n "$sdk_root" ]]; then
         local candidate
@@ -87,11 +82,18 @@ resolve_apksigner() {
         fi
     fi
 
+    if command -v apksigner >/dev/null 2>&1; then
+        command -v apksigner
+        return
+    fi
+
     echo "apksigner was not found; install Android SDK Build Tools." >&2
     exit 2
 }
 
 apksigner="$(resolve_apksigner)"
+echo "Using apksigner: $apksigner"
+"$apksigner" version
 phone_apk="$repo_root/phone/build/outputs/apk/$variant/phone-$variant.apk"
 wear_apk="$repo_root/wear/build/outputs/apk/$variant/wear-$variant.apk"
 watchface_apk="$repo_root/watchface/build/outputs/apk/$variant/watchface-$variant.apk"
