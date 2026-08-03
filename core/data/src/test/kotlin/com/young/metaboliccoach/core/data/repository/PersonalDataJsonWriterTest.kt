@@ -4,6 +4,8 @@ import com.young.metaboliccoach.core.model.DefaultCoachSettings
 import com.young.metaboliccoach.core.model.GlycemicTargetProvenance
 import com.young.metaboliccoach.core.model.GlycemicWindow
 import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
+import com.young.metaboliccoach.core.model.GlycemicPlanningMilestone
+import com.young.metaboliccoach.core.model.MilestoneLifecycleState
 import java.util.Base64
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -19,7 +21,7 @@ class PersonalDataJsonWriterTest {
         assertTrue(
             first.startsWith(
                 "{\"format\":\"metabolic-coach-personal-data\"," +
-                    "\"schemaVersion\":2,\"databaseSchemaVersion\":7," +
+                    "\"schemaVersion\":3,\"databaseSchemaVersion\":8," +
                     "\"exportedAtEpochMillis\":1234,\"settings\":{",
             ),
         )
@@ -44,7 +46,7 @@ class PersonalDataJsonWriterTest {
         PersonalDataJsonWriter(output).apply {
             beginDocument(
                 exportedAtEpochMillis = 10,
-                databaseSchemaVersion = 7,
+                databaseSchemaVersion = 8,
                 settings = DefaultCoachSettings.create(),
                 glycemicPlannerSettings = GlycemicPlannerSettings(
                     targetGmiPercent = 7.0,
@@ -64,12 +66,35 @@ class PersonalDataJsonWriterTest {
         assertTrue(output.contains("\"targetProvenance\":\"CLINICIAN_AGREED\""))
     }
 
+    @Test
+    fun `writer exports selected milestones in deterministic order`() {
+        val output = StringBuilder()
+        PersonalDataJsonWriter(output).apply {
+            beginDocument(
+                exportedAtEpochMillis = 10,
+                databaseSchemaVersion = 8,
+                settings = DefaultCoachSettings.create(),
+                selectedMilestoneId = "early",
+                milestones = listOf(
+                    milestone("late", 2_000),
+                    milestone("early", 1_000),
+                ),
+            )
+            endDocument()
+        }
+
+        val json = output.toString()
+        assertTrue(json.contains("\"selectedMilestoneId\":\"early\""))
+        assertTrue(json.indexOf("\"id\":\"early\"") < json.indexOf("\"id\":\"late\""))
+        assertTrue(json.contains("\"calculationContractVersion\":1"))
+    }
+
     private fun writeSample(): String {
         val output = StringBuilder()
         PersonalDataJsonWriter(output).apply {
             beginDocument(
                 exportedAtEpochMillis = 1_234,
-                databaseSchemaVersion = 7,
+                databaseSchemaVersion = 8,
                 settings = DefaultCoachSettings.create().copy(
                     healthConnectGlucoseOriginPackage = "pkg\"\\\n\u2028",
                 ),
@@ -96,4 +121,19 @@ class PersonalDataJsonWriterTest {
         }
         return output.toString()
     }
+
+    private fun milestone(id: String, targetDateEpochMillis: Long) =
+        GlycemicPlanningMilestone(
+            id = id,
+            title = null,
+            targetGmiPercent = 7.0,
+            targetProvenance = GlycemicTargetProvenance.USER_ENTERED,
+            targetDateEpochMillis = targetDateEpochMillis,
+            originalHorizonDays = 30,
+            lifecycleState = MilestoneLifecycleState.ACTIVE,
+            createdAtEpochMillis = targetDateEpochMillis,
+            updatedAtEpochMillis = targetDateEpochMillis,
+            archivedAtEpochMillis = null,
+            calculationContractVersion = 1,
+        )
 }

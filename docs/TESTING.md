@@ -26,7 +26,7 @@ The current source includes these JVM and Android local-test suites:
 | `NightscoutSettingsValidatorTest` | Multiple-server limits and selection, URL normalization, HTTPS enforcement, credential/query/fragment rejection, valid TCP ports, and polling/timeout/retry bounds |
 | `NightscoutJsonParserTest` | Nightscout response parsing, trend mapping, stable IDs, ordering, delta/rate calculation, timestamp fallbacks, malformed/unusable rows, and bounded value/time acceptance |
 | `NightscoutProviderTest` | Provider state flow, success, conditional cache reuse, retry/non-retry and response-size classification, retained cache on failure, cancellation, and per-server isolation/switching |
-| `GlycemicGoalPlannerTest` | GMI conversion, time-weighted 14/30/60/90-day metrics, coverage and long-gap handling, source discontinuity, horizon equations, and low-glucose-risk suppression |
+| `GlycemicGoalPlannerTest` | GMI conversion, time-weighted 14/30/60/90-day metrics, coverage and long-gap handling, source discontinuity, horizon equations, remaining-window milestones, temporal states, deterministic ordering, and low-glucose-risk suppression |
 | `OkHttpNightscoutApiClientTest` | MockWebServer request path/query/headers, conditional responses, redirect refusal, bounded declared/streamed response size, and future-authenticator hook without a real server |
 | `NightscoutSettingsJsonCodecTest` | Stable multi-server DataStore encoding/decoding and malformed stored-value recovery |
 | `XdripGlucoseIngestorTest` | Retained inactive-adapter input validation; it does not prove or enable a Version 1 broadcast route |
@@ -42,7 +42,8 @@ The current source includes these JVM and Android local-test suites:
 | `PhoneCommandProcessorTest` | Exactly-once terminal replay: a persisted rejected command triggers watch-state republication without invoking mutation logic |
 | `CommandDataEpochPolicyTest` | Legacy compatibility before erase and strict current-reset-token matching afterward |
 | `PhoneDataMutationGateTest` | Process-wide serialization prevents boundary crossing; local operations preempt cancellable provider work and retain priority over already queued provider work |
-| `PersonalDataJsonWriterTest` | Deterministic versioned JSON, planner-settings export, escaping/control characters, non-finite-number handling, binary encoding, and empty-table separators |
+| `GlycemicPlanningMilestoneRepositoryImplTest` | One-time legacy migration, fixed target dates, idempotent creation, selected-ID fallback, past-target edit freezing, and reset |
+| `PersonalDataJsonWriterTest` | Deterministic versioned JSON, planner-settings/milestone export, escaping/control characters, non-finite-number handling, binary encoding, and empty-table separators |
 | `SessionAckOrderingPolicyTest` | Completion-over-start ordering, older replay protection, and the rejected-start/completion/replayed-start chain |
 | `WearSessionReplicaReducerTest` | Persistent pending start/completion, transport state, tombstone protection, and all acknowledgement outcomes |
 | `WearCommandOutboxPolicyTest` | Generic command ordering, stable-ID deduplication, and removal |
@@ -52,10 +53,10 @@ The current source includes these JVM and Android local-test suites:
 | `RemoteDataResetPolicyTest` | First-seen reset handling, same-token idempotence, legacy-state compatibility, and missing-cache recovery |
 | `TimeSettingValueTest` | Exact minute/hour preservation and valid minute-of-day clamping |
 
-Exported Room schemas 1–7 are committed. `DatabaseMigrationTest` is an Android instrumentation
-suite for schema 1→7 and every supported starting version 2–6→7, including safe defaults, preserved
+Exported Room schemas 1–8 are committed. `DatabaseMigrationTest` is an Android instrumentation
+suite for schema 1→8 and every supported starting version 2–7→8, including safe defaults, preserved
 legacy rows, nullable prospective timing-provenance columns, and an initially empty recommendation
-snapshot table. Its source has compiled locally, but the suite has not executed because it requires
+snapshot table plus the phone-only milestone table. Its source has compiled locally, but the suite has not executed because it requires
 an Android device or emulator.
 
 Run them with:
@@ -88,11 +89,14 @@ Execute the migration suite on an Android runtime with:
   readability, stability, and battery checks complete on 2026-08-02. The report is retained as
   [the privacy-sanitized acceptance record](acceptance/V0_3_PHYSICAL_ACCEPTANCE.md); it is not a
   substitute for reproducible device logs.
-- `v0.4.1` gate: run the planner/provider regression tests, current-first/backfill ordering tests,
-  persistence/status checks, phone UI compile/lint, and a phone-only freshness retest. Verify that
-  Wear payloads, coaching decisions, notifications, and watch-face resources are unchanged.
-  Validate that the UI labels the result as CGM-derived GMI, exposes coverage/gaps and low-glucose
-  suppression, and never presents a scenario as a treatment recommendation.
+- `v0.4.1` gate: the phone-side freshness fix was accepted by user report; its tests and historical
+  artifact remain evidence, not a replacement for the next gate.
+- `v0.4.2` gate: run the planner/milestone/provider regression tests, schema-8 source compilation,
+  persistence/export checks, phone UI compile/lint, and a phone-only milestone acceptance test.
+  Verify that current glucose freshness remains correct and that Wear payloads, coaching
+  decisions, notifications, and watch-face resources are unchanged. Validate CGM-derived GMI
+  wording, fixed target dates, one selected detail milestone, safety suppression, deterministic
+  ordering, and no automatic milestone completion.
 
 ## Current local verification
 
@@ -129,8 +133,8 @@ artifact `8849324941`, with signing certificate SHA-256
 `7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6667da26c5fad4`. They are historical
 evidence and are not overwritten or relabeled.
 
-For the v0.4.1 hotfix checkout on 2026-08-03, the focused provider and repository regression suites
-passed locally with the ARM host's Android linker compatibility prefix:
+Historical v0.4.1 focused provider/repository evidence (2026-08-03) passed locally with the ARM
+host's Android linker compatibility prefix:
 
 ```text
 QEMU_LD_PREFIX=/usr/x86_64-linux-gnu ./gradlew --no-daemon --no-parallel --max-workers=1 \
@@ -141,12 +145,43 @@ QEMU_LD_PREFIX=/usr/x86_64-linux-gnu ./gradlew --no-daemon --no-parallel --max-w
 BUILD SUCCESSFUL
 ```
 
-The full v0.4.1 GitHub Actions result and hashes are recorded below after the pushed commit is
-verified. Physical acceptance remains required and is not inferred from these automated checks.
+The full v0.4.1 GitHub Actions result and hashes are historical evidence. The v0.4.2 GitHub Actions
+artifact and phone physical acceptance are separate gates and are not inferred from local tests.
 
-### v0.4.1 CI engineering artifact gate
+On 2026-08-03, the v0.4.2 saved-milestones checkout passed the authoritative local package script:
 
-The v0.4.1 debug artifact must be built on GitHub Actions before the phone freshness retest.
+```text
+QEMU_LD_PREFIX=/usr/x86_64-linux-gnu ./scripts/build-apks.sh
+BUILD SUCCESSFUL in 7m06s
+333 actionable tasks: 333 executed
+```
+
+The run passed model/domain/data-debug/data-release/sync/phone/Wear unit suites, Android
+migration-test source compilation, phone/Wear/watch-face debug lint, all three debug assemblies,
+APK signature checks, phone/Wear certificate equality, WFF v4 schema/memory validation, and exact
+five-file ZIP packaging. The generated local test reports contain 52 suites, 288 test executions,
+0 failures, 0 errors, and 0 skipped. Android instrumentation was compiled but not executed.
+
+The local v0.4.2 debug package passed the metadata/signature/ZIP/privacy verifier with
+`MC_EXPECTED_VERSION_NAME=0.4.2`, `MC_EXPECTED_VERSION_CODE=6`, and the expected v0.3 certificate
+digest. It is still an engineering build; GitHub Actions must repeat the same continuity check from
+the committed revision before phone physical acceptance.
+
+Local v0.4.2 SHA-256 values:
+
+```text
+c079b323c076b8185d931e9f63e7cefa947b41411ac86cfd12dc7c1cc30a74f6  metabolic-coach-phone-debug.apk
+9c3bcae9289edb4cd17da806c5eaa1c63e4fc5ed3dbffba6ec7fd42609eeb347  metabolic-coach-wear-debug.apk
+fdf856f2d5ad6164a0b2b610d3ac39c1dbc0816cafc8305f3ae5ef47f6d52a10  metabolic-coach-watchface-debug.apk
+5786592c93793a613a1cd7968c66d76bef0f2e90717b37080bafb9f8cf91cd41  MetabolicCoach-v0.4.2.zip
+```
+
+These local hashes are engineering evidence only. The GitHub Actions artifact must be built from
+the committed revision with the accepted v0.3 certificate before phone physical acceptance.
+
+### v0.4.2 CI engineering artifact gate
+
+The v0.4.2 debug artifact must be built on GitHub Actions before the phone milestone retest.
 The workflow requires the accepted v0.3 engineering keystore through the encrypted
 `MC_DEBUG_KEYSTORE_BASE64` repository secret; it never generates or commits a replacement key.
 The gate records the commit SHA, workflow run ID, signing certificate digest, and SHA-256 hashes,
@@ -156,17 +191,17 @@ and uploads exactly:
 metabolic-coach-phone-debug.apk
 metabolic-coach-wear-debug.apk
 metabolic-coach-watchface-debug.apk
-MetabolicCoach-v0.4.1.zip
+MetabolicCoach-v0.4.2.zip
 ```
 
-The v0.4.1 run is accepted only when all automated checks pass, every APK reports version
-`0.4.1`/code `5`, the ZIP contains exactly `CHANGELOG.md`, `INSTALL.md`, `phone.apk`,
+The v0.4.2 run is accepted only when all automated checks pass, every APK reports version
+`0.4.2`/code `6`, the ZIP contains exactly `CHANGELOG.md`, `INSTALL.md`, `phone.apk`,
 `watchface.apk`, and `wear.apk`, the v0.3 certificate matches, and the credential/privacy audit is
 clean. A successful artifact build does not claim new Wear, watch-face, synchronization, or
 coaching behavior; those modules are rebuilt only to keep the package metadata aligned. The failed
 v0.4.0 run and artifact remain unchanged for comparison and audit.
 
-Current debug artifact SHA-256 values:
+Historical v0.2 debug artifact SHA-256 values:
 
 ```text
 eb1dc99bd612970b975d17ff6e02e63c3529e38581f8a7d0bd50e7866bd2dbee  metabolic-coach-phone-debug.apk
@@ -175,7 +210,7 @@ e373a79b2dee352d6cc1ea798f32d9c1c8e6eab277a94d155bd8c3673f09e8a6  metabolic-coac
 477b8fd3bc7d9a05f88259d6568cf3cb3377d5ad7eb644b526c015aec9665885  MetabolicCoach-v0.2.zip
 ```
 
-Current artifact sizes are 41,673,623 bytes for phone, 44,620,696 bytes for Wear, and 10,095 bytes
+Those historical artifact sizes are 41,673,623 bytes for phone, 44,620,696 bytes for Wear, and 10,095 bytes
 for the watch face. The documentation-refreshed five-file ZIP is 29,964,055 bytes. These are
 debug-signed engineering artifacts. Extended live-server lifecycle, Android instrumentation,
 physical-watch, production-signing, and store/privacy results are not implied.

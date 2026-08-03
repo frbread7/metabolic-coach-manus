@@ -50,7 +50,19 @@ If the already accepted phone APK is installed from this same build/signing iden
 uninstall it. Uninstalling would delete its local settings and history. Install only the missing
 Wear and watch-face components unless an intentional same-certificate upgrade is required.
 
-## v0.4.1 CI artifact preflight
+## v0.4.2 CI artifact preflight
+
+The current package is a debug-signed engineering candidate for the phone-only saved-planning-
+milestones acceptance gate. Verify the ZIP SHA-256, commit SHA, versionName `0.4.2`, versionCode
+`6`, and signing certificate recorded in the GitHub Actions run summary before installing. It is an
+in-place update only when its certificate matches the accepted v0.3 package. Wear and watch-face
+APKs are rebuilt to keep the package metadata aligned; this milestone does not claim a new physical
+acceptance for those components.
+
+After installation, use [the v0.4.2 acceptance checklist](docs/V0.4_2_SAVED_MILESTONES.md) and
+stop after recording the phone results.
+
+## v0.4.1 CI artifact preflight (historical)
 
 The v0.4.1 package is a debug-signed engineering candidate for the freshness-defect phone retest. Verify
 the ZIP SHA-256, commit SHA, and signing certificate recorded in the GitHub Actions run summary

@@ -38,6 +38,41 @@ enum class GlycemicScenarioStatus {
     CALCULATION_ERROR,
 }
 
+enum class MilestoneLifecycleState {
+    ACTIVE,
+    ARCHIVED,
+}
+
+enum class MilestoneTemporalState {
+    FUTURE,
+    DUE,
+    PAST,
+}
+
+enum class MilestoneEvaluationState {
+    TARGET_CONDITION_MET,
+    TARGET_CONDITION_NOT_MET,
+    INSUFFICIENT_DATA,
+    SOURCE_DISCONTINUITY,
+    SUPPRESSED_FOR_LOW_GLUCOSE_RISK,
+    CALCULATION_UNAVAILABLE,
+}
+
+/** A saved phone-only planning intention. It never changes coaching or Wear state. */
+data class GlycemicPlanningMilestone(
+    val id: String,
+    val title: String?,
+    val targetGmiPercent: Double,
+    val targetProvenance: GlycemicTargetProvenance,
+    val targetDateEpochMillis: Long,
+    val originalHorizonDays: Int,
+    val lifecycleState: MilestoneLifecycleState,
+    val createdAtEpochMillis: Long,
+    val updatedAtEpochMillis: Long,
+    val archivedAtEpochMillis: Long?,
+    val calculationContractVersion: Int,
+)
+
 data class GlycemicPlannerSettings(
     val targetGmiPercent: Double? = null,
     val targetProvenance: GlycemicTargetProvenance? = null,
@@ -74,6 +109,17 @@ data class GlycemicGoalScenario(
     val scenarioFutureMeanGlucoseMgDl: Double?,
     val recentSafety: RollingGlycemicMetrics?,
     val status: GlycemicScenarioStatus,
+    val detail: String,
+    val remainingWindowDays: Int? = null,
+)
+
+data class GlycemicPlanningMilestoneEvaluation(
+    val milestoneId: String,
+    val targetDateEpochMillis: Long,
+    val temporalState: MilestoneTemporalState,
+    val evaluationState: MilestoneEvaluationState?,
+    val rollingMetrics: RollingGlycemicMetrics?,
+    val scenario: GlycemicGoalScenario?,
     val detail: String,
 )
 

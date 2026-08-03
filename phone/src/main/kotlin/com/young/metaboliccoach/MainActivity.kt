@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.net.toUri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +43,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -67,6 +69,7 @@ import androidx.health.connect.client.PermissionController
 import com.young.metaboliccoach.core.data.provider.HealthConnectPermissions
 import com.young.metaboliccoach.core.domain.CoachSettingsBounds
 import com.young.metaboliccoach.core.domain.GlycemicPlannerBounds
+import com.young.metaboliccoach.core.domain.temporalState
 import com.young.metaboliccoach.core.domain.NightscoutSettingsBounds
 import com.young.metaboliccoach.core.model.CoachRecommendation
 import com.young.metaboliccoach.core.model.CoachSettings
@@ -77,9 +80,14 @@ import com.young.metaboliccoach.core.model.GlucoseUnit
 import com.young.metaboliccoach.core.model.GlycemicMetricsStatus
 import com.young.metaboliccoach.core.model.GlycemicGoalScenario
 import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
+import com.young.metaboliccoach.core.model.GlycemicPlanningMilestone
+import com.young.metaboliccoach.core.model.GlycemicPlanningMilestoneEvaluation
 import com.young.metaboliccoach.core.model.GlycemicScenarioStatus
 import com.young.metaboliccoach.core.model.GlycemicTargetProvenance
 import com.young.metaboliccoach.core.model.GlycemicWindow
+import com.young.metaboliccoach.core.model.MilestoneEvaluationState
+import com.young.metaboliccoach.core.model.MilestoneLifecycleState
+import com.young.metaboliccoach.core.model.MilestoneTemporalState
 import com.young.metaboliccoach.core.model.RollingGlycemicMetrics
 import com.young.metaboliccoach.core.model.InterventionSession
 import com.young.metaboliccoach.core.model.InterventionType
@@ -91,6 +99,7 @@ import com.young.metaboliccoach.ui.PhoneViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import kotlin.math.roundToInt
 
 @AndroidEntryPoint
@@ -122,7 +131,13 @@ class MainActivity : ComponentActivity() {
                     onMarkMeal = viewModel::markMeal,
                     onQuickAction = viewModel::quickAction,
                     onSaveSettings = viewModel::saveSettings,
-                    onSaveGlycemicPlannerSettings = viewModel::saveGlycemicPlannerSettings,
+                    onSaveGlycemicPlannerSafetySettings = viewModel::saveGlycemicPlannerSafetySettings,
+                    onCreatePlanningMilestone = viewModel::createPlanningMilestone,
+                    onUpdatePlanningMilestone = viewModel::updatePlanningMilestone,
+                    onSelectPlanningMilestone = viewModel::selectPlanningMilestone,
+                    onArchivePlanningMilestone = viewModel::archivePlanningMilestone,
+                    onDeletePlanningMilestone = viewModel::deletePlanningMilestone,
+                    onDismissMilestoneMigrationNotice = viewModel::dismissMilestoneMigrationNotice,
                     onExportData = {
                         personalDataExportLauncher.launch(
                             "metabolic-coach-export-${LocalDate.now()}.json",
@@ -192,7 +207,20 @@ private fun MetabolicCoachApp(
     onMarkMeal: () -> Unit,
     onQuickAction: (QuickActionType, String?) -> Unit,
     onSaveSettings: (CoachSettings, NightscoutSettings) -> Unit,
-    onSaveGlycemicPlannerSettings: (GlycemicPlannerSettings) -> Unit,
+    onSaveGlycemicPlannerSafetySettings: (GlycemicPlannerSettings) -> Unit,
+    onCreatePlanningMilestone: (String?, Double, GlycemicTargetProvenance, Int) -> Unit,
+    onUpdatePlanningMilestone: (
+        GlycemicPlanningMilestone,
+        String?,
+        Double,
+        GlycemicTargetProvenance,
+        Int,
+        Long,
+    ) -> Unit,
+    onSelectPlanningMilestone: (String) -> Unit,
+    onArchivePlanningMilestone: (String) -> Unit,
+    onDeletePlanningMilestone: (String) -> Unit,
+    onDismissMilestoneMigrationNotice: () -> Unit,
     onExportData: () -> Unit,
     onEraseData: () -> Unit,
     onConnectHealth: () -> Unit,
@@ -246,7 +274,13 @@ private fun MetabolicCoachApp(
             )
             PhoneDestination.PLANNER -> GlycemicGoalScreen(
                 uiState = uiState,
-                onSave = onSaveGlycemicPlannerSettings,
+                onSaveSafetySettings = onSaveGlycemicPlannerSafetySettings,
+                onCreateMilestone = onCreatePlanningMilestone,
+                onUpdateMilestone = onUpdatePlanningMilestone,
+                onSelectMilestone = onSelectPlanningMilestone,
+                onArchiveMilestone = onArchivePlanningMilestone,
+                onDeleteMilestone = onDeletePlanningMilestone,
+                onDismissMigrationNotice = onDismissMilestoneMigrationNotice,
                 contentPadding = padding,
             )
         }
@@ -533,17 +567,68 @@ private fun DailySummaryCard(uiState: PhoneUiState) {
 @Composable
 private fun GlycemicGoalScreen(
     uiState: PhoneUiState,
-    onSave: (GlycemicPlannerSettings) -> Unit,
+    onSaveSafetySettings: (GlycemicPlannerSettings) -> Unit,
+    onCreateMilestone: (String?, Double, GlycemicTargetProvenance, Int) -> Unit,
+    onUpdateMilestone: (
+        GlycemicPlanningMilestone,
+        String?,
+        Double,
+        GlycemicTargetProvenance,
+        Int,
+        Long,
+    ) -> Unit,
+    onSelectMilestone: (String) -> Unit,
+    onArchiveMilestone: (String) -> Unit,
+    onDeleteMilestone: (String) -> Unit,
+    onDismissMigrationNotice: () -> Unit,
     contentPadding: PaddingValues,
 ) {
-    var draft by remember(uiState.glycemicPlannerSettings) {
+    var safetyDraft by remember(uiState.glycemicPlannerSettings) {
         mutableStateOf(uiState.glycemicPlannerSettings)
     }
-    var targetText by remember(uiState.glycemicPlannerSettings.targetGmiPercent) {
-        mutableStateOf(uiState.glycemicPlannerSettings.targetGmiPercent?.toString().orEmpty())
+    var editorKey by remember { mutableStateOf<String?>(null) }
+    var titleText by remember { mutableStateOf("") }
+    var targetText by remember { mutableStateOf("") }
+    var targetProvenance by remember { mutableStateOf(GlycemicTargetProvenance.USER_ENTERED) }
+    var horizonDays by remember { mutableIntStateOf(30) }
+    var pendingHorizonDays by remember { mutableStateOf<Int?>(null) }
+    var deleteMilestoneId by remember { mutableStateOf<String?>(null) }
+    val editingMilestone = editorKey
+        ?.takeUnless { it == NEW_MILESTONE_KEY }
+        ?.let { id -> uiState.planningMilestones.firstOrNull { it.id == id } }
+    val futureEditAllowed = editingMilestone?.let {
+        it.temporalState(uiState.nowEpochMillis) == MilestoneTemporalState.FUTURE
+    } ?: true
+    val orderedMilestones = com.young.metaboliccoach.core.domain.sortPlanningMilestones(
+        uiState.planningMilestones,
+        uiState.nowEpochMillis,
+    )
+    val parsedTarget = targetText.toDoubleOrNull()
+    val editorHorizon = GlycemicWindow.fromDays(horizonDays)
+    val editorTargetDate = editingMilestone?.let { milestone ->
+        if (horizonDays == milestone.originalHorizonDays) {
+            milestone.targetDateEpochMillis
+        } else {
+            uiState.nowEpochMillis + (editorHorizon?.durationMillis ?: 30 * DAY_MILLIS)
+        }
+    } ?: (uiState.nowEpochMillis + (editorHorizon?.durationMillis ?: 30 * DAY_MILLIS))
+
+    fun beginNewMilestone() {
+        editorKey = NEW_MILESTONE_KEY
+        titleText = ""
+        targetText = ""
+        targetProvenance = GlycemicTargetProvenance.USER_ENTERED
+        horizonDays = 30
     }
-    val target = targetText.toDoubleOrNull()
-    val targetProvenance = draft.targetProvenance ?: GlycemicTargetProvenance.USER_ENTERED
+
+    fun beginEditMilestone(milestone: GlycemicPlanningMilestone) {
+        editorKey = milestone.id
+        titleText = milestone.title.orEmpty()
+        targetText = milestone.targetGmiPercent.toString()
+        targetProvenance = milestone.targetProvenance
+        horizonDays = milestone.originalHorizonDays
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -564,102 +649,241 @@ private fun GlycemicGoalScreen(
                 )
             }
         }
+        if (uiState.milestoneMigrationNotice) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    ),
+                ) {
+                    Column(
+                        Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text("Existing planner target migrated", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Your previous target was converted into a saved milestone with a fixed target date.",
+                        )
+                        TextButton(onClick = onDismissMigrationNotice) { Text("Dismiss") }
+                    }
+                }
+            }
+        }
         item {
             Card {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text("Planning target", style = MaterialTheme.typography.titleLarge)
-                    OutlinedTextField(
-                        value = targetText,
-                        onValueChange = { targetText = it },
-                        label = { Text("Target GMI (%)") },
-                        supportingText = { Text("Enter a user-entered or clinician-agreed target.") },
-                        singleLine = true,
+                    Text("Saved planning milestones", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Save several intentions, then select one for detailed evaluation. " +
+                            "Milestones never change coaching, notifications, or watch data.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Button(
+                        onClick = ::beginNewMilestone,
+                        enabled = !uiState.isOperationInProgress,
                         modifier = Modifier.fillMaxWidth(),
-                    )
-                    EnumSetting(
-                        title = "Target provenance",
-                        values = GlycemicTargetProvenance.entries,
-                        selected = targetProvenance,
-                        label = { it.name.lowercase().replace('_', ' ') },
-                        onSelected = { draft = draft.copy(targetProvenance = it) },
-                    )
-                    EnumSetting(
-                        title = "Scenario horizon",
-                        values = listOf(
-                            GlycemicWindow.DAYS_30,
-                            GlycemicWindow.DAYS_60,
-                            GlycemicWindow.DAYS_90,
-                        ),
-                        selected = draft.horizon,
-                        label = { "${it.days} days" },
-                        onSelected = { draft = draft.copy(horizon = it) },
-                    )
+                    ) {
+                        Text("New planning milestone")
+                    }
+                    if (orderedMilestones.isEmpty()) {
+                        Text(
+                            "No saved milestones yet.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    orderedMilestones.forEach { milestone ->
+                        MilestoneRow(
+                            milestone = milestone,
+                            selected = milestone.id == uiState.selectedMilestoneId,
+                            nowEpochMillis = uiState.nowEpochMillis,
+                            onSelect = { onSelectMilestone(milestone.id) },
+                            onEdit = { beginEditMilestone(milestone) },
+                            onArchive = { onArchiveMilestone(milestone.id) },
+                            onDelete = { deleteMilestoneId = milestone.id },
+                            enabled = !uiState.isOperationInProgress,
+                        )
+                    }
+                }
+            }
+        }
+        editorKey?.let { key ->
+            item {
+                Card {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(
+                            if (key == NEW_MILESTONE_KEY) {
+                                "Create planning milestone"
+                            } else {
+                                "Edit planning milestone"
+                            },
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                        OutlinedTextField(
+                            value = titleText,
+                            onValueChange = { titleText = it.take(80) },
+                            label = { Text("Title (optional)") },
+                            supportingText = { Text("Use a neutral personal label.") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = targetText,
+                            onValueChange = { targetText = it },
+                            label = { Text("Target GMI (%)") },
+                            supportingText = {
+                                Text(
+                                    "GMI is CGM-derived and may differ from laboratory HbA1c.",
+                                )
+                            },
+                            singleLine = true,
+                            enabled = futureEditAllowed,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (futureEditAllowed) {
+                            EnumSetting(
+                                title = "Target provenance",
+                                values = GlycemicTargetProvenance.entries,
+                                selected = targetProvenance,
+                                label = { it.name.lowercase().replace('_', ' ') },
+                                onSelected = { targetProvenance = it },
+                            )
+                            EnumSetting(
+                                title = "Time horizon",
+                                values = listOf(30, 60, 90),
+                                selected = horizonDays,
+                                label = { "$it days" },
+                                onSelected = { selected ->
+                                    if (
+                                        editingMilestone != null &&
+                                        selected != editingMilestone.originalHorizonDays
+                                    ) {
+                                        pendingHorizonDays = selected
+                                    } else {
+                                        horizonDays = selected
+                                    }
+                                },
+                            )
+                        } else {
+                            Text(
+                                "Target, provenance, horizon, and date are fixed after the " +
+                                    "milestone is due; only the title can change.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Text(
+                            "Target date: ${formatMilestoneDate(editorTargetDate)}",
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            OutlinedButton(
+                                onClick = { editorKey = null },
+                                modifier = Modifier.weight(1f),
+                            ) { Text("Cancel") }
+                            Button(
+                                onClick = {
+                                    val target = parsedTarget ?: return@Button
+                                    if (editingMilestone == null) {
+                                        onCreateMilestone(
+                                            normalizedTitle(titleText),
+                                            target,
+                                            targetProvenance,
+                                            horizonDays,
+                                        )
+                                    } else {
+                                        onUpdateMilestone(
+                                            editingMilestone,
+                                            normalizedTitle(titleText),
+                                            target,
+                                            targetProvenance,
+                                            horizonDays,
+                                            editorTargetDate,
+                                        )
+                                    }
+                                    editorKey = null
+                                },
+                                enabled = parsedTarget != null && !uiState.isOperationInProgress,
+                                modifier = Modifier.weight(1f),
+                            ) { Text("Save") }
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            uiState.selectedMilestoneEvaluation?.let { evaluation ->
+                MilestoneEvaluationCard(evaluation, uiState.settings.glucoseUnit)
+            }
+        }
+        item {
+            Card {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text("Planner safety settings", style = MaterialTheme.typography.titleLarge)
                     GlucoseThresholdSetting(
                         title = "Planner low-glucose boundary",
-                        valueMgDl = draft.lowGlucoseThresholdMgDl,
+                        valueMgDl = safetyDraft.lowGlucoseThresholdMgDl,
                         rangeMgDl = GlycemicPlannerBounds.LOW_GLUCOSE_MG_DL,
                         unit = uiState.settings.glucoseUnit,
                     ) {
-                        draft = draft.copy(
+                        safetyDraft = safetyDraft.copy(
                             lowGlucoseThresholdMgDl = it.coerceAtLeast(
-                                draft.veryLowGlucoseThresholdMgDl + 1,
+                                safetyDraft.veryLowGlucoseThresholdMgDl + 1,
                             ),
                         )
                     }
                     GlucoseThresholdSetting(
                         title = "Planner very-low boundary",
-                        valueMgDl = draft.veryLowGlucoseThresholdMgDl,
+                        valueMgDl = safetyDraft.veryLowGlucoseThresholdMgDl,
                         rangeMgDl = GlycemicPlannerBounds.VERY_LOW_GLUCOSE_MG_DL,
                         unit = uiState.settings.glucoseUnit,
                     ) {
-                        draft = draft.copy(
+                        safetyDraft = safetyDraft.copy(
                             veryLowGlucoseThresholdMgDl = it.coerceAtMost(
-                                draft.lowGlucoseThresholdMgDl - 1,
+                                safetyDraft.lowGlucoseThresholdMgDl - 1,
                             ),
                         )
                     }
                     DecimalSliderSetting(
                         title = "Maximum low-glucose exposure",
-                        value = draft.maximumLowGlucosePercent,
+                        value = safetyDraft.maximumLowGlucosePercent,
                         range = GlycemicPlannerBounds.MAXIMUM_LOW_EXPOSURE_PERCENT,
                         suffix = "%",
                     ) {
-                        draft = draft.copy(
+                        safetyDraft = safetyDraft.copy(
                             maximumLowGlucosePercent = it.coerceAtLeast(
-                                draft.maximumVeryLowGlucosePercent,
+                                safetyDraft.maximumVeryLowGlucosePercent,
                             ),
                         )
                     }
                     DecimalSliderSetting(
                         title = "Maximum very-low exposure",
-                        value = draft.maximumVeryLowGlucosePercent,
+                        value = safetyDraft.maximumVeryLowGlucosePercent,
                         range = GlycemicPlannerBounds.MAXIMUM_VERY_LOW_EXPOSURE_PERCENT,
                         suffix = "%",
                     ) {
-                        draft = draft.copy(
+                        safetyDraft = safetyDraft.copy(
                             maximumVeryLowGlucosePercent = it.coerceAtMost(
-                                draft.maximumLowGlucosePercent,
+                                safetyDraft.maximumLowGlucosePercent,
                             ),
                         )
                     }
                     OutlinedButton(
-                        onClick = {
-                            onSave(
-                                draft.copy(
-                                    targetGmiPercent = target,
-                                    targetProvenance = target?.let {
-                                        targetProvenance
-                                    },
-                                ),
-                            )
-                        },
-                        enabled = targetText.isBlank() || target != null,
+                        onClick = { onSaveSafetySettings(safetyDraft) },
+                        enabled = !uiState.isOperationInProgress,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(if (targetText.isBlank()) "Clear planner target" else "Save planner target")
+                        Text("Save safety settings")
                     }
                 }
             }
@@ -676,14 +900,185 @@ private fun GlycemicGoalScreen(
         item {
             Text(
                 "Scenarios describe the future-period mean that would satisfy a simplified " +
-                    "rolling CGM model. They are not treatment recommendations, required " +
+                    "rolling CGM model. They are not treatment recommendations, prescribed " +
                     "glucose levels, or guarantees about laboratory HbA1c.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
+
+    pendingHorizonDays?.let { pending ->
+        AlertDialog(
+            onDismissRequest = { pendingHorizonDays = null },
+            title = { Text("Change milestone timeframe?") },
+            text = { Text("Changing the timeframe will set a new fixed target date.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    horizonDays = pending
+                    pendingHorizonDays = null
+                }) { Text("Change date") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingHorizonDays = null }) { Text("Keep date") }
+            },
+        )
+    }
+    deleteMilestoneId?.let { id ->
+        AlertDialog(
+            onDismissRequest = { deleteMilestoneId = null },
+            title = { Text("Delete planning milestone?") },
+            text = { Text("Only this saved milestone will be deleted. CGM history is unchanged.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteMilestone(id)
+                    deleteMilestoneId = null
+                }) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteMilestoneId = null }) { Text("Cancel") }
+            },
+        )
+    }
 }
+
+@Composable
+private fun MilestoneRow(
+    milestone: GlycemicPlanningMilestone,
+    selected: Boolean,
+    nowEpochMillis: Long,
+    onSelect: () -> Unit,
+    onEdit: () -> Unit,
+    onArchive: () -> Unit,
+    onDelete: () -> Unit,
+    enabled: Boolean,
+) {
+    val temporal = milestone.temporalState(nowEpochMillis)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onSelect),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerHigh
+            },
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    milestone.title ?: "Planning milestone",
+                    fontWeight = FontWeight.Bold,
+                )
+                if (selected) Text("Selected", fontWeight = FontWeight.Medium)
+            }
+            Text("Target GMI: ${"%.1f".format(milestone.targetGmiPercent)}%")
+            Text(
+                "Target date: ${formatMilestoneDate(milestone.targetDateEpochMillis)} • " +
+                    temporal.name.lowercase(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (milestone.lifecycleState == MilestoneLifecycleState.ARCHIVED) {
+                Text("Archived", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (milestone.lifecycleState == MilestoneLifecycleState.ACTIVE) {
+                    OutlinedButton(onClick = onEdit, enabled = enabled) { Text("Edit") }
+                }
+                if (milestone.lifecycleState == MilestoneLifecycleState.ACTIVE) {
+                    OutlinedButton(onClick = onArchive, enabled = enabled) { Text("Archive") }
+                }
+                OutlinedButton(onClick = onDelete, enabled = enabled) { Text("Delete") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MilestoneEvaluationCard(
+    evaluation: GlycemicPlanningMilestoneEvaluation,
+    unit: GlucoseUnit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text("Selected milestone", style = MaterialTheme.typography.titleLarge)
+            evaluation.scenario?.let { scenario ->
+                if (
+                    scenario.status == GlycemicScenarioStatus.AVAILABLE ||
+                    scenario.status == GlycemicScenarioStatus.AVAILABLE_WITH_WARNING
+                ) {
+                    Text(
+                        "Remaining-window scenario mean: " +
+                            formatGlucose(scenario.scenarioFutureMeanGlucoseMgDl, unit),
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                Text(
+                    "Target date: ${formatMilestoneDate(evaluation.targetDateEpochMillis)}",
+                )
+                Text(scenario.detail)
+            }
+            evaluation.evaluationState?.let { state ->
+                Text(
+                    when (state) {
+                        MilestoneEvaluationState.TARGET_CONDITION_MET ->
+                            "Target condition met"
+                        MilestoneEvaluationState.TARGET_CONDITION_NOT_MET ->
+                            "Target condition not met"
+                        MilestoneEvaluationState.INSUFFICIENT_DATA ->
+                            "Not enough data to evaluate"
+                        MilestoneEvaluationState.SOURCE_DISCONTINUITY ->
+                            "Source discontinuity"
+                        MilestoneEvaluationState.SUPPRESSED_FOR_LOW_GLUCOSE_RISK ->
+                            "Evaluation suppressed for low-glucose risk"
+                        MilestoneEvaluationState.CALCULATION_UNAVAILABLE ->
+                            "Evaluation unavailable"
+                    },
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            Text(evaluation.detail)
+            evaluation.rollingMetrics?.let { metrics ->
+                Text(
+                    "Coverage: ${formatPercent(metrics.coveragePercent)} • " +
+                        "GMI: ${formatPercent(metrics.gmiPercent)}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
+}
+
+private fun normalizedTitle(value: String): String? = value.trim().takeIf(String::isNotEmpty)
+
+private fun formatMilestoneDate(epochMillis: Long): String =
+    Instant.ofEpochMilli(epochMillis)
+        .atZone(ZoneId.systemDefault())
+        .toLocalDate()
+        .toString()
+
+private const val NEW_MILESTONE_KEY = "__new_milestone__"
+private const val DAY_MILLIS = 24 * 60 * 60 * 1_000L
 
 @Composable
 private fun GlycemicMetricsCard(

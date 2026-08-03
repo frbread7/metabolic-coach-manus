@@ -4,6 +4,7 @@ import android.database.Cursor
 import androidx.room.withTransaction
 import com.young.metaboliccoach.core.data.db.MetabolicCoachDatabase
 import com.young.metaboliccoach.core.domain.GlycemicGoalRepository
+import com.young.metaboliccoach.core.domain.GlycemicPlanningMilestoneRepository
 import com.young.metaboliccoach.core.domain.PersonalDataRepository
 import com.young.metaboliccoach.core.domain.SettingsRepository
 import java.util.Base64
@@ -19,6 +20,7 @@ class PersonalDataRepositoryImpl @Inject constructor(
     private val database: MetabolicCoachDatabase,
     private val settingsRepository: SettingsRepository,
     private val glycemicGoalRepository: GlycemicGoalRepository,
+    private val milestoneRepository: GlycemicPlanningMilestoneRepository,
 ) : PersonalDataRepository {
     override suspend fun writeJsonExport(
         exportedAtEpochMillis: Long,
@@ -26,6 +28,8 @@ class PersonalDataRepositoryImpl @Inject constructor(
     ) = withContext(Dispatchers.IO) {
         val settings = settingsRepository.observe().first()
         val glycemicPlannerSettings = glycemicGoalRepository.observeSettings().first()
+        val milestones = milestoneRepository.observeMilestones().first()
+        val selectedMilestoneId = milestoneRepository.observeSelectedMilestoneId().first()
         database.withTransaction {
             val readableDatabase = database.openHelper.readableDatabase
             val writer = PersonalDataJsonWriter(destination)
@@ -34,6 +38,8 @@ class PersonalDataRepositoryImpl @Inject constructor(
                 databaseSchemaVersion = readableDatabase.version,
                 settings = settings,
                 glycemicPlannerSettings = glycemicPlannerSettings,
+                milestones = milestones,
+                selectedMilestoneId = selectedMilestoneId,
             )
             EXPORT_TABLES.forEach { table ->
                 readableDatabase.query(table.query).use { cursor ->
@@ -60,6 +66,7 @@ class PersonalDataRepositoryImpl @Inject constructor(
             // are still gone and a retry can finish resetting preferences.
             database.clearAllTables()
             settingsRepository.reset()
+            milestoneRepository.reset()
         }
     }
 
@@ -122,6 +129,14 @@ class PersonalDataRepositoryImpl @Inject constructor(
                 query = """
                     SELECT * FROM recommendation_snapshots
                     ORDER BY createdAtEpochMillis ASC, id ASC
+                """.trimIndent(),
+            ),
+            ExportTable(
+                name = "glycemic_planning_milestones",
+                query = """
+                    SELECT * FROM glycemic_planning_milestones
+                    ORDER BY lifecycleState ASC, targetDateEpochMillis ASC,
+                             createdAtEpochMillis ASC, id ASC
                 """.trimIndent(),
             ),
         )

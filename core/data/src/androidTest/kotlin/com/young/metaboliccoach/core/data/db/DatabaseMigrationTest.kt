@@ -20,7 +20,7 @@ class DatabaseMigrationTest {
 
     @Test
     @Throws(IOException::class)
-    fun migrateFromVersion1To7PreservesRowsAndAddsSafeDefaults() {
+    fun migrateFromVersion1To8PreservesRowsAndAddsSafeDefaults() {
         helper.createDatabase(TEST_DATABASE, 1).apply {
             execSQL(
                 """
@@ -56,7 +56,7 @@ class DatabaseMigrationTest {
 
         helper.runMigrationsAndValidate(
             TEST_DATABASE,
-            7,
+            8,
             true,
             *DatabaseMigrations.ALL,
         ).use { database ->
@@ -116,13 +116,13 @@ class DatabaseMigrationTest {
 
     @Test
     @Throws(IOException::class)
-    fun everySupportedStartingVersionHasAValidatedPathToVersion7() {
-        for (startVersion in 2..6) {
+    fun everySupportedStartingVersionHasAValidatedPathToVersion8() {
+        for (startVersion in 2..7) {
             val databaseName = "$TEST_DATABASE-$startVersion"
             helper.createDatabase(databaseName, startVersion).close()
             helper.runMigrationsAndValidate(
                 databaseName,
-                7,
+                8,
                 true,
                 *DatabaseMigrations.ALL,
             ).close()

@@ -110,3 +110,24 @@ data class RecommendationSnapshotEntity(
     val triggerContextId: String?,
     val triggerAtEpochMillis: Long?,
 )
+
+@Entity(
+    tableName = "glycemic_planning_milestones",
+    indices = [
+        Index(value = ["lifecycleState", "targetDateEpochMillis"]),
+        Index(value = ["createdAtEpochMillis"]),
+    ],
+)
+data class GlycemicPlanningMilestoneEntity(
+    @PrimaryKey val id: String,
+    val title: String?,
+    val targetGmiPercent: Double,
+    val targetProvenance: String,
+    val targetDateEpochMillis: Long,
+    val originalHorizonDays: Int,
+    val lifecycleState: String,
+    val createdAtEpochMillis: Long,
+    val updatedAtEpochMillis: Long,
+    val archivedAtEpochMillis: Long?,
+    val calculationContractVersion: Int,
+)

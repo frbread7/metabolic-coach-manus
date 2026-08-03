@@ -11,8 +11,9 @@ import androidx.room.RoomDatabase
         MealMarkerEntity::class,
         CoachStateEntity::class,
         RecommendationSnapshotEntity::class,
+        GlycemicPlanningMilestoneEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class MetabolicCoachDatabase : RoomDatabase() {
@@ -22,4 +23,5 @@ abstract class MetabolicCoachDatabase : RoomDatabase() {
     abstract fun mealDao(): MealDao
     abstract fun coachStateDao(): CoachStateDao
     abstract fun recommendationSnapshotDao(): RecommendationSnapshotDao
+    abstract fun glycemicPlanningMilestoneDao(): GlycemicPlanningMilestoneDao
 }

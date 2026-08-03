@@ -100,6 +100,24 @@ clinical test (see [NIDDK's A1C overview](https://www.niddk.nih.gov/health-infor
 Goal scenarios are mathematical displays only and are suppressed when recent low-glucose exposure
 or the required data coverage makes a lower target unsafe to present.
 
+### Saved planning milestones (`v0.4.2`)
+
+The milestone repository stores phone-only planning intentions above this provider-independent
+contract. A milestone contains a canonical target GMI, provenance, original 30/60/90-day horizon,
+fixed target date, lifecycle state, and calculation-contract version. It never stores a second
+target mean and never enters the provider, coaching, notification, or Wear payload paths.
+
+The selected milestone is a single presentation pointer; any number of active or archived rows may
+exist. Future rows can be edited, while due/past target/date/horizon fields are frozen. Before the
+fixed date, the domain calculation uses the actual remaining days and the observed complementary
+history. At or after the date, it evaluates the fixed 90-day window ending at that date. Source
+discontinuity, insufficient coverage, and low-glucose exposure remain explicit non-success states.
+
+The legacy singleton planner target is migrated once to a stable milestone ID. Room owns milestone
+definitions; Preferences DataStore owns the selected ID and migration notice. A future provider
+implementation only needs to emit normalized `GlucoseReading` values; it must not know about
+milestone storage or UI state.
+
 Primary references:
 
 - [Nightscout API overview](https://github.com/nightscout/cgm-remote-monitor/blob/7e0e77f88fc113a76fe363504125f5b36b8a3fe3/README.md#L210-L229)
@@ -137,10 +155,11 @@ coaching settings, never a Nightscout URL, active-server ID, timeout/retry polic
 ### Connectivity, retry, and cache behavior
 
 The OkHttp call is asynchronous and coroutine-cancellable; UI code observes flows and is never
-blocked by a network request. Responses are capped at 1 MiB. `Last-Modified` is cached per exact
-server source and sent as `If-Modified-Since`; a `304 Not Modified` response reuses only that
-server's memory cache. Each server's process-memory cache is bounded to the 90-day planner
-lookback plus a one-day interpolation cushion.
+blocked by a network request. Responses are capped at 1 MiB. Current-entry refreshes intentionally
+do not send a conditional validator, so an intermediary cannot turn a stale cache into a successful
+current refresh. Historical range requests may return an empty/304 result, but only the matching
+source cache is retained and the newest valid timestamp remains authoritative. Each server's
+process-memory cache is bounded to the 90-day planner lookback plus a one-day interpolation cushion.
 
 Transport errors, timeouts, HTTP 408, HTTP 429, and HTTP 5xx can be retried with exponential delay
 from the configured base interval, capped at 60 seconds per delay and bounded by the configured

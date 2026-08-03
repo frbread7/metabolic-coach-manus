@@ -16,6 +16,8 @@ import com.young.metaboliccoach.core.domain.CoachingRepository
 import com.young.metaboliccoach.core.domain.GlucoseRepository
 import com.young.metaboliccoach.core.domain.GlycemicGoalPlanner
 import com.young.metaboliccoach.core.domain.GlycemicGoalRepository
+import com.young.metaboliccoach.core.domain.GlycemicPlanningMilestoneRepository
+import com.young.metaboliccoach.core.domain.GLYCEMIC_MILESTONE_CALCULATION_CONTRACT_VERSION
 import com.young.metaboliccoach.core.domain.NightscoutSettingsRepository
 import com.young.metaboliccoach.core.domain.NightscoutSettingsValidator
 import com.young.metaboliccoach.core.domain.SettingsRepository
@@ -29,6 +31,8 @@ import com.young.metaboliccoach.core.model.DefaultNightscoutSettings
 import com.young.metaboliccoach.core.model.GlucoseDataOrigin
 import com.young.metaboliccoach.core.model.GlucoseReading
 import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
+import com.young.metaboliccoach.core.model.GlycemicPlanningMilestone
+import com.young.metaboliccoach.core.model.GlycemicPlanningMilestoneEvaluation
 import com.young.metaboliccoach.core.model.GlycemicWindow
 import com.young.metaboliccoach.core.model.RollingGlycemicMetrics
 import com.young.metaboliccoach.core.model.GlycemicGoalScenario
@@ -50,6 +54,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -75,6 +80,10 @@ data class PhoneUiState(
     val glycemicPlannerSettings: GlycemicPlannerSettings = GlycemicPlannerSettings(),
     val glycemicMetrics: List<RollingGlycemicMetrics> = emptyList(),
     val glycemicGoalScenario: GlycemicGoalScenario? = null,
+    val planningMilestones: List<GlycemicPlanningMilestone> = emptyList(),
+    val selectedMilestoneId: String? = null,
+    val selectedMilestoneEvaluation: GlycemicPlanningMilestoneEvaluation? = null,
+    val milestoneMigrationNotice: Boolean = false,
 )
 
 private data class CurrentState(
@@ -94,6 +103,16 @@ private data class PlannerState(
     val settings: GlycemicPlannerSettings,
     val metrics: List<RollingGlycemicMetrics>,
     val scenario: GlycemicGoalScenario?,
+    val milestones: List<GlycemicPlanningMilestone>,
+    val selectedMilestoneId: String?,
+    val selectedEvaluation: GlycemicPlanningMilestoneEvaluation?,
+    val migrationNotice: Boolean,
+)
+
+private data class MilestoneInputs(
+    val milestones: List<GlycemicPlanningMilestone>,
+    val selectedMilestoneId: String?,
+    val migrationNotice: Boolean,
 )
 
 @HiltViewModel
@@ -105,6 +124,7 @@ class PhoneViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val nightscoutSettingsRepository: NightscoutSettingsRepository,
     private val glycemicGoalRepository: GlycemicGoalRepository,
+    private val milestoneRepository: GlycemicPlanningMilestoneRepository,
     private val quickActionHandler: QuickActionHandler,
     private val refreshCoordinator: PhoneRefreshCoordinator,
     private val syncScheduler: SyncScheduler,
@@ -156,50 +176,85 @@ class PhoneViewModel @Inject constructor(
         )
     }
 
+    private val milestoneInputs = combine(
+        milestoneRepository.observeMilestones(),
+        milestoneRepository.observeSelectedMilestoneId(),
+        milestoneRepository.observeMigrationNotice(),
+    ) { milestones, selectedId, notice ->
+        MilestoneInputs(milestones, selectedId, notice)
+    }
+
     private val plannerState = combine(
         glucoseRepository.observeLatest(),
         glycemicGoalRepository.observeSettings(),
-        nightscoutSettingsRepository.observeNightscoutSettings(),
         settingsRepository.observe(),
-    ) { _, plannerSettings, _, coachSettings -> plannerSettings to coachSettings }
-        .flatMapLatest { (plannerSettings, coachSettings) ->
-            flow {
+        milestoneInputs,
+    ) { _, plannerSettings, coachSettings, milestones ->
+        plannerSettings to (coachSettings to milestones)
+    }.flatMapLatest { (plannerSettings, configuration) ->
+        val (coachSettings, milestoneInputs) = configuration
+        flow {
+            val readings = runCatching {
                 val now = timeSource.nowEpochMillis()
-                val readings = runCatching {
-                    glucoseRepository.readingsBetween(
-                        startEpochMillis = now - GlycemicWindow.DAYS_90.durationMillis - 30 * 60_000L,
-                        endEpochMillis = now,
+                val selectedMilestoneTargetDate = milestoneInputs.milestones
+                    .firstOrNull { it.id == milestoneInputs.selectedMilestoneId }
+                    ?.targetDateEpochMillis
+                val currentWindowStart =
+                    now - GlycemicWindow.DAYS_90.durationMillis - 30 * 60_000L
+                val selectedEvaluationWindowStart = selectedMilestoneTargetDate
+                    ?.minus(GlycemicWindow.DAYS_90.durationMillis + 30 * 60_000L)
+                glucoseRepository.readingsBetween(
+                    startEpochMillis = minOf(
+                        currentWindowStart,
+                        selectedEvaluationWindowStart ?: currentWindowStart,
+                    ),
+                    endEpochMillis = now,
+                )
+            }.getOrDefault(emptyList())
+            emitAll(
+                timeSource.minuteTicks().map { now ->
+                    val metrics = listOf(
+                        GlycemicWindow.DAYS_30,
+                        GlycemicWindow.DAYS_60,
+                        GlycemicWindow.DAYS_90,
+                    ).map { window ->
+                        GlycemicGoalPlanner.calculateRollingMetrics(
+                            readings = readings,
+                            window = window,
+                            windowEndEpochMillis = now,
+                            targetLowerMgDl = coachSettings.targetLowerMgDl,
+                            targetUpperMgDl = coachSettings.targetUpperMgDl,
+                            lowGlucoseThresholdMgDl = plannerSettings.lowGlucoseThresholdMgDl,
+                            veryLowGlucoseThresholdMgDl =
+                                plannerSettings.veryLowGlucoseThresholdMgDl,
+                        )
+                    }
+                    val selectedMilestone = milestoneInputs.milestones.firstOrNull {
+                        it.id == milestoneInputs.selectedMilestoneId
+                    }
+                    val evaluation = selectedMilestone?.let {
+                        GlycemicGoalPlanner.evaluatePlanningMilestone(
+                            readings = readings,
+                            milestone = it,
+                            windowEndEpochMillis = now,
+                            plannerSettings = plannerSettings,
+                            targetLowerMgDl = coachSettings.targetLowerMgDl,
+                            targetUpperMgDl = coachSettings.targetUpperMgDl,
+                        )
+                    }
+                    PlannerState(
+                        settings = plannerSettings,
+                        metrics = metrics,
+                        scenario = evaluation?.scenario,
+                        milestones = milestoneInputs.milestones,
+                        selectedMilestoneId = milestoneInputs.selectedMilestoneId,
+                        selectedEvaluation = evaluation,
+                        migrationNotice = milestoneInputs.migrationNotice,
                     )
-                }.getOrDefault(emptyList())
-                val metrics = listOf(
-                    GlycemicWindow.DAYS_30,
-                    GlycemicWindow.DAYS_60,
-                    GlycemicWindow.DAYS_90,
-                ).map { window ->
-                    GlycemicGoalPlanner.calculateRollingMetrics(
-                        readings = readings,
-                        window = window,
-                        windowEndEpochMillis = now,
-                        targetLowerMgDl = coachSettings.targetLowerMgDl,
-                        targetUpperMgDl = coachSettings.targetUpperMgDl,
-                        lowGlucoseThresholdMgDl = plannerSettings.lowGlucoseThresholdMgDl,
-                        veryLowGlucoseThresholdMgDl = plannerSettings.veryLowGlucoseThresholdMgDl,
-                    )
-                }
-                val scenario = plannerSettings.targetGmiPercent?.let { target ->
-                    GlycemicGoalPlanner.calculateGoalScenario(
-                        readings = readings,
-                        horizon = plannerSettings.horizon,
-                        windowEndEpochMillis = now,
-                        targetGmiPercent = target,
-                        plannerSettings = plannerSettings,
-                        targetLowerMgDl = coachSettings.targetLowerMgDl,
-                        targetUpperMgDl = coachSettings.targetUpperMgDl,
-                    )
-                }
-                emit(PlannerState(plannerSettings, metrics, scenario))
-            }
+                },
+            )
         }
+    }
 
     private val uiClock = baseUiState
         .map { (it.recommendation as? CoachRecommendation.Action)?.validUntilEpochMillis }
@@ -247,6 +302,10 @@ class PhoneViewModel @Inject constructor(
             glycemicPlannerSettings = planner.settings,
             glycemicMetrics = planner.metrics,
             glycemicGoalScenario = planner.scenario,
+            planningMilestones = planner.milestones,
+            selectedMilestoneId = planner.selectedMilestoneId,
+            selectedMilestoneEvaluation = planner.selectedEvaluation,
+            milestoneMigrationNotice = planner.migrationNotice,
         )
     }.stateIn(
         viewModelScope,
@@ -276,6 +335,94 @@ class PhoneViewModel @Inject constructor(
             mutationGate.withLock {
                 glycemicGoalRepository.updateSettings(settings)
             }
+        }
+    }
+
+    fun saveGlycemicPlannerSafetySettings(settings: GlycemicPlannerSettings) {
+        runOperation("Planner safety settings saved.") {
+            mutationGate.withLock {
+                glycemicGoalRepository.updateSafetySettings(settings)
+            }
+        }
+    }
+
+    fun createPlanningMilestone(
+        title: String?,
+        targetGmiPercent: Double,
+        targetProvenance: com.young.metaboliccoach.core.model.GlycemicTargetProvenance,
+        horizonDays: Int,
+    ) {
+        runOperation("Planning milestone saved.") {
+            mutationGate.withLock {
+                val now = timeSource.nowEpochMillis()
+                val horizon = requireNotNull(GlycemicWindow.fromDays(horizonDays))
+                milestoneRepository.create(
+                    GlycemicPlanningMilestone(
+                        id = UUID.randomUUID().toString(),
+                        title = title,
+                        targetGmiPercent = targetGmiPercent,
+                        targetProvenance = targetProvenance,
+                        targetDateEpochMillis = now + horizon.durationMillis,
+                        originalHorizonDays = horizonDays,
+                        lifecycleState = com.young.metaboliccoach.core.model.MilestoneLifecycleState.ACTIVE,
+                        createdAtEpochMillis = now,
+                        updatedAtEpochMillis = now,
+                        archivedAtEpochMillis = null,
+                        calculationContractVersion =
+                            GLYCEMIC_MILESTONE_CALCULATION_CONTRACT_VERSION,
+                    ),
+                )
+            }
+        }
+    }
+
+    fun updatePlanningMilestone(
+        existing: GlycemicPlanningMilestone,
+        title: String?,
+        targetGmiPercent: Double,
+        targetProvenance: com.young.metaboliccoach.core.model.GlycemicTargetProvenance,
+        horizonDays: Int,
+        targetDateEpochMillis: Long,
+    ) {
+        runOperation("Planning milestone updated.") {
+            mutationGate.withLock {
+                milestoneRepository.update(
+                    existing.copy(
+                        title = title,
+                        targetGmiPercent = targetGmiPercent,
+                        targetProvenance = targetProvenance,
+                        originalHorizonDays = horizonDays,
+                        targetDateEpochMillis = targetDateEpochMillis,
+                    ),
+                )
+            }
+        }
+    }
+
+    fun selectPlanningMilestone(id: String) {
+        runOperation("Planning milestone selected.") {
+            mutationGate.withLock { milestoneRepository.select(id) }
+        }
+    }
+
+    fun archivePlanningMilestone(id: String) {
+        runOperation("Planning milestone archived.") {
+            mutationGate.withLock {
+                milestoneRepository.archive(id, timeSource.nowEpochMillis())
+            }
+        }
+    }
+
+    fun deletePlanningMilestone(id: String) {
+        runOperation("Planning milestone deleted.") {
+            mutationGate.withLock { milestoneRepository.delete(id) }
+        }
+    }
+
+    fun dismissMilestoneMigrationNotice() {
+        runOperation {
+            mutationGate.withLock { milestoneRepository.dismissMigrationNotice() }
+            ""
         }
     }
 

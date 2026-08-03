@@ -323,6 +323,43 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun updateSafetySettings(settings: GlycemicPlannerSettings) {
+        require(settings.lowGlucoseThresholdMgDl > settings.veryLowGlucoseThresholdMgDl) {
+            "The low-glucose threshold must be above the very-low threshold."
+        }
+        require(settings.lowGlucoseThresholdMgDl in GlycemicPlannerBounds.LOW_GLUCOSE_MG_DL) {
+            "The planner low-glucose boundary is outside the supported range."
+        }
+        require(
+            settings.veryLowGlucoseThresholdMgDl in GlycemicPlannerBounds.VERY_LOW_GLUCOSE_MG_DL,
+        ) {
+            "The planner very-low boundary is outside the supported range."
+        }
+        require(
+            settings.maximumLowGlucosePercent in
+                GlycemicPlannerBounds.MAXIMUM_LOW_EXPOSURE_PERCENT.start.toDouble()..
+                GlycemicPlannerBounds.MAXIMUM_LOW_EXPOSURE_PERCENT.endInclusive.toDouble(),
+        ) {
+            "The maximum low-glucose percentage must be between 0 and 20."
+        }
+        require(
+            settings.maximumVeryLowGlucosePercent in
+                GlycemicPlannerBounds.MAXIMUM_VERY_LOW_EXPOSURE_PERCENT.start.toDouble()..
+                GlycemicPlannerBounds.MAXIMUM_VERY_LOW_EXPOSURE_PERCENT.endInclusive.toDouble(),
+        ) {
+            "The maximum very-low-glucose percentage must be between 0 and 10."
+        }
+        require(settings.maximumVeryLowGlucosePercent <= settings.maximumLowGlucosePercent) {
+            "The maximum very-low-glucose percentage cannot exceed the maximum low-glucose percentage."
+        }
+        context.settingsDataStore.edit { values ->
+            values[Keys.glycemicLowThreshold] = settings.lowGlucoseThresholdMgDl
+            values[Keys.glycemicVeryLowThreshold] = settings.veryLowGlucoseThresholdMgDl
+            values[Keys.glycemicMaximumLowPercent] = settings.maximumLowGlucosePercent
+            values[Keys.glycemicMaximumVeryLowPercent] = settings.maximumVeryLowGlucosePercent
+        }
+    }
+
     override suspend fun reset() {
         recommendationSnapshotDao.deleteAll()
         context.settingsDataStore.edit { values ->

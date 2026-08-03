@@ -4,8 +4,13 @@ import com.young.metaboliccoach.core.model.GlucoseReading
 import com.young.metaboliccoach.core.model.GlucoseTrend
 import com.young.metaboliccoach.core.model.GlycemicMetricsStatus
 import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
+import com.young.metaboliccoach.core.model.GlycemicPlanningMilestone
 import com.young.metaboliccoach.core.model.GlycemicScenarioStatus
+import com.young.metaboliccoach.core.model.GlycemicTargetProvenance
 import com.young.metaboliccoach.core.model.GlycemicWindow
+import com.young.metaboliccoach.core.model.MilestoneEvaluationState
+import com.young.metaboliccoach.core.model.MilestoneLifecycleState
+import com.young.metaboliccoach.core.model.MilestoneTemporalState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -191,6 +196,91 @@ class GlycemicGoalPlannerTest {
         assertEquals(SOURCE, metrics.sourceId)
     }
 
+    @Test
+    fun `milestone scenario uses the actual remaining window after time passes`() {
+        val now = DAY * 100
+        val readings = readings(now, days = 90) { 150 }
+        val milestone = milestone(
+            id = "milestone",
+            targetGmiPercent = checkNotNull(GlycemicGoalPlanner.gmiFromMeanGlucose(140.0)),
+            targetDate = now + 20 * DAY,
+            horizonDays = 30,
+        )
+
+        val scenario = GlycemicGoalPlanner.calculateGoalScenarioForMilestone(
+            readings = readings,
+            milestone = milestone,
+            windowEndEpochMillis = now,
+            plannerSettings = GlycemicPlannerSettings(),
+            targetLowerMgDl = 70,
+            targetUpperMgDl = 180,
+        )
+
+        assertEquals(20, scenario.remainingWindowDays)
+        assertEquals(105.0, checkNotNull(scenario.scenarioFutureMeanGlucoseMgDl), 0.3)
+    }
+
+    @Test
+    fun `milestone evaluation suppresses a met target when low exposure is unsafe`() {
+        val targetDate = DAY * 90
+        val readings = readings(targetDate, days = 90) { 60 }
+        val milestone = milestone(
+            id = "milestone",
+            targetGmiPercent = 7.0,
+            targetDate = targetDate,
+            horizonDays = 30,
+        )
+
+        val evaluation = GlycemicGoalPlanner.evaluatePlanningMilestone(
+            readings = readings,
+            milestone = milestone,
+            windowEndEpochMillis = targetDate,
+            plannerSettings = GlycemicPlannerSettings(),
+            targetLowerMgDl = 70,
+            targetUpperMgDl = 180,
+        )
+
+        assertEquals(MilestoneTemporalState.DUE, evaluation.temporalState)
+        assertEquals(
+            MilestoneEvaluationState.SUPPRESSED_FOR_LOW_GLUCOSE_RISK,
+            evaluation.evaluationState,
+        )
+    }
+
+    @Test
+    fun `milestone dates derive future due and past temporal states by local date`() {
+        val now = 10 * DAY + 12 * 60 * 60 * 1_000L
+        val future = milestone("future", targetDate = now + 2 * DAY, horizonDays = 30)
+        val due = milestone("due", targetDate = now, horizonDays = 30)
+        val past = milestone("past", targetDate = now - 2 * DAY, horizonDays = 30)
+
+        assertEquals(MilestoneTemporalState.FUTURE, future.temporalState(now))
+        assertEquals(MilestoneTemporalState.DUE, due.temporalState(now))
+        assertEquals(MilestoneTemporalState.PAST, past.temporalState(now))
+    }
+
+    @Test
+    fun `milestones sort active future then past then archived deterministically`() {
+        val now = 100 * DAY
+        val milestones = listOf(
+            milestone(
+                id = "archived",
+                targetDate = now - DAY,
+                horizonDays = 30,
+                lifecycleState = MilestoneLifecycleState.ARCHIVED,
+            ),
+            milestone(id = "past-late", targetDate = now - DAY, horizonDays = 30),
+            milestone(id = "future-late", targetDate = now + 10 * DAY, horizonDays = 30),
+            milestone(id = "future-early", targetDate = now + DAY, horizonDays = 30),
+            milestone(id = "past-early", targetDate = now - 10 * DAY, horizonDays = 30),
+        )
+
+        assertEquals(
+            listOf("future-early", "future-late", "past-late", "past-early", "archived"),
+            sortPlanningMilestones(milestones, now).map { it.id },
+        )
+    }
+
     private fun readings(
         now: Long,
         days: Int,
@@ -216,6 +306,26 @@ class GlycemicGoalPlannerTest {
         measuredAtEpochMillis = timestamp,
         receivedAtEpochMillis = timestamp,
         sourceId = sourceId,
+    )
+
+    private fun milestone(
+        id: String,
+        targetGmiPercent: Double = 7.0,
+        targetDate: Long,
+        horizonDays: Int,
+        lifecycleState: MilestoneLifecycleState = MilestoneLifecycleState.ACTIVE,
+    ) = GlycemicPlanningMilestone(
+        id = id,
+        title = null,
+        targetGmiPercent = targetGmiPercent,
+        targetProvenance = GlycemicTargetProvenance.USER_ENTERED,
+        targetDateEpochMillis = targetDate,
+        originalHorizonDays = horizonDays,
+        lifecycleState = lifecycleState,
+        createdAtEpochMillis = targetDate - DAY,
+        updatedAtEpochMillis = targetDate - DAY,
+        archivedAtEpochMillis = null,
+        calculationContractVersion = 1,
     )
 
     private companion object {

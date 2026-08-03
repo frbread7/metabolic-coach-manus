@@ -9,6 +9,9 @@ import com.young.metaboliccoach.core.model.InterventionSession
 import com.young.metaboliccoach.core.model.InterventionStatus
 import com.young.metaboliccoach.core.model.InterventionType
 import com.young.metaboliccoach.core.model.MealMarker
+import com.young.metaboliccoach.core.model.GlycemicPlanningMilestone
+import com.young.metaboliccoach.core.model.GlycemicTargetProvenance
+import com.young.metaboliccoach.core.model.MilestoneLifecycleState
 
 fun GlucoseReadingEntity.toModel() = GlucoseReading(
     id = id,
@@ -134,4 +137,32 @@ fun CoachRecommendation.Action.toEntity() = RecommendationSnapshotEntity(
     algorithmVersion = algorithmVersion,
     triggerContextId = triggerContextId,
     triggerAtEpochMillis = triggerAtEpochMillis,
+)
+
+fun GlycemicPlanningMilestoneEntity.toModel() = GlycemicPlanningMilestone(
+    id = id,
+    title = title,
+    targetGmiPercent = targetGmiPercent,
+    targetProvenance = GlycemicTargetProvenance.valueOf(targetProvenance),
+    targetDateEpochMillis = targetDateEpochMillis,
+    originalHorizonDays = originalHorizonDays,
+    lifecycleState = MilestoneLifecycleState.valueOf(lifecycleState),
+    createdAtEpochMillis = createdAtEpochMillis,
+    updatedAtEpochMillis = updatedAtEpochMillis,
+    archivedAtEpochMillis = archivedAtEpochMillis,
+    calculationContractVersion = calculationContractVersion,
+)
+
+fun GlycemicPlanningMilestone.toEntity() = GlycemicPlanningMilestoneEntity(
+    id = id,
+    title = title,
+    targetGmiPercent = targetGmiPercent,
+    targetProvenance = targetProvenance.name,
+    targetDateEpochMillis = targetDateEpochMillis,
+    originalHorizonDays = originalHorizonDays,
+    lifecycleState = lifecycleState.name,
+    createdAtEpochMillis = createdAtEpochMillis,
+    updatedAtEpochMillis = updatedAtEpochMillis,
+    archivedAtEpochMillis = archivedAtEpochMillis,
+    calculationContractVersion = calculationContractVersion,
 )

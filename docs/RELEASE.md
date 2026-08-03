@@ -50,7 +50,29 @@ handed off.
 These are debug-signed engineering artifacts, not production releases. Regenerate and rehash them
 after every source/build change.
 
-## v0.4.1 GitHub Actions engineering artifact
+## v0.4.2 GitHub Actions engineering artifact
+
+The current engineering artifact is `v0.4.2` (versionCode `6`). It is the phone-only saved
+planning-milestones milestone layered on the accepted v0.4.1 freshness fix. The workflow keeps the
+same signed phone/Wear/watch-face package contract, but physical acceptance is limited to the phone
+Planner behavior described in [V0_4_2_SAVED_MILESTONES.md](V0.4_2_SAVED_MILESTONES.md).
+
+The workflow requires the accepted v0.3 engineering keystore through the encrypted
+`MC_DEBUG_KEYSTORE_BASE64` repository secret and uploads:
+
+```text
+metabolic-coach-phone-debug.apk
+metabolic-coach-wear-debug.apk
+metabolic-coach-watchface-debug.apk
+MetabolicCoach-v0.4.2.zip
+```
+
+The ZIP must contain exactly `CHANGELOG.md`, `INSTALL.md`, `phone.apk`, `watchface.apk`, and
+`wear.apk`. All three APKs must report `versionName=0.4.2`, `versionCode=6`, and the v0.3 signing
+certificate. The old v0.4.0 artifact is preserved and the v0.4.1 artifact/evidence remain separate;
+neither is overwritten or relabeled.
+
+## v0.4.1 GitHub Actions engineering artifact (historical)
 
 The v0.4.1 workflow is the reproducible build path for this ARM development host. It runs on an
 x86_64 `ubuntu-latest` runner, keeps the existing test/lint/WFF/release-isolation checks, and then
@@ -229,7 +251,7 @@ Recheck current policies at release time; store policy is time-sensitive.
 - [ ] Version names/codes updated intentionally.
 - [ ] Dependency and license inventory reviewed.
 - [ ] No credentials, private health data, or vendor-restricted binaries committed.
-- [ ] Room v7, exported schemas 1–7, migrations 1→7, and migration-test execution reviewed.
+- [ ] Room v8, exported schemas 1–8, migrations 1→8, and migration-test execution reviewed.
 - [ ] R8 rules and release warnings reviewed.
 - [ ] Exported components and PendingIntents security-reviewed.
 

@@ -1,10 +1,15 @@
 package com.young.metaboliccoach.core.data.di
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.young.metaboliccoach.core.data.db.MetabolicCoachDatabase
+import com.young.metaboliccoach.core.data.db.GlycemicPlanningMilestoneDao
 import com.young.metaboliccoach.core.data.provider.CareSensAirProvider
 import com.young.metaboliccoach.core.data.provider.GlucoseProvider
 import com.young.metaboliccoach.core.data.provider.HealthConnectGlucoseProvider
@@ -19,6 +24,7 @@ import com.young.metaboliccoach.core.data.provider.nightscout.OkHttpNightscoutAp
 import com.young.metaboliccoach.core.data.repository.ActivityRepositoryImpl
 import com.young.metaboliccoach.core.data.repository.CoachingRepositoryImpl
 import com.young.metaboliccoach.core.data.repository.GlucoseRepositoryImpl
+import com.young.metaboliccoach.core.data.repository.GlycemicPlanningMilestoneRepositoryImpl
 import com.young.metaboliccoach.core.data.repository.PersonalDataRepositoryImpl
 import com.young.metaboliccoach.core.data.repository.SettingsRepositoryImpl
 import com.young.metaboliccoach.core.data.repository.SystemCoachTimeSource
@@ -27,6 +33,7 @@ import com.young.metaboliccoach.core.domain.CoachTimeSource
 import com.young.metaboliccoach.core.domain.CoachRuleEngine
 import com.young.metaboliccoach.core.domain.CoachingRepository
 import com.young.metaboliccoach.core.domain.GlycemicGoalRepository
+import com.young.metaboliccoach.core.domain.GlycemicPlanningMilestoneRepository
 import com.young.metaboliccoach.core.domain.GlucoseRepository
 import com.young.metaboliccoach.core.domain.ObservationAnalyzer
 import com.young.metaboliccoach.core.domain.NightscoutSettingsRepository
@@ -70,6 +77,12 @@ abstract class RepositoryModule {
     abstract fun bindGlycemicGoalRepository(
         impl: SettingsRepositoryImpl,
     ): GlycemicGoalRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindGlycemicPlanningMilestoneRepository(
+        impl: GlycemicPlanningMilestoneRepositoryImpl,
+    ): GlycemicPlanningMilestoneRepository
 
     @Binds
     @Singleton
@@ -157,6 +170,18 @@ object DataModule {
     @Provides
     fun provideRecommendationSnapshotDao(database: MetabolicCoachDatabase) =
         database.recommendationSnapshotDao()
+
+    @Provides
+    fun provideGlycemicPlanningMilestoneDao(database: MetabolicCoachDatabase) =
+        database.glycemicPlanningMilestoneDao()
+
+    @Provides
+    @Singleton
+    fun provideGlycemicPlanningMilestoneDataStore(
+        @ApplicationContext context: Context,
+    ): DataStore<Preferences> = PreferenceDataStoreFactory.create {
+        context.preferencesDataStoreFile("glycemic_planning_milestones")
+    }
 
     @Provides
     fun provideRuleEngine() = CoachRuleEngine()
@@ -329,6 +354,39 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_7_8 = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS glycemic_planning_milestones (
+                    id TEXT NOT NULL,
+                    title TEXT,
+                    targetGmiPercent REAL NOT NULL,
+                    targetProvenance TEXT NOT NULL,
+                    targetDateEpochMillis INTEGER NOT NULL,
+                    originalHorizonDays INTEGER NOT NULL,
+                    lifecycleState TEXT NOT NULL,
+                    createdAtEpochMillis INTEGER NOT NULL,
+                    updatedAtEpochMillis INTEGER NOT NULL,
+                    archivedAtEpochMillis INTEGER,
+                    calculationContractVersion INTEGER NOT NULL,
+                    PRIMARY KEY(id)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS " +
+                    "index_glycemic_planning_milestones_lifecycleState_targetDateEpochMillis " +
+                    "ON glycemic_planning_milestones (lifecycleState, targetDateEpochMillis)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS " +
+                    "index_glycemic_planning_milestones_createdAtEpochMillis " +
+                    "ON glycemic_planning_milestones (createdAtEpochMillis)",
+            )
+        }
+    }
+
     val ALL = arrayOf(
         MIGRATION_1_2,
         MIGRATION_2_3,
@@ -336,5 +394,6 @@ object DatabaseMigrations {
         MIGRATION_4_5,
         MIGRATION_5_6,
         MIGRATION_6_7,
+        MIGRATION_7_8,
     )
 }

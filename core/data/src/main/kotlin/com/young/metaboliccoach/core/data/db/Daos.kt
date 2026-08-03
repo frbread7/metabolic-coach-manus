@@ -272,3 +272,43 @@ interface RecommendationSnapshotDao {
     @Query("DELETE FROM recommendation_snapshots")
     suspend fun deleteAll()
 }
+
+@Dao
+interface GlycemicPlanningMilestoneDao {
+    @Query(
+        "SELECT * FROM glycemic_planning_milestones " +
+            "ORDER BY lifecycleState ASC, targetDateEpochMillis ASC, " +
+            "createdAtEpochMillis ASC, id ASC",
+    )
+    fun observeAll(): Flow<List<GlycemicPlanningMilestoneEntity>>
+
+    @Query(
+        "SELECT * FROM glycemic_planning_milestones " +
+            "ORDER BY lifecycleState ASC, targetDateEpochMillis ASC, " +
+            "createdAtEpochMillis ASC, id ASC",
+    )
+    suspend fun getAll(): List<GlycemicPlanningMilestoneEntity>
+
+    @Query("SELECT * FROM glycemic_planning_milestones WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): GlycemicPlanningMilestoneEntity?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfAbsent(milestone: GlycemicPlanningMilestoneEntity): Long
+
+    @Upsert
+    suspend fun upsert(milestone: GlycemicPlanningMilestoneEntity)
+
+    @Query(
+        "UPDATE glycemic_planning_milestones " +
+            "SET lifecycleState = 'ARCHIVED', archivedAtEpochMillis = :nowEpochMillis, " +
+            "updatedAtEpochMillis = :nowEpochMillis " +
+            "WHERE id = :id AND lifecycleState = 'ACTIVE'",
+    )
+    suspend fun archive(id: String, nowEpochMillis: Long): Int
+
+    @Query("DELETE FROM glycemic_planning_milestones WHERE id = :id")
+    suspend fun delete(id: String): Int
+
+    @Query("DELETE FROM glycemic_planning_milestones")
+    suspend fun deleteAll()
+}

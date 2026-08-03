@@ -8,6 +8,7 @@ import com.young.metaboliccoach.core.model.GlucoseDataOrigin
 import com.young.metaboliccoach.core.model.GlucoseProviderState
 import com.young.metaboliccoach.core.model.GlucoseReading
 import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
+import com.young.metaboliccoach.core.model.GlycemicPlanningMilestone
 import com.young.metaboliccoach.core.model.InterventionSession
 import com.young.metaboliccoach.core.model.MealMarker
 import com.young.metaboliccoach.core.model.NightscoutSettings
@@ -54,6 +55,20 @@ interface NightscoutSettingsRepository {
 interface GlycemicGoalRepository {
     fun observeSettings(): Flow<GlycemicPlannerSettings>
     suspend fun updateSettings(settings: GlycemicPlannerSettings)
+    suspend fun updateSafetySettings(settings: GlycemicPlannerSettings)
+    suspend fun reset()
+}
+
+interface GlycemicPlanningMilestoneRepository {
+    fun observeMilestones(): Flow<List<GlycemicPlanningMilestone>>
+    fun observeSelectedMilestoneId(): Flow<String?>
+    fun observeMigrationNotice(): Flow<Boolean>
+    suspend fun create(milestone: GlycemicPlanningMilestone)
+    suspend fun update(milestone: GlycemicPlanningMilestone)
+    suspend fun archive(id: String, nowEpochMillis: Long)
+    suspend fun delete(id: String)
+    suspend fun select(id: String?)
+    suspend fun dismissMigrationNotice()
     suspend fun reset()
 }
 

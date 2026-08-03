@@ -114,6 +114,8 @@ Pure Kotlin models define:
   observations;
 - Glycemic Goal Planner windows, GMI-derived metrics, target provenance, coverage/gap status, and
   low-glucose-risk scenario status;
+- saved planning milestones with lifecycle, fixed target dates, deterministic ordering, selected
+  detail state, and versioned calculation contracts;
 - watch state, phone instance/revision metadata, session-command acknowledgements, and quick-action
   commands.
 
@@ -150,7 +152,8 @@ The data module adapts Android facilities to domain contracts:
 - CareSens partner capability stub and an inactive Samsung Health partner-provider boundary;
 - retained Health Connect glucose and xDrip adapter code as inactive future-provider boundaries;
 - a bounded-memory, schema-versioned personal-data JSON exporter and local-data eraser;
-- planner settings persisted in the phone DataStore and included in the user-owned JSON export;
+- planner settings persisted in the phone DataStore, saved milestones in Room with selected-ID
+  state in a separate DataStore, and both included in the user-owned JSON export;
 - repository implementations and Hilt multibindings for the normalized `GlucoseProvider`
   interface.
 
@@ -179,15 +182,16 @@ The current authenticator is deliberately a no-op for public Nightscout servers.
 Credentials are invalid inside a URL and must eventually use a phone-only secure credential store;
 they must never enter ordinary DataStore settings, logs, exports, or Wear synchronization.
 
-Room is currently at schema version 7. Exported schemas 1–7 are committed under
+Room is currently at schema version 8. Exported schemas 1–8 are committed under
 `core/data/schemas/`; migrations 1→2 add follow-up lifecycle fields, 2→3 add query indices, 3→4 add
 exact baseline/follow-up reading provenance plus the last presented recommendation ID, and 4→5 add
 daily exercise-session count/duration with safe zero defaults. Migration 5→6 adds nullable
 recommendation, trigger, baseline-rate, and low-threshold-at-start provenance so legacy rows are not
 retrospectively classified as prospective timing samples. Migration 6→7 adds immutable,
-phone-authored recommendation snapshots used to validate delayed watch commands. The
-`DatabaseMigrationTest` instrumentation source covers 1→7 plus every supported starting version
-2–6, and the build pipeline compiles that source. The suite has not executed; doing so still
+phone-authored recommendation snapshots used to validate delayed watch commands. Migration 7→8
+adds the phone-only `glycemic_planning_milestones` table and lifecycle/date indexes. The
+`DatabaseMigrationTest` instrumentation source covers 1→8 plus every supported starting version
+2–7, and the build pipeline compiles that source. The suite has not executed; doing so still
 requires an Android device or emulator. Every future version must add both a migration and its
 exported schema.
 
@@ -257,7 +261,18 @@ inverse equation is used only to show a mathematical future mean for a selected 
 preceding 30-day mean; for 90 days it targets the full-window mean directly. Insufficient coverage,
 source changes, long gaps, invalid input, and configured low/very-low exposure suppress or qualify
 the result. Planner output is display-only and does not enter coaching, notifications, Wear state,
-or watch-face complications in `v0.4`; the v0.4.1 freshness hotfix preserves that boundary.
+or watch-face complications in `v0.4`; the v0.4.1 freshness fix and v0.4.2 milestones preserve
+that boundary.
+
+Saved planning milestones are layered above the same calculation boundary. Each row stores one
+canonical target GMI, provenance, original horizon, fixed target date, lifecycle state, and
+calculation-contract version. The repository migrates the old singleton target once into a stable
+row and keeps selected-ID/migration-notice presentation state separate from Room. Before a target
+date, the selected milestone uses the actual remaining days in its fixed horizon; at or after the
+date it evaluates the fixed 90-day window ending at that date. Active future/due, active past, and
+archived rows use deterministic ordering. Due/past rows cannot change target/date/horizon, and no
+milestone is auto-completed or sent to Wear/coaching/notifications. This is the `v0.4.2`
+phone-only extension of the planner, not a new glucose or intervention pipeline.
 
 ### Refresh and coaching
 
@@ -269,9 +284,9 @@ or watch-face complications in `v0.4`; the v0.4.1 freshness hotfix preserves tha
 2. Nightscout glucose and Health Connect activity refresh concurrently. Missing Health Connect
    background access does not cancel Nightscout work; activity can degrade independently.
 3. `NightscoutProvider` loads only the explicitly active server. It makes a cancellable asynchronous
-   API request, reuses `Last-Modified` with `If-Modified-Since`, accepts `304 Not Modified` from the
-   matching server cache, parses up to 300 recent entries, and publishes provider state without
-   blocking the UI.
+   current-entry request without a conditional validator, parses up to 300 recent entries, and
+   publishes provider state without blocking the UI. Historical range requests remain best effort;
+   an unexpected `304` or failed range cannot replace the current cache pointer.
 4. Transport failures, HTTP 408/429, and server 5xx responses receive bounded exponential retry
    using the configured base interval and maximum attempts, with every delay capped at 60 seconds.
    Authentication/configuration/client errors and invalid JSON are not retried. On final failure,
@@ -432,8 +447,8 @@ Google requires WFF logic and Wear application logic in separate bundles:
 
 | Store | Device | Data |
 | --- | --- | --- |
-| Room | Phone | Glucose readings, activity snapshots, intervention sessions, meal markers, coaching state |
-| Preferences DataStore | Phone | Coaching/presentation settings, Glycemic Goal Planner target/provenance/horizon/safety thresholds, and persistent phone instance, publication revision, data-reset token, and terminal command acknowledgement/history |
+| Room | Phone | Glucose readings, activity snapshots, intervention sessions, meal markers, coaching state, and saved planning milestones |
+| Preferences DataStore | Phone | Coaching/presentation settings, legacy planner target/safety settings, selected planning-milestone ID and migration notice, and persistent phone instance, publication revision, data-reset token, and terminal command acknowledgement/history |
 | Preferences DataStore | Watch | Latest encoded watch state, active/pending session replica and completion tombstone, plus the bounded generic command outbox |
 | Data Layer | Google Play services | Latest synchronized state and transient action items |
 
@@ -442,7 +457,7 @@ backend. Wear Data Layer traffic can use Bluetooth or Google infrastructure and 
 encrypted according to the platform documentation. See [Privacy and safety](PRIVACY_AND_SAFETY.md).
 
 The phone Settings screen can stream a schema-versioned JSON export through Android's document
-picker. It contains coaching settings, planner settings, and every row from the six application
+picker. It contains coaching settings, planner settings, selected milestone state, and every row from the seven application
 Room tables in stable table/row/property order; Nightscout connection configuration and future
 credentials are excluded.
 The writer emits one database row at a time and does not create an extra temporary health-data copy.

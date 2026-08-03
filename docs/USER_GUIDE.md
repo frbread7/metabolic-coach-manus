@@ -156,6 +156,18 @@ medical recommendation, medication instruction, or laboratory HbA1c result. The 
 **insufficient coverage**, **source discontinuity**, or **suppressed for low-glucose risk** instead
 of a number. Keep the official CGM app and clinician plan authoritative.
 
+#### Saved planning milestones
+
+Use **Saved planning milestones** to keep several personal targets without changing the active
+coach. Each row can have an optional title, target GMI, provenance, and a fixed 30-, 60-, or
+90-day horizon. Select exactly one row to see its detailed remaining-window scenario. The list
+keeps future/due milestones first, then past and archived history in deterministic order.
+
+Future milestones can be edited. Once a milestone is due or past, its target, date, and horizon are
+locked; only its title can be changed. Archive a row to retain it as history or delete it to remove
+that saved intention. Milestones do not change glucose retrieval, current readings, Wear state,
+coaching decisions, reminders, notifications, or the watch face.
+
 ### Wear app
 
 Use touch scrolling and large buttons:
@@ -263,7 +275,8 @@ All coaching thresholds are configurable on the phone:
 - follow-up-delay matching width and baseline glucose matching band;
 - intervention follow-up delay and quick-action expiry;
 - optional Glycemic Goal Planner target GMI, target provenance, 30/60/90-day horizon, low/very-low
-  boundaries, and maximum low-exposure limits;
+  boundaries, maximum low-exposure limits, and any number of saved planning milestones with one
+  selected detail target;
 - reminder enable/disable switches;
 - theme and font scale.
 

@@ -2,6 +2,7 @@ package com.young.metaboliccoach.core.data.repository
 
 import com.young.metaboliccoach.core.model.CoachSettings
 import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
+import com.young.metaboliccoach.core.model.GlycemicPlanningMilestone
 
 internal sealed interface ExportValue {
     data object Null : ExportValue
@@ -30,6 +31,8 @@ internal class PersonalDataJsonWriter(
         databaseSchemaVersion: Int,
         settings: CoachSettings,
         glycemicPlannerSettings: GlycemicPlannerSettings = GlycemicPlannerSettings(),
+        milestones: List<GlycemicPlanningMilestone> = emptyList(),
+        selectedMilestoneId: String? = null,
     ) {
         check(!documentOpen) { "An export document is already open." }
         tableCount = 0
@@ -43,7 +46,11 @@ internal class PersonalDataJsonWriter(
         destination.append(",\"settings\":")
         writeSettings(settings)
         destination.append(",\"glycemicPlanner\":")
-        writeGlycemicPlannerSettings(glycemicPlannerSettings)
+        writeGlycemicPlannerSettings(
+            settings = glycemicPlannerSettings,
+            milestones = milestones,
+            selectedMilestoneId = selectedMilestoneId,
+        )
         destination.append(",\"data\":{")
         documentOpen = true
     }
@@ -145,7 +152,11 @@ internal class PersonalDataJsonWriter(
         destination.append('}')
     }
 
-    private fun writeGlycemicPlannerSettings(settings: GlycemicPlannerSettings) {
+    private fun writeGlycemicPlannerSettings(
+        settings: GlycemicPlannerSettings,
+        milestones: List<GlycemicPlanningMilestone>,
+        selectedMilestoneId: String?,
+    ) {
         val values = listOf(
             "targetGmiPercent" to settings.targetGmiPercent,
             "targetProvenance" to settings.targetProvenance?.name,
@@ -159,6 +170,34 @@ internal class PersonalDataJsonWriter(
         values.forEachIndexed { index, (name, value) ->
             writeNamedValue(name, value, first = index == 0)
         }
+        writeNamedValue("selectedMilestoneId", selectedMilestoneId)
+        destination.append(",\"milestones\":[")
+        milestones
+            .sortedWith(compareBy<GlycemicPlanningMilestone> { it.targetDateEpochMillis }
+                .thenBy { it.createdAtEpochMillis }
+                .thenBy { it.id })
+            .forEachIndexed { index, milestone ->
+                if (index > 0) destination.append(',')
+                destination.append('{')
+                val milestoneValues = listOf(
+                    "id" to milestone.id,
+                    "title" to milestone.title,
+                    "targetGmiPercent" to milestone.targetGmiPercent,
+                    "targetProvenance" to milestone.targetProvenance.name,
+                    "targetDateEpochMillis" to milestone.targetDateEpochMillis,
+                    "originalHorizonDays" to milestone.originalHorizonDays,
+                    "lifecycleState" to milestone.lifecycleState.name,
+                    "createdAtEpochMillis" to milestone.createdAtEpochMillis,
+                    "updatedAtEpochMillis" to milestone.updatedAtEpochMillis,
+                    "archivedAtEpochMillis" to milestone.archivedAtEpochMillis,
+                    "calculationContractVersion" to milestone.calculationContractVersion,
+                )
+                milestoneValues.forEachIndexed { valueIndex, (name, value) ->
+                    writeNamedValue(name, value, first = valueIndex == 0)
+                }
+                destination.append('}')
+            }
+        destination.append(']')
         destination.append('}')
     }
 
@@ -240,7 +279,7 @@ internal class PersonalDataJsonWriter(
     }
 
     private companion object {
-        const val EXPORT_SCHEMA_VERSION = 2
+        const val EXPORT_SCHEMA_VERSION = 3
         const val HEX_DIGITS = "0123456789abcdef"
     }
 }

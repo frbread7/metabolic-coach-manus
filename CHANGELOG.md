@@ -2,6 +2,27 @@
 
 All notable Metabolic Coach package changes are recorded here.
 
+## v0.4.2 — 2026-08-03 — Saved planning milestones (phone-only)
+
+### Added
+
+- Multiple saved planning milestones with optional titles, target GMI, provenance, and fixed
+  30/60/90-day horizons.
+- Exactly one selected milestone for a detailed remaining-window scenario and fixed-date
+  evaluation; active/past/archived ordering is deterministic.
+- One-time migration of the legacy singleton planner target, milestone CRUD/archive/delete,
+  immutable target/date/horizon fields after the due date, and milestone-aware personal-data
+  export (schema version 3).
+
+### Safety and scope
+
+- Milestones remain phone-only presentation state. They do not change Nightscout freshness,
+  provider selection, Wear synchronization, watch-face resources, coaching, notifications, or
+  quick actions.
+- The feature uses CGM-derived GMI terminology and is not a laboratory HbA1c result, treatment
+  instruction, medication guidance, or guarantee. A new phone physical acceptance test is
+  required before the next milestone.
+
 ## v0.4.1 — 2026-08-03 — Current glucose freshness hotfix
 
 ### Fixed

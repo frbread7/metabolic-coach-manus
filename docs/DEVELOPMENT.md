@@ -12,7 +12,7 @@ The project is configured for:
 - phone minimum SDK 28;
 - Wear app minimum SDK 30;
 - WFF v4 watch face minimum SDK 36;
-- Room 2.8.4 with database schema version 7;
+- Room 2.8.4 with database schema version 8;
 - Health Connect client 1.1.0;
 - OkHttp 5.3.0 with MockWebServer for Nightscout transport tests;
 - kotlinx-serialization JSON 1.9.0 for provider/settings parsing;
@@ -71,10 +71,10 @@ Targeted iteration remains available:
 ./gradlew :phone:compileDebugKotlin :wear:compileDebugKotlin
 ```
 
-Room exports 1–7 are committed under `core/data/schemas/`. The v7 `DatabaseMigrationTest` Android
-instrumentation source covers migration from schema 1 and every supported starting version 2–6
-through schema 7. It has compiled locally, but its migrations still need execution on an Android
-runtime:
+Room exports 1–8 are committed under `core/data/schemas/`. The v8 `DatabaseMigrationTest` Android
+instrumentation source covers migration from schema 1 and every supported starting version 2–7
+through schema 8, including the phone-only saved-planning-milestone table. It has compiled locally,
+but its migrations still need execution on an Android runtime:
 
 ```bash
 ./gradlew :core:data:connectedDebugAndroidTest
@@ -159,8 +159,8 @@ fresh run against each release candidate.
 - Add no vendor SDK until its license, authorization, data contract, and test strategy are known.
 - Never log glucose values, Nightscout bodies/headers/URLs/credentials, Health Connect records, raw
   broadcast extras, or user identifiers in production.
-- Preserve the existing Room 1→2, 2→3, 3→4, 4→5, 5→6, and 6→7 migrations; add a migration and
-  exported schema whenever database version 7 changes.
+- Preserve the existing Room 1→2, 2→3, 3→4, 4→5, 5→6, and 6→7 migrations plus 7→8; add a
+  migration and exported schema whenever the database version changes.
 - Preserve exact recommendation, trigger, activity-dose, baseline, source, and follow-up provenance
   across model, Room, sync, action, and analysis changes. Never reconstruct prospective timing
   provenance for legacy or manual sessions.

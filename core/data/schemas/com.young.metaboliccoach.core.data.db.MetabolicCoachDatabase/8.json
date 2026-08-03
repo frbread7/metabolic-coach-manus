@@ -1,0 +1,586 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 8,
+    "identityHash": "87d74f3cf969a467a9644d91edf25d3f",
+    "entities": [
+      {
+        "tableName": "glucose_readings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `valueMgDl` INTEGER NOT NULL, `trend` TEXT NOT NULL, `deltaMgDl` INTEGER, `rateMgDlPerMinute` REAL, `measuredAtEpochMillis` INTEGER NOT NULL, `receivedAtEpochMillis` INTEGER NOT NULL, `sourceId` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "valueMgDl",
+            "columnName": "valueMgDl",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "trend",
+            "columnName": "trend",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deltaMgDl",
+            "columnName": "deltaMgDl",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "rateMgDlPerMinute",
+            "columnName": "rateMgDlPerMinute",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "measuredAtEpochMillis",
+            "columnName": "measuredAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "receivedAtEpochMillis",
+            "columnName": "receivedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_glucose_readings_measuredAtEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "measuredAtEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_glucose_readings_measuredAtEpochMillis` ON `${TABLE_NAME}` (`measuredAtEpochMillis`)"
+          },
+          {
+            "name": "index_glucose_readings_sourceId_measuredAtEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "sourceId",
+              "measuredAtEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_glucose_readings_sourceId_measuredAtEpochMillis` ON `${TABLE_NAME}` (`sourceId`, `measuredAtEpochMillis`)"
+          }
+        ]
+      },
+      {
+        "tableName": "activity_snapshots",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`dayStartEpochMillis` INTEGER NOT NULL, `stepsToday` INTEGER NOT NULL, `floorsToday` REAL NOT NULL, `latestHeartRateBpm` INTEGER, `activeCaloriesToday` REAL, `lastMovementAtEpochMillis` INTEGER, `measuredAtEpochMillis` INTEGER NOT NULL, `sourceId` TEXT NOT NULL, `exerciseSessionCountToday` INTEGER NOT NULL, `exerciseDurationMinutesToday` INTEGER NOT NULL, PRIMARY KEY(`dayStartEpochMillis`))",
+        "fields": [
+          {
+            "fieldPath": "dayStartEpochMillis",
+            "columnName": "dayStartEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stepsToday",
+            "columnName": "stepsToday",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "floorsToday",
+            "columnName": "floorsToday",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latestHeartRateBpm",
+            "columnName": "latestHeartRateBpm",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "activeCaloriesToday",
+            "columnName": "activeCaloriesToday",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "lastMovementAtEpochMillis",
+            "columnName": "lastMovementAtEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "measuredAtEpochMillis",
+            "columnName": "measuredAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "exerciseSessionCountToday",
+            "columnName": "exerciseSessionCountToday",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "exerciseDurationMinutesToday",
+            "columnName": "exerciseDurationMinutesToday",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "dayStartEpochMillis"
+          ]
+        }
+      },
+      {
+        "tableName": "intervention_sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `type` TEXT NOT NULL, `status` TEXT NOT NULL, `startedAtEpochMillis` INTEGER NOT NULL, `endedAtEpochMillis` INTEGER, `targetDurationMinutes` INTEGER, `targetFloors` INTEGER, `baselineGlucoseMgDl` INTEGER, `baselineGlucoseReadingId` TEXT, `baselineGlucoseMeasuredAtEpochMillis` INTEGER, `baselineGlucoseSourceId` TEXT, `glucoseAfterMgDl` INTEGER, `followUpDueAtEpochMillis` INTEGER, `followUpReadingAtEpochMillis` INTEGER, `followUpGlucoseReadingId` TEXT, `followUpGlucoseSourceId` TEXT, `followUpFinalizedAtEpochMillis` INTEGER, `recommendationId` TEXT, `recommendationReason` TEXT, `recommendationAlgorithmVersion` INTEGER, `recommendationCreatedAtEpochMillis` INTEGER, `recommendationValidUntilEpochMillis` INTEGER, `triggerContextId` TEXT, `triggerAtEpochMillis` INTEGER, `baselineEffectiveRateMgDlPerMinute` REAL, `lowGlucoseThresholdMgDlAtStart` INTEGER, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAtEpochMillis",
+            "columnName": "startedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endedAtEpochMillis",
+            "columnName": "endedAtEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "targetDurationMinutes",
+            "columnName": "targetDurationMinutes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "targetFloors",
+            "columnName": "targetFloors",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "baselineGlucoseMgDl",
+            "columnName": "baselineGlucoseMgDl",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "baselineGlucoseReadingId",
+            "columnName": "baselineGlucoseReadingId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "baselineGlucoseMeasuredAtEpochMillis",
+            "columnName": "baselineGlucoseMeasuredAtEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "baselineGlucoseSourceId",
+            "columnName": "baselineGlucoseSourceId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "glucoseAfterMgDl",
+            "columnName": "glucoseAfterMgDl",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "followUpDueAtEpochMillis",
+            "columnName": "followUpDueAtEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "followUpReadingAtEpochMillis",
+            "columnName": "followUpReadingAtEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "followUpGlucoseReadingId",
+            "columnName": "followUpGlucoseReadingId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "followUpGlucoseSourceId",
+            "columnName": "followUpGlucoseSourceId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "followUpFinalizedAtEpochMillis",
+            "columnName": "followUpFinalizedAtEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "recommendationId",
+            "columnName": "recommendationId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "recommendationReason",
+            "columnName": "recommendationReason",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "recommendationAlgorithmVersion",
+            "columnName": "recommendationAlgorithmVersion",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "recommendationCreatedAtEpochMillis",
+            "columnName": "recommendationCreatedAtEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "recommendationValidUntilEpochMillis",
+            "columnName": "recommendationValidUntilEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "triggerContextId",
+            "columnName": "triggerContextId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "triggerAtEpochMillis",
+            "columnName": "triggerAtEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "baselineEffectiveRateMgDlPerMinute",
+            "columnName": "baselineEffectiveRateMgDlPerMinute",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "lowGlucoseThresholdMgDlAtStart",
+            "columnName": "lowGlucoseThresholdMgDlAtStart",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_intervention_sessions_status_startedAtEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "status",
+              "startedAtEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_intervention_sessions_status_startedAtEpochMillis` ON `${TABLE_NAME}` (`status`, `startedAtEpochMillis`)"
+          },
+          {
+            "name": "index_intervention_sessions_status_followUpDueAtEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "status",
+              "followUpDueAtEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_intervention_sessions_status_followUpDueAtEpochMillis` ON `${TABLE_NAME}` (`status`, `followUpDueAtEpochMillis`)"
+          }
+        ]
+      },
+      {
+        "tableName": "meal_markers",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `occurredAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "occurredAtEpochMillis",
+            "columnName": "occurredAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "coach_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`singletonId` INTEGER NOT NULL, `lastRecommendationAtEpochMillis` INTEGER, `lastRecommendationId` TEXT, `snoozedUntilEpochMillis` INTEGER, `notificationDayStartEpochMillis` INTEGER NOT NULL, `notificationsSentToday` INTEGER NOT NULL, PRIMARY KEY(`singletonId`))",
+        "fields": [
+          {
+            "fieldPath": "singletonId",
+            "columnName": "singletonId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastRecommendationAtEpochMillis",
+            "columnName": "lastRecommendationAtEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastRecommendationId",
+            "columnName": "lastRecommendationId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "snoozedUntilEpochMillis",
+            "columnName": "snoozedUntilEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "notificationDayStartEpochMillis",
+            "columnName": "notificationDayStartEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notificationsSentToday",
+            "columnName": "notificationsSentToday",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "singletonId"
+          ]
+        }
+      },
+      {
+        "tableName": "recommendation_snapshots",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `reason` TEXT NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL, `validUntilEpochMillis` INTEGER NOT NULL, `interventionType` TEXT NOT NULL, `title` TEXT NOT NULL, `actionLabel` TEXT NOT NULL, `durationMinutes` INTEGER, `targetFloors` INTEGER, `algorithmVersion` INTEGER NOT NULL, `triggerContextId` TEXT, `triggerAtEpochMillis` INTEGER, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reason",
+            "columnName": "reason",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "createdAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "validUntilEpochMillis",
+            "columnName": "validUntilEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "interventionType",
+            "columnName": "interventionType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actionLabel",
+            "columnName": "actionLabel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationMinutes",
+            "columnName": "durationMinutes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "targetFloors",
+            "columnName": "targetFloors",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "algorithmVersion",
+            "columnName": "algorithmVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "triggerContextId",
+            "columnName": "triggerContextId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "triggerAtEpochMillis",
+            "columnName": "triggerAtEpochMillis",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_recommendation_snapshots_validUntilEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "validUntilEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recommendation_snapshots_validUntilEpochMillis` ON `${TABLE_NAME}` (`validUntilEpochMillis`)"
+          }
+        ]
+      },
+      {
+        "tableName": "glycemic_planning_milestones",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT, `targetGmiPercent` REAL NOT NULL, `targetProvenance` TEXT NOT NULL, `targetDateEpochMillis` INTEGER NOT NULL, `originalHorizonDays` INTEGER NOT NULL, `lifecycleState` TEXT NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL, `updatedAtEpochMillis` INTEGER NOT NULL, `archivedAtEpochMillis` INTEGER, `calculationContractVersion` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "targetGmiPercent",
+            "columnName": "targetGmiPercent",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetProvenance",
+            "columnName": "targetProvenance",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetDateEpochMillis",
+            "columnName": "targetDateEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalHorizonDays",
+            "columnName": "originalHorizonDays",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lifecycleState",
+            "columnName": "lifecycleState",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "createdAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMillis",
+            "columnName": "updatedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archivedAtEpochMillis",
+            "columnName": "archivedAtEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "calculationContractVersion",
+            "columnName": "calculationContractVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_glycemic_planning_milestones_lifecycleState_targetDateEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "lifecycleState",
+              "targetDateEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_glycemic_planning_milestones_lifecycleState_targetDateEpochMillis` ON `${TABLE_NAME}` (`lifecycleState`, `targetDateEpochMillis`)"
+          },
+          {
+            "name": "index_glycemic_planning_milestones_createdAtEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "createdAtEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_glycemic_planning_milestones_createdAtEpochMillis` ON `${TABLE_NAME}` (`createdAtEpochMillis`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '87d74f3cf969a467a9644d91edf25d3f')"
+    ]
+  }
+}

@@ -4,10 +4,14 @@ import com.young.metaboliccoach.core.model.GlucoseReading
 import com.young.metaboliccoach.core.model.GlycemicGoalScenario
 import com.young.metaboliccoach.core.model.GlycemicMetricsStatus
 import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
+import com.young.metaboliccoach.core.model.GlycemicPlanningMilestone
+import com.young.metaboliccoach.core.model.GlycemicPlanningMilestoneEvaluation
 import com.young.metaboliccoach.core.model.GlycemicScenarioStatus
 import com.young.metaboliccoach.core.model.GlycemicWindow
+import com.young.metaboliccoach.core.model.MilestoneEvaluationState
 import com.young.metaboliccoach.core.model.RollingGlycemicMetrics
 import kotlin.math.abs
+import kotlin.math.ceil
 
 /** Pure, provider-independent calculations for the phone-side Glycemic Goal Planner. */
 object GlycemicGoalPlanner {
@@ -55,6 +59,133 @@ object GlycemicGoalPlanner {
         targetLowerMgDl: Int,
         targetUpperMgDl: Int,
         maxInterpolationGapMinutes: Long = DEFAULT_MAX_INTERPOLATION_GAP_MINUTES,
+    ): GlycemicGoalScenario = calculateGoalScenarioInternal(
+        readings = readings,
+        displayHorizon = horizon,
+        horizonDays = horizon.days.toDouble(),
+        windowEndEpochMillis = windowEndEpochMillis,
+        targetGmiPercent = targetGmiPercent,
+        plannerSettings = plannerSettings,
+        targetLowerMgDl = targetLowerMgDl,
+        targetUpperMgDl = targetUpperMgDl,
+        maxInterpolationGapMinutes = maxInterpolationGapMinutes,
+    )
+
+    fun calculateGoalScenarioForMilestone(
+        readings: List<GlucoseReading>,
+        milestone: GlycemicPlanningMilestone,
+        windowEndEpochMillis: Long,
+        plannerSettings: GlycemicPlannerSettings,
+        targetLowerMgDl: Int,
+        targetUpperMgDl: Int,
+        maxInterpolationGapMinutes: Long = DEFAULT_MAX_INTERPOLATION_GAP_MINUTES,
+    ): GlycemicGoalScenario {
+        val displayHorizon = GlycemicWindow.fromDays(milestone.originalHorizonDays)
+            ?: GlycemicWindow.DAYS_30
+        val remainingDays = ceil(
+            (milestone.targetDateEpochMillis - windowEndEpochMillis).toDouble() / DAY_MILLIS,
+        ).toInt().coerceIn(1, 90)
+        return calculateGoalScenarioInternal(
+            readings = readings,
+            displayHorizon = displayHorizon,
+            horizonDays = remainingDays.toDouble(),
+            windowEndEpochMillis = windowEndEpochMillis,
+            targetGmiPercent = milestone.targetGmiPercent,
+            plannerSettings = plannerSettings,
+            targetLowerMgDl = targetLowerMgDl,
+            targetUpperMgDl = targetUpperMgDl,
+            maxInterpolationGapMinutes = maxInterpolationGapMinutes,
+        ).copy(remainingWindowDays = remainingDays)
+    }
+
+    fun evaluatePlanningMilestone(
+        readings: List<GlucoseReading>,
+        milestone: GlycemicPlanningMilestone,
+        windowEndEpochMillis: Long,
+        plannerSettings: GlycemicPlannerSettings,
+        targetLowerMgDl: Int,
+        targetUpperMgDl: Int,
+        maxInterpolationGapMinutes: Long = DEFAULT_MAX_INTERPOLATION_GAP_MINUTES,
+    ): GlycemicPlanningMilestoneEvaluation {
+        val temporalState = milestone.temporalState(windowEndEpochMillis)
+        if (windowEndEpochMillis < milestone.targetDateEpochMillis) {
+            val scenario = calculateGoalScenarioForMilestone(
+                readings = readings,
+                milestone = milestone,
+                windowEndEpochMillis = windowEndEpochMillis,
+                plannerSettings = plannerSettings,
+                targetLowerMgDl = targetLowerMgDl,
+                targetUpperMgDl = targetUpperMgDl,
+                maxInterpolationGapMinutes = maxInterpolationGapMinutes,
+            )
+            return GlycemicPlanningMilestoneEvaluation(
+                milestoneId = milestone.id,
+                targetDateEpochMillis = milestone.targetDateEpochMillis,
+                temporalState = temporalState,
+                evaluationState = null,
+                rollingMetrics = scenario.recentSafety,
+                scenario = scenario,
+                detail = "Remaining-window scenario; not a treatment recommendation.",
+            )
+        }
+
+        val metrics = calculateRollingMetrics(
+            readings = readings,
+            window = GlycemicWindow.DAYS_90,
+            windowEndEpochMillis = milestone.targetDateEpochMillis,
+            targetLowerMgDl = targetLowerMgDl,
+            targetUpperMgDl = targetUpperMgDl,
+            lowGlucoseThresholdMgDl = plannerSettings.lowGlucoseThresholdMgDl,
+            veryLowGlucoseThresholdMgDl = plannerSettings.veryLowGlucoseThresholdMgDl,
+            maxInterpolationGapMinutes = maxInterpolationGapMinutes,
+        )
+        val evaluationState = when {
+            metrics.status == GlycemicMetricsStatus.SOURCE_DISCONTINUITY ->
+                MilestoneEvaluationState.SOURCE_DISCONTINUITY
+            metrics.status != GlycemicMetricsStatus.AVAILABLE ->
+                MilestoneEvaluationState.INSUFFICIENT_DATA
+            (metrics.timeBelowRangePercent ?: 0.0) > plannerSettings.maximumLowGlucosePercent ||
+                (metrics.timeVeryLowPercent ?: 0.0) >
+                plannerSettings.maximumVeryLowGlucosePercent ->
+                MilestoneEvaluationState.SUPPRESSED_FOR_LOW_GLUCOSE_RISK
+            (metrics.gmiPercent ?: Double.POSITIVE_INFINITY) <= milestone.targetGmiPercent ->
+                MilestoneEvaluationState.TARGET_CONDITION_MET
+            else -> MilestoneEvaluationState.TARGET_CONDITION_NOT_MET
+        }
+        return GlycemicPlanningMilestoneEvaluation(
+            milestoneId = milestone.id,
+            targetDateEpochMillis = milestone.targetDateEpochMillis,
+            temporalState = temporalState,
+            evaluationState = evaluationState,
+            rollingMetrics = metrics,
+            scenario = null,
+            detail = when (evaluationState) {
+                MilestoneEvaluationState.TARGET_CONDITION_MET ->
+                    "Target condition met from sufficiently covered CGM-derived data."
+                MilestoneEvaluationState.TARGET_CONDITION_NOT_MET ->
+                    "Target condition was not met by the selected target date."
+                MilestoneEvaluationState.SUPPRESSED_FOR_LOW_GLUCOSE_RISK ->
+                    "Evaluation is hidden because low-glucose exposure exceeds the configured safety boundary."
+                MilestoneEvaluationState.SOURCE_DISCONTINUITY ->
+                    "The evaluation window contains more than one glucose source."
+                MilestoneEvaluationState.INSUFFICIENT_DATA ->
+                    "This milestone could not be evaluated from the available data."
+                MilestoneEvaluationState.CALCULATION_UNAVAILABLE ->
+                    "The milestone evaluation is not currently available."
+            },
+        )
+    }
+
+    private fun calculateGoalScenarioInternal(
+        readings: List<GlucoseReading>,
+        displayHorizon: GlycemicWindow,
+        horizonDays: Double,
+        windowEndEpochMillis: Long,
+        targetGmiPercent: Double,
+        plannerSettings: GlycemicPlannerSettings,
+        targetLowerMgDl: Int,
+        targetUpperMgDl: Int,
+        maxInterpolationGapMinutes: Long,
     ): GlycemicGoalScenario {
         val targetMean = meanGlucoseFromGmi(targetGmiPercent)
         if (
@@ -63,7 +194,7 @@ object GlycemicGoalPlanner {
             targetMean !in MINIMUM_GLUCOSE_MG_DL.toDouble()..MAXIMUM_GLUCOSE_MG_DL.toDouble()
         ) {
             return GlycemicGoalScenario(
-                horizon = horizon,
+                horizon = displayHorizon,
                 targetGmiPercent = targetGmiPercent,
                 targetMeanGlucoseMgDl = targetMean,
                 observedPastMeanGlucoseMgDl = null,
@@ -86,7 +217,7 @@ object GlycemicGoalPlanner {
         )
         if (recentSafety.status != GlycemicMetricsStatus.AVAILABLE) {
             return GlycemicGoalScenario(
-                horizon = horizon,
+                horizon = displayHorizon,
                 targetGmiPercent = targetGmiPercent,
                 targetMeanGlucoseMgDl = targetMean,
                 observedPastMeanGlucoseMgDl = null,
@@ -120,7 +251,7 @@ object GlycemicGoalPlanner {
                 )
         ) {
             return GlycemicGoalScenario(
-                horizon = horizon,
+                horizon = displayHorizon,
                 targetGmiPercent = targetGmiPercent,
                 targetMeanGlucoseMgDl = targetMean,
                 observedPastMeanGlucoseMgDl = null,
@@ -131,13 +262,12 @@ object GlycemicGoalPlanner {
             )
         }
 
-        val observedPastMetrics = if (horizon.days < 90) {
-            val pastWindow = GlycemicWindow.fromDays(90 - horizon.days)
-                ?: return invalidScenario(horizon, targetGmiPercent, targetMean)
+        val observedPastMetrics = if (horizonDays < 90.0) {
             calculateWindowMetrics(
                 readings = readings,
-                window = pastWindow,
+                window = GlycemicWindow.DAYS_90,
                 windowEndEpochMillis = windowEndEpochMillis,
+                requestedDurationMillis = ((90.0 - horizonDays) * DAY_MILLIS).toLong(),
                 targetLowerMgDl = targetLowerMgDl,
                 targetUpperMgDl = targetUpperMgDl,
                 lowGlucoseThresholdMgDl = plannerSettings.lowGlucoseThresholdMgDl,
@@ -151,9 +281,9 @@ object GlycemicGoalPlanner {
             ?.takeIf { it.status == GlycemicMetricsStatus.AVAILABLE }
             ?.meanGlucoseMgDl
 
-        if (horizon.days < 90 && observedPastMean == null) {
+        if (horizonDays < 90.0 && observedPastMean == null) {
             return GlycemicGoalScenario(
-                horizon = horizon,
+                horizon = displayHorizon,
                 targetGmiPercent = targetGmiPercent,
                 targetMeanGlucoseMgDl = targetMean,
                 observedPastMeanGlucoseMgDl = null,
@@ -170,15 +300,15 @@ object GlycemicGoalPlanner {
             )
         }
 
-        val scenarioMean = if (horizon.days == 90) {
+        val scenarioMean = if (horizonDays >= 90.0) {
             targetMean
         } else {
-            ((90.0 * targetMean) - ((90 - horizon.days) * checkNotNull(observedPastMean))) /
-                horizon.days
+            ((90.0 * targetMean) - ((90.0 - horizonDays) * checkNotNull(observedPastMean))) /
+                horizonDays
         }
         if (!scenarioMean.isFinite() || scenarioMean <= 0.0) {
             return GlycemicGoalScenario(
-                horizon = horizon,
+                horizon = displayHorizon,
                 targetGmiPercent = targetGmiPercent,
                 targetMeanGlucoseMgDl = targetMean,
                 observedPastMeanGlucoseMgDl = observedPastMean,
@@ -190,7 +320,7 @@ object GlycemicGoalPlanner {
         }
         if (scenarioMean <= plannerSettings.lowGlucoseThresholdMgDl) {
             return GlycemicGoalScenario(
-                horizon = horizon,
+                horizon = displayHorizon,
                 targetGmiPercent = targetGmiPercent,
                 targetMeanGlucoseMgDl = targetMean,
                 observedPastMeanGlucoseMgDl = observedPastMean,
@@ -203,7 +333,7 @@ object GlycemicGoalPlanner {
 
         val warning = scenarioMean > MAXIMUM_GLUCOSE_MG_DL
         return GlycemicGoalScenario(
-            horizon = horizon,
+            horizon = displayHorizon,
             targetGmiPercent = targetGmiPercent,
             targetMeanGlucoseMgDl = targetMean,
             observedPastMeanGlucoseMgDl = observedPastMean,
@@ -226,16 +356,17 @@ object GlycemicGoalPlanner {
         readings: List<GlucoseReading>,
         window: GlycemicWindow,
         windowEndEpochMillis: Long,
+        requestedDurationMillis: Long = window.durationMillis,
         targetLowerMgDl: Int,
         targetUpperMgDl: Int,
         lowGlucoseThresholdMgDl: Int,
         veryLowGlucoseThresholdMgDl: Int,
         maxInterpolationGapMinutes: Long,
     ): RollingGlycemicMetrics {
-        val windowStart = windowEndEpochMillis - window.durationMillis
-        val durationMillis = windowEndEpochMillis - windowStart
+        val windowStart = windowEndEpochMillis - requestedDurationMillis
+        val windowDurationMillis = windowEndEpochMillis - windowStart
         if (
-            durationMillis <= 0L ||
+            windowDurationMillis <= 0L ||
             targetLowerMgDl >= targetUpperMgDl ||
             veryLowGlucoseThresholdMgDl > lowGlucoseThresholdMgDl
         ) {
@@ -329,8 +460,8 @@ object GlycemicGoalPlanner {
             veryLowMillis += classification.veryLowMillis
         }
 
-        val coveragePercent = coveredMillis * 100.0 / durationMillis
-        val missingDurationMillis = (durationMillis - coveredMillis).coerceAtLeast(0L)
+        val coveragePercent = coveredMillis * 100.0 / windowDurationMillis
+        val missingDurationMillis = (windowDurationMillis - coveredMillis).coerceAtLeast(0L)
         val available = coveragePercent >= MINIMUM_COVERAGE_PERCENT
         val mean = glucoseIntegral.takeIf { coveredMillis > 0L }?.let { it / coveredMillis }
         val percent: (Long) -> Double? = { value ->
@@ -490,4 +621,5 @@ object GlycemicGoalPlanner {
     private const val MAXIMUM_GMI_PERCENT = 15.0
     private const val MINIMUM_GLUCOSE_MG_DL = 20
     private const val MAXIMUM_GLUCOSE_MG_DL = 600
+    private const val DAY_MILLIS = 24 * 60 * 60 * 1_000L
 }
