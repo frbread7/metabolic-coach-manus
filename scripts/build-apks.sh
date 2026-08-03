@@ -74,6 +74,12 @@ resolve_apksigner() {
     local sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
     if [[ -n "$sdk_root" ]]; then
         local candidate
+        local preferred_version="${MC_ANDROID_BUILD_TOOLS_VERSION:-36.0.0}"
+        candidate="$sdk_root/build-tools/$preferred_version/apksigner"
+        if [[ -x "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return
+        fi
         candidate="$(find "$sdk_root/build-tools" -maxdepth 2 -type f -name apksigner \
             -print 2>/dev/null | sort -V | tail -n 1)"
         if [[ -n "$candidate" ]]; then
