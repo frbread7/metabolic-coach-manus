@@ -44,6 +44,12 @@ jobs:
             -keystore "$HOME/.android/debug.keystore" \
             -storepass android \
             -alias androiddebugkey >/dev/null
+          {
+            echo "MC_DEBUG_KEYSTORE_PATH=$HOME/.android/debug.keystore"
+            echo "MC_DEBUG_STORE_PASSWORD=android"
+            echo "MC_DEBUG_KEY_ALIAS=androiddebugkey"
+            echo "MC_DEBUG_KEY_PASSWORD=android"
+          } >> "$GITHUB_ENV"
 
       - name: Verify and assemble
         run: ./scripts/build-apks.sh

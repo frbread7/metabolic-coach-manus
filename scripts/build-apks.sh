@@ -110,6 +110,8 @@ phone_digest="$(certificate_digest "$phone_apk")"
 wear_digest="$(certificate_digest "$wear_apk")"
 if [[ -z "$phone_digest" || "$phone_digest" != "$wear_digest" ]]; then
     echo "Phone and Wear APK signing certificates do not match." >&2
+    echo "Phone certificate: ${phone_digest:-<missing>}" >&2
+    echo "Wear certificate: ${wear_digest:-<missing>}" >&2
     exit 1
 fi
 echo "Phone/Wear signing certificate SHA-256: $phone_digest"
