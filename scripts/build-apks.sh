@@ -101,7 +101,7 @@ for apk in "$phone_apk" "$wear_apk" "$watchface_apk"; do
 done
 
 certificate_digest() {
-    "$apksigner" verify --print-certs "$1" |
+    "$apksigner" verify --print-certs "$1" 2>&1 |
         sed -n 's/^Signer #1 certificate SHA-256 digest: //p' |
         head -n 1
 }

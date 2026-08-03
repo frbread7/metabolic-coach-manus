@@ -69,7 +69,7 @@ for apk in "$phone_apk" "$wear_apk" "$watchface_apk"; do
         exit 1
     fi
 
-    certificate="$($apksigner verify --print-certs "$apk" |
+    certificate="$($apksigner verify --print-certs "$apk" 2>&1 |
         sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1 |
         tr '[:upper:]' '[:lower:]')"
     if [[ -z "$certificate" ]]; then

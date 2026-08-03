@@ -101,7 +101,7 @@ jobs:
           phone_apk="artifacts/metabolic-coach-phone-debug.apk"
           wear_apk="artifacts/metabolic-coach-wear-debug.apk"
           watchface_apk="artifacts/metabolic-coach-watchface-debug.apk"
-          certificate="$($apksigner verify --print-certs "$phone_apk" |
+          certificate="$($apksigner verify --print-certs "$phone_apk" 2>&1 |
             sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
           {
             echo "### v0.4 debug artifact"
