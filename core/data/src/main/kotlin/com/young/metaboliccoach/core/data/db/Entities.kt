@@ -22,6 +22,32 @@ data class GlucoseReadingEntity(
     val sourceId: String,
 )
 
+@Entity(tableName = "glucose_history_settings")
+data class GlucoseHistorySettingsEntity(
+    @PrimaryKey val singletonId: Int = SINGLETON_ID,
+    val retentionPolicy: String,
+    val retentionConfirmed: Boolean,
+) {
+    companion object {
+        const val SINGLETON_ID = 1
+    }
+}
+
+@Entity(tableName = "glucose_history_backfill_state")
+data class GlucoseHistoryBackfillEntity(
+    @PrimaryKey val sourceId: String,
+    val nextBackfillEndEpochMillis: Long?,
+    val status: String,
+    val lastError: String?,
+    val updatedAtEpochMillis: Long,
+)
+
+data class GlucoseHistoryStatsRow(
+    val oldestReadingAtEpochMillis: Long?,
+    val newestReadingAtEpochMillis: Long?,
+    val readingCount: Long,
+)
+
 @Entity(tableName = "activity_snapshots")
 data class ActivitySnapshotEntity(
     @PrimaryKey val dayStartEpochMillis: Long,

@@ -20,7 +20,7 @@ class DatabaseMigrationTest {
 
     @Test
     @Throws(IOException::class)
-    fun migrateFromVersion1To8PreservesRowsAndAddsSafeDefaults() {
+    fun migrateFromVersion1To9PreservesRowsAndAddsSafeDefaults() {
         helper.createDatabase(TEST_DATABASE, 1).apply {
             execSQL(
                 """
@@ -56,7 +56,7 @@ class DatabaseMigrationTest {
 
         helper.runMigrationsAndValidate(
             TEST_DATABASE,
-            8,
+            9,
             true,
             *DatabaseMigrations.ALL,
         ).use { database ->
@@ -111,6 +111,10 @@ class DatabaseMigrationTest {
                 cursor.moveToFirst()
                 assertEquals(0, cursor.getInt(0))
             }
+            database.query("SELECT COUNT(*) FROM glucose_history_settings").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(0, cursor.getInt(0))
+            }
         }
     }
 
@@ -122,7 +126,7 @@ class DatabaseMigrationTest {
             helper.createDatabase(databaseName, startVersion).close()
             helper.runMigrationsAndValidate(
                 databaseName,
-                8,
+                9,
                 true,
                 *DatabaseMigrations.ALL,
             ).close()

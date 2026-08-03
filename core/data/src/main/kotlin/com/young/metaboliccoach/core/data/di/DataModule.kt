@@ -24,6 +24,7 @@ import com.young.metaboliccoach.core.data.provider.nightscout.OkHttpNightscoutAp
 import com.young.metaboliccoach.core.data.repository.ActivityRepositoryImpl
 import com.young.metaboliccoach.core.data.repository.CoachingRepositoryImpl
 import com.young.metaboliccoach.core.data.repository.GlucoseRepositoryImpl
+import com.young.metaboliccoach.core.data.repository.GlucoseHistoryRepositoryImpl
 import com.young.metaboliccoach.core.data.repository.GlycemicPlanningMilestoneRepositoryImpl
 import com.young.metaboliccoach.core.data.repository.PersonalDataRepositoryImpl
 import com.young.metaboliccoach.core.data.repository.SettingsRepositoryImpl
@@ -35,6 +36,7 @@ import com.young.metaboliccoach.core.domain.CoachingRepository
 import com.young.metaboliccoach.core.domain.GlycemicGoalRepository
 import com.young.metaboliccoach.core.domain.GlycemicPlanningMilestoneRepository
 import com.young.metaboliccoach.core.domain.GlucoseRepository
+import com.young.metaboliccoach.core.domain.GlucoseHistoryRepository
 import com.young.metaboliccoach.core.domain.ObservationAnalyzer
 import com.young.metaboliccoach.core.domain.NightscoutSettingsRepository
 import com.young.metaboliccoach.core.domain.NightscoutSettingsValidator
@@ -57,6 +59,12 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindGlucoseRepository(impl: GlucoseRepositoryImpl): GlucoseRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindGlucoseHistoryRepository(
+        impl: GlucoseHistoryRepositoryImpl,
+    ): GlucoseHistoryRepository
 
     @Binds
     @Singleton
@@ -154,6 +162,9 @@ object DataModule {
 
     @Provides
     fun provideGlucoseDao(database: MetabolicCoachDatabase) = database.glucoseDao()
+
+    @Provides
+    fun provideGlucoseHistoryDao(database: MetabolicCoachDatabase) = database.glucoseHistoryDao()
 
     @Provides
     fun provideActivityDao(database: MetabolicCoachDatabase) = database.activityDao()
@@ -387,6 +398,33 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_8_9 = object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS glucose_history_settings (
+                    singletonId INTEGER NOT NULL,
+                    retentionPolicy TEXT NOT NULL,
+                    retentionConfirmed INTEGER NOT NULL,
+                    PRIMARY KEY(singletonId)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS glucose_history_backfill_state (
+                    sourceId TEXT NOT NULL,
+                    nextBackfillEndEpochMillis INTEGER,
+                    status TEXT NOT NULL,
+                    lastError TEXT,
+                    updatedAtEpochMillis INTEGER NOT NULL,
+                    PRIMARY KEY(sourceId)
+                )
+                """.trimIndent(),
+            )
+        }
+    }
+
     val ALL = arrayOf(
         MIGRATION_1_2,
         MIGRATION_2_3,
@@ -395,5 +433,6 @@ object DatabaseMigrations {
         MIGRATION_5_6,
         MIGRATION_6_7,
         MIGRATION_7_8,
+        MIGRATION_8_9,
     )
 }

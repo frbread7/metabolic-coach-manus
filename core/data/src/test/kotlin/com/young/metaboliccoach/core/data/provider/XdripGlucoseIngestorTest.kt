@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import com.young.metaboliccoach.core.data.db.GlucoseDao
 import com.young.metaboliccoach.core.data.db.GlucoseReadingEntity
+import com.young.metaboliccoach.core.data.db.GlucoseHistoryStatsRow
 import com.young.metaboliccoach.core.domain.SettingsRepository
 import com.young.metaboliccoach.core.model.CoachSettings
 import com.young.metaboliccoach.core.model.DefaultCoachSettings
@@ -280,6 +281,20 @@ class XdripGlucoseIngestorTest {
             sourceId: String,
             startEpochMillis: Long,
         ): Flow<List<GlucoseReadingEntity>> = flowOf(emptyList())
+
+        override fun observeHistoryStatsForSource(
+            sourceId: String,
+        ): Flow<GlucoseHistoryStatsRow> = flowOf(GlucoseHistoryStatsRow(null, null, 0))
+
+        override suspend fun getHistoryStatsForSource(sourceId: String): GlucoseHistoryStatsRow =
+            GlucoseHistoryStatsRow(null, null, 0)
+
+        override suspend fun getSourceIds(): List<String> = emptyList()
+
+        override suspend fun deleteOlderThanForSource(
+            sourceId: String,
+            cutoffEpochMillis: Long,
+        ) = Unit
 
         override suspend fun insertAll(readings: List<GlucoseReadingEntity>) {
             inserted += readings

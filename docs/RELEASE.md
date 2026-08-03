@@ -72,6 +72,27 @@ The ZIP must contain exactly `CHANGELOG.md`, `INSTALL.md`, `phone.apk`, `watchfa
 certificate. The old v0.4.0 artifact is preserved and the v0.4.1 artifact/evidence remain separate;
 neither is overwritten or relabeled.
 
+## v0.5.0 GitHub Actions engineering artifact
+
+The current engineering artifact is `v0.5.0` (versionCode `7`). It is the phone-only local-history
+foundation layered on the accepted planner milestone. The workflow keeps the same signed
+phone/Wear/watch-face package contract, while the new history controls remain phone-only.
+
+The workflow requires the accepted v0.3 engineering keystore through the encrypted
+`MC_DEBUG_KEYSTORE_BASE64` repository secret and uploads:
+
+```text
+metabolic-coach-phone-debug.apk
+metabolic-coach-wear-debug.apk
+metabolic-coach-watchface-debug.apk
+MetabolicCoach-v0.5.0.zip
+```
+
+The ZIP must contain exactly `CHANGELOG.md`, `INSTALL.md`, `phone.apk`, `watchface.apk`, and
+`wear.apk`. All three APKs must report `versionName=0.5.0`, `versionCode=7`, and the v0.3 signing
+certificate. This artifact does not claim new Wear/watch-face/coaching behavior or physical
+acceptance; the next step is the phone-only v0.5.0 acceptance test.
+
 ## v0.4.1 GitHub Actions engineering artifact (historical)
 
 The v0.4.1 workflow is the reproducible build path for this ARM development host. It runs on an
@@ -116,8 +137,8 @@ artifacts/MetabolicCoach-v<version>.zip
 ```
 
 The packager reads the version name from every APK and fails if phone, Wear, and watch face do not
-match. A trailing patch zero is omitted from the archive label, so APK version `0.2.0` produces
-`MetabolicCoach-v0.2.zip`. The embedded installation guide records whether the archive contains
+match. The archive label preserves the full APK version, so APK version `0.5.0` produces
+`MetabolicCoach-v0.5.0.zip`. The embedded installation guide records whether the archive contains
 debug- or release-signed APKs.
 
 To package already-verified debug artifacts without rebuilding:

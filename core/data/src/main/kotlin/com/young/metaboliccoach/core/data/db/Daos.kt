@@ -112,8 +112,82 @@ interface GlucoseDao {
         startEpochMillis: Long,
     ): Flow<List<GlucoseReadingEntity>>
 
+    @Query(
+        """
+        SELECT MIN(measuredAtEpochMillis) AS oldestReadingAtEpochMillis,
+               MAX(measuredAtEpochMillis) AS newestReadingAtEpochMillis,
+               COUNT(*) AS readingCount
+        FROM glucose_readings
+        WHERE sourceId = :sourceId
+        """,
+    )
+    fun observeHistoryStatsForSource(sourceId: String): Flow<GlucoseHistoryStatsRow>
+
+    @Query(
+        """
+        SELECT MIN(measuredAtEpochMillis) AS oldestReadingAtEpochMillis,
+               MAX(measuredAtEpochMillis) AS newestReadingAtEpochMillis,
+               COUNT(*) AS readingCount
+        FROM glucose_readings
+        WHERE sourceId = :sourceId
+        """,
+    )
+    suspend fun getHistoryStatsForSource(sourceId: String): GlucoseHistoryStatsRow
+
+    @Query("SELECT DISTINCT sourceId FROM glucose_readings ORDER BY sourceId ASC")
+    suspend fun getSourceIds(): List<String>
+
+    /** Prune only records older than the chosen cutoff and keep each source's newest record. */
+    @Query(
+        """
+        DELETE FROM glucose_readings
+        WHERE sourceId = :sourceId
+          AND measuredAtEpochMillis < :cutoffEpochMillis
+          AND id NOT IN (
+              SELECT id FROM glucose_readings
+              WHERE sourceId = :sourceId
+              ORDER BY measuredAtEpochMillis DESC, id ASC
+              LIMIT 1
+          )
+        """,
+    )
+    suspend fun deleteOlderThanForSource(
+        sourceId: String,
+        cutoffEpochMillis: Long,
+    )
+
     @Upsert
     suspend fun insertAll(readings: List<GlucoseReadingEntity>)
+}
+
+@Dao
+interface GlucoseHistoryDao {
+    @Query("SELECT * FROM glucose_history_settings WHERE singletonId = 1 LIMIT 1")
+    fun observeSettings(): Flow<GlucoseHistorySettingsEntity?>
+
+    @Query("SELECT * FROM glucose_history_settings WHERE singletonId = 1 LIMIT 1")
+    suspend fun getSettings(): GlucoseHistorySettingsEntity?
+
+    @Upsert
+    suspend fun upsertSettings(settings: GlucoseHistorySettingsEntity)
+
+    @Query(
+        "SELECT * FROM glucose_history_backfill_state " +
+            "WHERE sourceId = :sourceId LIMIT 1",
+    )
+    fun observeBackfill(sourceId: String): Flow<GlucoseHistoryBackfillEntity?>
+
+    @Query(
+        "SELECT * FROM glucose_history_backfill_state " +
+            "WHERE sourceId = :sourceId LIMIT 1",
+    )
+    suspend fun getBackfill(sourceId: String): GlucoseHistoryBackfillEntity?
+
+    @Upsert
+    suspend fun upsertBackfill(state: GlucoseHistoryBackfillEntity)
+
+    @Query("DELETE FROM glucose_history_backfill_state")
+    suspend fun deleteAllBackfill()
 }
 
 @Dao

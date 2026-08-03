@@ -14,6 +14,7 @@ import com.young.metaboliccoach.core.domain.CoachTimeSource
 import com.young.metaboliccoach.core.domain.CoachedExerciseActionPolicy
 import com.young.metaboliccoach.core.domain.CoachingRepository
 import com.young.metaboliccoach.core.domain.GlucoseRepository
+import com.young.metaboliccoach.core.domain.GlucoseHistoryRepository
 import com.young.metaboliccoach.core.domain.GlycemicGoalPlanner
 import com.young.metaboliccoach.core.domain.GlycemicGoalRepository
 import com.young.metaboliccoach.core.domain.GlycemicPlanningMilestoneRepository
@@ -29,6 +30,8 @@ import com.young.metaboliccoach.core.model.DailySummary
 import com.young.metaboliccoach.core.model.DefaultCoachSettings
 import com.young.metaboliccoach.core.model.DefaultNightscoutSettings
 import com.young.metaboliccoach.core.model.GlucoseDataOrigin
+import com.young.metaboliccoach.core.model.GlucoseHistorySettings
+import com.young.metaboliccoach.core.model.GlucoseHistoryStatus
 import com.young.metaboliccoach.core.model.GlucoseReading
 import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
 import com.young.metaboliccoach.core.model.GlycemicPlanningMilestone
@@ -71,6 +74,7 @@ data class PhoneUiState(
     val settings: CoachSettings = DefaultCoachSettings.create(),
     val nightscoutSettings: NightscoutSettings = DefaultNightscoutSettings.create(),
     val providerStatus: ProviderStatus? = null,
+    val glucoseHistory: GlucoseHistoryStatus = GlucoseHistoryStatus(),
     val availableGlucoseOrigins: List<GlucoseDataOrigin> = emptyList(),
     val observations: List<PersonalObservation> = emptyList(),
     val activeSession: InterventionSession? = null,
@@ -119,6 +123,7 @@ private data class MilestoneInputs(
 @OptIn(ExperimentalCoroutinesApi::class)
 class PhoneViewModel @Inject constructor(
     private val glucoseRepository: GlucoseRepository,
+    private val glucoseHistoryRepository: GlucoseHistoryRepository,
     private val activityRepository: ActivityRepository,
     private val coachingRepository: CoachingRepository,
     private val settingsRepository: SettingsRepository,
@@ -155,7 +160,7 @@ class PhoneViewModel @Inject constructor(
         PhoneConfiguration(coach, nightscout)
     }
 
-    private val baseUiState = combine(
+    private val baseUiStateWithoutHistory = combine(
         current,
         configuration,
         glucoseRepository.observeProviderStatus(),
@@ -175,6 +180,11 @@ class PhoneViewModel @Inject constructor(
             activeSession = current.activeSession,
         )
     }
+
+    private val baseUiState = combine(
+        baseUiStateWithoutHistory,
+        glucoseHistoryRepository.observeStatus(),
+    ) { state, history -> state.copy(glucoseHistory = history) }
 
     private val milestoneInputs = combine(
         milestoneRepository.observeMilestones(),
@@ -320,6 +330,30 @@ class PhoneViewModel @Inject constructor(
     fun refresh() {
         runOperation("Updated from configured providers.") {
             refreshCoordinator.refresh(refreshProviders = true)
+        }
+    }
+
+    fun saveGlucoseHistorySettings(settings: GlucoseHistorySettings) {
+        runOperation("History settings saved. Confirm the policy to apply it.") {
+            mutationGate.withLock {
+                glucoseHistoryRepository.updateSettings(settings)
+            }
+        }
+    }
+
+    fun confirmGlucoseHistoryRetention() {
+        runOperation("History retention policy applied.") {
+            mutationGate.withLock {
+                glucoseHistoryRepository.confirmRetentionPolicy()
+            }
+        }
+    }
+
+    fun backfillGlucoseHistory() {
+        runOperation("Older glucose history downloaded.") {
+            mutationGate.withLock {
+                glucoseHistoryRepository.backfillNextChunk()
+            }
         }
     }
 

@@ -107,15 +107,15 @@ non-conflicting earlier constraints, and avoid inferring acceptance that the use
   privacy-sanitized record is [V0_3_PHYSICAL_ACCEPTANCE.md](acceptance/V0_3_PHYSICAL_ACCEPTANCE.md);
   it records user evidence and does not fabricate device logs or private health values.
 - Architecture review: the continued ChatGPT architecture conversation returned `READY WITH
-  CONDITIONS` for the bounded v0.4.2 saved-milestone scope; the conditions are recorded in
-  `docs/V0_4_2_SAVED_MILESTONES.md` and the implementation keeps the phone-only boundary.
+  CONDITIONS` for the staged history/chart/GMI/coaching roadmap. v0.5.0 is limited to the local
+  history foundation; the handoff is recorded in `docs/V0_5_0_HISTORY_FOUNDATION.md`.
 - Automated preflight: the historical v0.3 sync/phone/Wear pre-install suite passed with all 200
   selected Gradle tasks executed. The current v0.4.2 authoritative local package run passed 333
   selected tasks, 52 local test suites/288 executions, lint, APK/WFF validation, and packaging.
-- Production-code freeze: the reviewed `v0.4.2` saved-milestone scope is implemented. Wear,
+- Production-code freeze: the reviewed `v0.5.0` local-history scope is implemented. Wear,
   watch-face, coaching, notification, and current-glucose freshness behavior remain frozen.
-- `v0.4.2` gate: active until GitHub Actions produces the versionName `0.4.2`/versionCode `6`
-  artifact and the user completes the phone-only saved-milestone acceptance checklist. The failed
-  `v0.4.0` artifact and accepted `v0.4.1` phone evidence remain separate historical records.
+- `v0.5.0` gate: active until GitHub Actions produces the versionName `0.5.0`/versionCode `7`
+  artifact and the user completes the phone-only history acceptance checklist. Chart, selected-
+  period GMI, and new coaching work remain locked until that acceptance is reviewed.
 
 The completed physical test was defined in [V0.3_WEAR_ACCEPTANCE.md](V0.3_WEAR_ACCEPTANCE.md).

@@ -12,7 +12,7 @@ The project is configured for:
 - phone minimum SDK 28;
 - Wear app minimum SDK 30;
 - WFF v4 watch face minimum SDK 36;
-- Room 2.8.4 with database schema version 8;
+- Room 2.8.4 with database schema version 9;
 - Health Connect client 1.1.0;
 - OkHttp 5.3.0 with MockWebServer for Nightscout transport tests;
 - kotlinx-serialization JSON 1.9.0 for provider/settings parsing;
@@ -71,9 +71,9 @@ Targeted iteration remains available:
 ./gradlew :phone:compileDebugKotlin :wear:compileDebugKotlin
 ```
 
-Room exports 1–8 are committed under `core/data/schemas/`. The v8 `DatabaseMigrationTest` Android
-instrumentation source covers migration from schema 1 and every supported starting version 2–7
-through schema 8, including the phone-only saved-planning-milestone table. It has compiled locally,
+Room exports 1–9 are committed under `core/data/schemas/`. The v9 `DatabaseMigrationTest` Android
+instrumentation source covers migration from schema 1 and every supported starting version 2–8
+through schema 9, including the phone-only saved-planning-milestone and history-management tables. It has compiled locally,
 but its migrations still need execution on an Android runtime:
 
 ```bash

@@ -93,9 +93,6 @@ for apk in "$phone_apk" "$wear_apk"; do
 done
 
 package_version="${MC_PACKAGE_VERSION:-$phone_version}"
-if [[ -z "${MC_PACKAGE_VERSION:-}" && "$package_version" =~ ^([0-9]+\.[0-9]+)\.0$ ]]; then
-    package_version="${BASH_REMATCH[1]}"
-fi
 if [[ ! "$package_version" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]]; then
     echo "Package version contains unsafe filename characters: $package_version" >&2
     exit 2

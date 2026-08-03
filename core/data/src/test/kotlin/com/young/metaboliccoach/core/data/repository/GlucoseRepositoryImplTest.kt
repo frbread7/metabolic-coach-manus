@@ -2,6 +2,7 @@ package com.young.metaboliccoach.core.data.repository
 
 import com.young.metaboliccoach.core.data.db.GlucoseDao
 import com.young.metaboliccoach.core.data.db.GlucoseReadingEntity
+import com.young.metaboliccoach.core.data.db.GlucoseHistoryStatsRow
 import com.young.metaboliccoach.core.data.db.toEntity
 import com.young.metaboliccoach.core.data.provider.GlucoseProvider
 import com.young.metaboliccoach.core.data.provider.nightscout.NightscoutProvider
@@ -404,6 +405,35 @@ class GlucoseRepositoryImplTest {
             )
         }
 
+        override fun observeHistoryStatsForSource(
+            sourceId: String,
+        ): Flow<GlucoseHistoryStatsRow> = state.map { readings ->
+            readings.filter { it.sourceId == sourceId }.historyStats()
+        }
+
+        override suspend fun getHistoryStatsForSource(sourceId: String): GlucoseHistoryStatsRow =
+            state.value.filter { it.sourceId == sourceId }.historyStats()
+
+        override suspend fun getSourceIds(): List<String> =
+            state.value.map(GlucoseReadingEntity::sourceId).distinct().sorted()
+
+        override suspend fun deleteOlderThanForSource(
+            sourceId: String,
+            cutoffEpochMillis: Long,
+        ) {
+            val newestId = state.value
+                .filter { it.sourceId == sourceId }
+                .maxWithOrNull(
+                    compareBy<GlucoseReadingEntity> { it.measuredAtEpochMillis }
+                        .thenBy { it.id },
+                )?.id
+            state.value = state.value.filter {
+                it.sourceId != sourceId ||
+                    it.measuredAtEpochMillis >= cutoffEpochMillis ||
+                    it.id == newestId
+            }
+        }
+
         override suspend fun insertAll(readings: List<GlucoseReadingEntity>) {
             val byId = state.value.associateByTo(linkedMapOf(), GlucoseReadingEntity::id)
             readings.forEach { byId[it.id] = it }
@@ -429,6 +459,13 @@ class GlucoseRepositoryImplTest {
         ): List<GlucoseReadingEntity> = filter {
             it.measuredAtEpochMillis in startEpochMillis..endEpochMillis
         }.sortedBy(GlucoseReadingEntity::measuredAtEpochMillis)
+
+        private fun List<GlucoseReadingEntity>.historyStats(): GlucoseHistoryStatsRow =
+            GlucoseHistoryStatsRow(
+                oldestReadingAtEpochMillis = minOfOrNull { it.measuredAtEpochMillis },
+                newestReadingAtEpochMillis = maxOfOrNull { it.measuredAtEpochMillis },
+                readingCount = size.toLong(),
+            )
     }
 
     private suspend fun <T> Flow<T>.firstValue(): T = first()

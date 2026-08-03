@@ -6,6 +6,8 @@ import androidx.room.RoomDatabase
 @Database(
     entities = [
         GlucoseReadingEntity::class,
+        GlucoseHistorySettingsEntity::class,
+        GlucoseHistoryBackfillEntity::class,
         ActivitySnapshotEntity::class,
         InterventionSessionEntity::class,
         MealMarkerEntity::class,
@@ -13,11 +15,12 @@ import androidx.room.RoomDatabase
         RecommendationSnapshotEntity::class,
         GlycemicPlanningMilestoneEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class MetabolicCoachDatabase : RoomDatabase() {
     abstract fun glucoseDao(): GlucoseDao
+    abstract fun glucoseHistoryDao(): GlucoseHistoryDao
     abstract fun activityDao(): ActivityDao
     abstract fun interventionDao(): InterventionDao
     abstract fun mealDao(): MealDao

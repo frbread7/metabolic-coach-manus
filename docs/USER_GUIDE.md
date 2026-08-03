@@ -168,6 +168,20 @@ locked; only its title can be changed. Archive a row to retain it as history or 
 that saved intention. Milestones do not change glucose retrieval, current readings, Wear state,
 coaching decisions, reminders, notifications, or the watch face.
 
+### Local glucose history (v0.5.0)
+
+The phone stores normalized Nightscout rows locally after refresh. Open **Settings → Local glucose
+history** to inspect the stored row count and local date range. Choose **90 days** (the default),
+**1 year**, or **Keep all downloaded**. Saving a different choice only stages it; press **Confirm
+and apply policy** before any retention pruning can occur. The app never prunes records silently,
+and pruning is isolated per source while preserving each source's newest record.
+
+After confirming 1 year or Keep all downloaded, press **Download one older range** to request one
+bounded 90-day range and repeat for another range. The operation is resumable and reports paused or
+failed state after interruption/network loss. It does not alter the current glucose state or watch.
+v0.5.0 does not include a trend chart or selected-period GMI; those are planned only after the
+history foundation is physically accepted.
+
 ### Wear app
 
 Use touch scrolling and large buttons:

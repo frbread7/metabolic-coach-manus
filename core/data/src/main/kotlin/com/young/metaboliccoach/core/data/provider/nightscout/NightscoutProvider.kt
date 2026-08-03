@@ -118,6 +118,33 @@ class NightscoutProvider @Inject constructor(
             )
         }
 
+    override suspend fun readHistoryRange(
+        startEpochMillis: Long,
+        endEpochMillis: Long,
+    ): List<GlucoseReading> = refreshMutex.withLock {
+        require(startEpochMillis <= endEpochMillis) {
+            "Historical range start must not be after its end."
+        }
+        val settings = normalizedSettings()
+        retainConfiguredSourceCaches(settings)
+        val server = settings.activeServer
+        if (server == null) {
+            state.value = GlucoseProviderState.ConfigurationRequired
+            return@withLock emptyList()
+        }
+        // Backfill is deliberately independent of the current-state cache. In particular, an
+        // older range must never publish an older reading as the current reading.
+        fetchHistoryWithRetry(
+            server = server,
+            sourceId = server.sourceId(settings.requireHttps),
+            connectionTimeoutSeconds = settings.connectionTimeoutSeconds,
+            retryIntervalSeconds = settings.retryIntervalSeconds,
+            maximumRetryAttempts = settings.maximumRetryAttempts,
+            startEpochMillis = startEpochMillis,
+            endEpochMillis = endEpochMillis,
+        ).filter { it.measuredAtEpochMillis in startEpochMillis..endEpochMillis }
+    }
+
     override suspend fun readSince(startEpochMillis: Long): List<GlucoseReading> {
         readCurrent()
         return readHistorySince(startEpochMillis)

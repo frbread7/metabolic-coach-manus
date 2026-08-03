@@ -97,6 +97,20 @@ class PersonalDataRepositoryImpl @Inject constructor(
                 """.trimIndent(),
             ),
             ExportTable(
+                name = "glucose_history_settings",
+                query = """
+                    SELECT * FROM glucose_history_settings
+                    ORDER BY singletonId ASC
+                """.trimIndent(),
+            ),
+            ExportTable(
+                name = "glucose_history_backfill_state",
+                query = """
+                    SELECT * FROM glucose_history_backfill_state
+                    ORDER BY sourceId ASC
+                """.trimIndent(),
+            ),
+            ExportTable(
                 name = "activity_snapshots",
                 query = """
                     SELECT * FROM activity_snapshots

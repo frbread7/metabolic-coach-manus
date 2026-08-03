@@ -62,6 +62,20 @@ acceptance for those components.
 After installation, use [the v0.4.2 acceptance checklist](docs/V0.4_2_SAVED_MILESTONES.md) and
 stop after recording the phone results.
 
+## v0.5.0 CI artifact preflight
+
+The v0.5.0 package is a debug-signed engineering candidate for the phone-only local-history
+foundation. Verify the ZIP SHA-256, commit SHA, versionName `0.5.0`, versionCode `7`, and signing
+certificate recorded in the GitHub Actions run summary before installing. It is an in-place update
+only when its certificate matches the accepted v0.3 package. Wear and watch-face APKs are rebuilt
+only to keep the three-module package metadata aligned; their behavior is unchanged.
+
+After installation, use [the v0.5.0 history acceptance document](docs/V0_5_0_HISTORY_FOUNDATION.md).
+In Settings, confirm that recent Nightscout rows are stored locally, choose a retention policy, and
+press **Confirm and apply policy** before using **Download one older range**. A backfill click is
+bounded and resumable; repeat it to request another range. Do not expect a trend chart or selected-
+period GMI in this build. Stop after recording the phone acceptance results.
+
 ## v0.4.1 CI artifact preflight (historical)
 
 The v0.4.1 package is a debug-signed engineering candidate for the freshness-defect phone retest. Verify

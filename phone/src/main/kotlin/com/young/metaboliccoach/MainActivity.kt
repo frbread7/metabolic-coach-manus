@@ -75,6 +75,10 @@ import com.young.metaboliccoach.core.model.CoachRecommendation
 import com.young.metaboliccoach.core.model.CoachSettings
 import com.young.metaboliccoach.core.model.CoachTheme
 import com.young.metaboliccoach.core.model.GlucoseDataOrigin
+import com.young.metaboliccoach.core.model.GlucoseHistoryBackfillStatus
+import com.young.metaboliccoach.core.model.GlucoseHistoryRetentionPolicy
+import com.young.metaboliccoach.core.model.GlucoseHistorySettings
+import com.young.metaboliccoach.core.model.GlucoseHistoryStatus
 import com.young.metaboliccoach.core.model.GlucoseProviderMode
 import com.young.metaboliccoach.core.model.GlucoseUnit
 import com.young.metaboliccoach.core.model.GlycemicMetricsStatus
@@ -144,6 +148,9 @@ class MainActivity : ComponentActivity() {
                         )
                     },
                     onEraseData = viewModel::eraseLocalData,
+                    onSaveGlucoseHistorySettings = viewModel::saveGlucoseHistorySettings,
+                    onConfirmGlucoseHistoryRetention = viewModel::confirmGlucoseHistoryRetention,
+                    onBackfillGlucoseHistory = viewModel::backfillGlucoseHistory,
                     onConnectHealth = {
                         when (healthConnectSdkStatus.intValue) {
                             HealthConnectClient.SDK_AVAILABLE -> {
@@ -223,6 +230,9 @@ private fun MetabolicCoachApp(
     onDismissMilestoneMigrationNotice: () -> Unit,
     onExportData: () -> Unit,
     onEraseData: () -> Unit,
+    onSaveGlucoseHistorySettings: (GlucoseHistorySettings) -> Unit,
+    onConfirmGlucoseHistoryRetention: () -> Unit,
+    onBackfillGlucoseHistory: () -> Unit,
     onConnectHealth: () -> Unit,
     onEnableNotifications: () -> Unit,
 ) {
@@ -265,11 +275,15 @@ private fun MetabolicCoachApp(
             PhoneDestination.SETTINGS -> SettingsScreen(
                 settings = uiState.settings,
                 nightscoutSettings = uiState.nightscoutSettings,
+                glucoseHistory = uiState.glucoseHistory,
                 operationMessage = uiState.operationMessage,
                 isOperationInProgress = uiState.isOperationInProgress,
                 onSave = onSaveSettings,
                 onExportData = onExportData,
                 onEraseData = onEraseData,
+                onSaveGlucoseHistorySettings = onSaveGlucoseHistorySettings,
+                onConfirmGlucoseHistoryRetention = onConfirmGlucoseHistoryRetention,
+                onBackfillGlucoseHistory = onBackfillGlucoseHistory,
                 contentPadding = padding,
             )
             PhoneDestination.PLANNER -> GlycemicGoalScreen(
@@ -1176,11 +1190,15 @@ private fun formatDuration(durationMillis: Long): String {
 private fun SettingsScreen(
     settings: CoachSettings,
     nightscoutSettings: NightscoutSettings,
+    glucoseHistory: GlucoseHistoryStatus,
     operationMessage: String?,
     isOperationInProgress: Boolean,
     onSave: (CoachSettings, NightscoutSettings) -> Unit,
     onExportData: () -> Unit,
     onEraseData: () -> Unit,
+    onSaveGlucoseHistorySettings: (GlucoseHistorySettings) -> Unit,
+    onConfirmGlucoseHistoryRetention: () -> Unit,
+    onBackfillGlucoseHistory: () -> Unit,
     contentPadding: PaddingValues,
 ) {
     var draft by remember(settings) { mutableStateOf(settings) }
@@ -1213,6 +1231,15 @@ private fun SettingsScreen(
             NightscoutSettingsCard(
                 settings = nightscoutDraft,
                 onSettingsChanged = { nightscoutDraft = it },
+            )
+        }
+        item {
+            GlucoseHistorySettingsCard(
+                status = glucoseHistory,
+                isOperationInProgress = isOperationInProgress,
+                onSaveSettings = onSaveGlucoseHistorySettings,
+                onConfirmRetention = onConfirmGlucoseHistoryRetention,
+                onBackfill = onBackfillGlucoseHistory,
             )
         }
         item {
@@ -1589,6 +1616,103 @@ private fun SettingsScreen(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun GlucoseHistorySettingsCard(
+    status: GlucoseHistoryStatus,
+    isOperationInProgress: Boolean,
+    onSaveSettings: (GlucoseHistorySettings) -> Unit,
+    onConfirmRetention: () -> Unit,
+    onBackfill: () -> Unit,
+) {
+    var draft by remember(status.settings) { mutableStateOf(status.settings) }
+    Card {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("Local glucose history", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "Current and historical Nightscout readings are stored locally on the phone. " +
+                    "The watch receives only the normalized current state.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            EnumSetting(
+                title = "Retention policy",
+                values = GlucoseHistoryRetentionPolicy.entries,
+                selected = draft.retentionPolicy,
+                label = { it.label },
+                onSelected = {
+                    draft = GlucoseHistorySettings(
+                        retentionPolicy = it,
+                        retentionConfirmed = false,
+                    )
+                },
+            )
+            Button(
+                onClick = { onSaveSettings(draft) },
+                enabled = !isOperationInProgress,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Save history policy") }
+            if (!status.settings.retentionConfirmed) {
+                Text(
+                    "No records are pruned until you explicitly confirm the selected policy.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(
+                    onClick = onConfirmRetention,
+                    enabled = !isOperationInProgress,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Confirm and apply policy") }
+            } else {
+                Text("Retention policy confirmed; pruning is source-scoped.")
+            }
+            Text(
+                "Stored: ${status.readingCount} readings • " +
+                    "oldest: ${status.oldestReadingAtEpochMillis?.let(::formatMilestoneDate) ?: "—"} • " +
+                    "newest: ${status.newestReadingAtEpochMillis?.let(::formatMilestoneDate) ?: "—"}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (status.settings.retentionPolicy == GlucoseHistoryRetentionPolicy.LAST_90_DAYS) {
+                Text(
+                    "The normal refresh keeps the most recent 90 days. Choose 1 year or " +
+                        "Keep all downloaded, confirm it, then download older ranges here.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (status.settings.retentionPolicy != GlucoseHistoryRetentionPolicy.LAST_90_DAYS) {
+                Button(
+                    onClick = onBackfill,
+                    enabled = status.settings.retentionConfirmed &&
+                        !isOperationInProgress &&
+                        status.backfillStatus != GlucoseHistoryBackfillStatus.RUNNING &&
+                        status.backfillStatus != GlucoseHistoryBackfillStatus.COMPLETE,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        if (status.backfillStatus == GlucoseHistoryBackfillStatus.COMPLETE) {
+                            "Older history complete"
+                        } else {
+                            "Download one older range"
+                        },
+                    )
+                }
+                Text(
+                    "Backfill status: ${status.backfillStatus.name.lowercase()}" +
+                        (status.lastError?.let { " • $it" } ?: ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                "History is app-private and excluded from Android cloud/device backup. " +
+                    "Opening future charts will use local rows and will not start network work.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

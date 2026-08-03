@@ -5,6 +5,8 @@ import com.young.metaboliccoach.core.model.CoachRecommendation
 import com.young.metaboliccoach.core.model.CoachSettings
 import com.young.metaboliccoach.core.model.DailySummary
 import com.young.metaboliccoach.core.model.GlucoseDataOrigin
+import com.young.metaboliccoach.core.model.GlucoseHistorySettings
+import com.young.metaboliccoach.core.model.GlucoseHistoryStatus
 import com.young.metaboliccoach.core.model.GlucoseProviderState
 import com.young.metaboliccoach.core.model.GlucoseReading
 import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
@@ -34,6 +36,17 @@ interface GlucoseRepository {
     suspend fun refresh()
     suspend fun refreshExactSource(sourceId: String)
     suspend fun clearRuntimeCaches()
+}
+
+/**
+ * Phone-only local-history management. This boundary is deliberately separate from the current
+ * reading repository so retention and backfill cannot alter the refresh/Wear synchronization path.
+ */
+interface GlucoseHistoryRepository {
+    fun observeStatus(): Flow<GlucoseHistoryStatus>
+    suspend fun updateSettings(settings: GlucoseHistorySettings)
+    suspend fun confirmRetentionPolicy()
+    suspend fun backfillNextChunk()
 }
 
 interface ActivityRepository {

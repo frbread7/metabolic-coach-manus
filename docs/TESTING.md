@@ -26,6 +26,8 @@ The current source includes these JVM and Android local-test suites:
 | `NightscoutSettingsValidatorTest` | Multiple-server limits and selection, URL normalization, HTTPS enforcement, credential/query/fragment rejection, valid TCP ports, and polling/timeout/retry bounds |
 | `NightscoutJsonParserTest` | Nightscout response parsing, trend mapping, stable IDs, ordering, delta/rate calculation, timestamp fallbacks, malformed/unusable rows, and bounded value/time acceptance |
 | `NightscoutProviderTest` | Provider state flow, success, conditional cache reuse, retry/non-retry and response-size classification, retained cache on failure, cancellation, and per-server isolation/switching |
+| `GlucoseHistoryRetentionPolicyTest` | Deterministic 90-day/1-year cutoffs and no-cutoff keep-all behavior |
+| `NightscoutProviderTest` range case | Bounded older-range reads use the range endpoint without publishing an older current state |
 | `GlycemicGoalPlannerTest` | GMI conversion, time-weighted 14/30/60/90-day metrics, coverage and long-gap handling, source discontinuity, horizon equations, remaining-window milestones, temporal states, deterministic ordering, and low-glucose-risk suppression |
 | `OkHttpNightscoutApiClientTest` | MockWebServer request path/query/headers, conditional responses, redirect refusal, bounded declared/streamed response size, and future-authenticator hook without a real server |
 | `NightscoutSettingsJsonCodecTest` | Stable multi-server DataStore encoding/decoding and malformed stored-value recovery |
@@ -53,8 +55,8 @@ The current source includes these JVM and Android local-test suites:
 | `RemoteDataResetPolicyTest` | First-seen reset handling, same-token idempotence, legacy-state compatibility, and missing-cache recovery |
 | `TimeSettingValueTest` | Exact minute/hour preservation and valid minute-of-day clamping |
 
-Exported Room schemas 1–8 are committed. `DatabaseMigrationTest` is an Android instrumentation
-suite for schema 1→8 and every supported starting version 2–7→8, including safe defaults, preserved
+Exported Room schemas 1–9 are committed. `DatabaseMigrationTest` is an Android instrumentation
+suite for schema 1→9 and every supported starting version 2–8→9, including safe defaults, preserved
 legacy rows, nullable prospective timing-provenance columns, and an initially empty recommendation
 snapshot table plus the phone-only milestone table. Its source has compiled locally, but the suite has not executed because it requires
 an Android device or emulator.
@@ -97,6 +99,13 @@ Execute the migration suite on an Android runtime with:
   decisions, notifications, and watch-face resources are unchanged. Validate CGM-derived GMI
   wording, fixed target dates, one selected detail milestone, safety suppression, deterministic
   ordering, and no automatic milestone completion.
+- `v0.5.0` gate: run history retention/backfill/provider tests, schema-9 migration source
+  compilation, export/reset checks, phone compile/lint, and unchanged current-freshness/Wear/
+  coaching/notification/watch-face regression suites. Physical phone acceptance must verify that
+  the default 90-day history is preserved, policy changes require confirmation, pruning is
+  source-scoped, one older range can pause/resume, process interruption presents a resumable
+  checkpoint, and no network work is triggered by future chart surfaces. Stop after that acceptance;
+  v0.5.1 is not unlocked automatically.
 
 ## Current local verification
 
@@ -200,6 +209,39 @@ The v0.4.2 run is accepted only when all automated checks pass, every APK report
 clean. A successful artifact build does not claim new Wear, watch-face, synchronization, or
 coaching behavior; those modules are rebuilt only to keep the package metadata aligned. The failed
 v0.4.0 run and artifact remain unchanged for comparison and audit.
+
+### v0.5.0 local engineering artifact gate
+
+On 2026-08-03, the v0.5.0 foundation passed the authoritative local package script with the ARM
+host compatibility prefix:
+
+```text
+QEMU_LD_PREFIX=/usr/x86_64-linux-gnu ./scripts/build-apks.sh
+BUILD SUCCESSFUL in 7m05s
+333 actionable tasks: 333 executed
+```
+
+The run passed model/domain/data-debug/data-release/sync/phone/Wear unit suites, including the
+history repository checkpoint/source-containment tests, Android migration-test source compilation,
+phone/Wear/watch-face debug lint, all three debug assemblies, APK signature checks, phone/Wear
+certificate equality, WFF v4 schema/memory validation, and exact five-file ZIP packaging. The fresh
+JVM reports contain 55 suites, 296 test executions, 0 failures, 0 errors, and 0 skipped. Android
+instrumentation was compiled but not executed because no Android runtime was attached.
+
+The local v0.5.0 debug package passed the metadata/signature/ZIP/privacy verifier with version name
+`0.5.0`, version code `7`, and the accepted v0.3 engineering certificate
+`7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6667da26c5fad4`:
+
+```text
+435f867469ea611c9734b51b2602cae2906e0a3f66fc4af7a43347fdfb0e91c0  metabolic-coach-phone-debug.apk
+fce9de3ba029a064f439956456484b7ed158336908c924d014cfbf42c4fa8397  metabolic-coach-wear-debug.apk
+5c00457c40ebd2b9f386a89c66b535cdc39dc1ae3c35aa1b59bbc757ec8d123c  metabolic-coach-watchface-debug.apk
+3fe5f6d3eff7a35361061e7b24280f92cf72153462456c2b75efb551637ed503  MetabolicCoach-v0.5.0.zip
+```
+
+These are local engineering artifacts only. The GitHub Actions run must repeat the certificate,
+metadata, privacy, and ZIP checks from the pushed revision. Physical phone acceptance is still
+required and must stop before chart/GMI or coaching work is unlocked.
 
 Historical v0.2 debug artifact SHA-256 values:
 

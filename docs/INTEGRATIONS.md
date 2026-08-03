@@ -62,11 +62,13 @@ GET {baseUrl}/api/v1/entries/sgv.json?find[dateString][$gte]=<start-iso>&find[da
 Accept: application/json
 ```
 
-The range request is used only for the phone's recent (at most 90-day) history backfill. Each
-response is capped, retried under the configured policy, normalized, and merged by stable reading
-ID. A range failure does not mix another server into the active source and does not fabricate
-missing readings. Nightscout deployments that expose only a different historical query contract
-must be verified with a synthetic or staging server before daily use.
+The normal refresh uses the range request only for the phone's recent (at most 90-day) history. The
+v0.5.0 history operation can request one additional bounded 90-day range at a time for an explicitly
+confirmed 1-year or keep-all policy. Each response is capped, retried under the configured policy,
+normalized, and merged by stable reading ID. A range failure does not mix another server into the
+active source, publish an older current reading, or fabricate missing readings. Nightscout
+deployments that expose only a different historical query contract must be verified with a synthetic
+or staging server before daily use.
 
 The parser accepts Nightscout `sgv`, `date` or ISO `dateString`, `_id`, and `direction`, ignores
 unknown fields, orders entries by measurement time, deduplicates stable records, and normalizes
@@ -84,6 +86,17 @@ Each normalized record contains:
 The source ID prevents histories, intervention baselines/follow-ups, observations, and caches from
 mixing across servers. Changing a server URL creates a different source identity even when the
 display name and slot ID are unchanged.
+
+### Local history foundation (`v0.5.0`)
+
+The phone Room table `glucose_readings` is the normalized local source of truth for downloaded
+records. `GlucoseHistoryRepository` stores a retention policy and explicit confirmation in Room,
+keeps a durable source-scoped backfill checkpoint, and prunes only after confirmation. Bounded
+pruning is by measurement time and preserves each source's newest record; keep-all means no
+automatic pruning, not an unlimited-server guarantee. Backfill uses `GlucoseProvider.readHistoryRange`
+and filters returned rows back to the requested source before upsert. The operation is cancellable,
+resumable, and independent of current refresh and Wear synchronization. Android backup rules exclude
+the database and app-private files; export includes history-management state without credentials.
 
 ### Glycemic Goal Planner data contract
 

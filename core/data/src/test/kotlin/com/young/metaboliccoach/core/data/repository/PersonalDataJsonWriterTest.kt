@@ -21,7 +21,7 @@ class PersonalDataJsonWriterTest {
         assertTrue(
             first.startsWith(
                 "{\"format\":\"metabolic-coach-personal-data\"," +
-                    "\"schemaVersion\":3,\"databaseSchemaVersion\":8," +
+                    "\"schemaVersion\":3,\"databaseSchemaVersion\":9," +
                     "\"exportedAtEpochMillis\":1234,\"settings\":{",
             ),
         )
@@ -46,7 +46,7 @@ class PersonalDataJsonWriterTest {
         PersonalDataJsonWriter(output).apply {
             beginDocument(
                 exportedAtEpochMillis = 10,
-                databaseSchemaVersion = 8,
+                databaseSchemaVersion = 9,
                 settings = DefaultCoachSettings.create(),
                 glycemicPlannerSettings = GlycemicPlannerSettings(
                     targetGmiPercent = 7.0,
@@ -72,7 +72,7 @@ class PersonalDataJsonWriterTest {
         PersonalDataJsonWriter(output).apply {
             beginDocument(
                 exportedAtEpochMillis = 10,
-                databaseSchemaVersion = 8,
+                databaseSchemaVersion = 9,
                 settings = DefaultCoachSettings.create(),
                 selectedMilestoneId = "early",
                 milestones = listOf(
@@ -94,7 +94,7 @@ class PersonalDataJsonWriterTest {
         PersonalDataJsonWriter(output).apply {
             beginDocument(
                 exportedAtEpochMillis = 1_234,
-                databaseSchemaVersion = 8,
+                databaseSchemaVersion = 9,
                 settings = DefaultCoachSettings.create().copy(
                     healthConnectGlucoseOriginPackage = "pkg\"\\\n\u2028",
                 ),

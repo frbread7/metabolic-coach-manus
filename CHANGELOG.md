@@ -2,6 +2,28 @@
 
 All notable Metabolic Coach package changes are recorded here.
 
+## v0.5.0 — 2026-08-03 — Local glucose history foundation (phone-only)
+
+### Added
+
+- Explicit local-history retention choices: 90 days, 1 year, or keep all downloaded records.
+- Confirmation-gated, source-scoped pruning that preserves the newest record for each source.
+- Durable 90-day range backfill checkpoints with pause/failure recovery for older Nightscout data.
+- Settings status for stored row count, local date range, source identity, and backfill state.
+- Room schema version 9 plus deterministic export of history-management state.
+
+### Changed
+
+- Versioned release ZIP names preserve the full APK version (`MetabolicCoach-v0.5.0.zip`).
+
+### Safety and scope
+
+- Nightscout range backfill never publishes an older record as current and does not change Wear
+  synchronization, the watch face, coaching, notifications, or quick actions.
+- Existing Android backup exclusions remain in force; raw history stays app-private.
+- No trend chart, selected-period GMI, analytics, AI recommendation, or new coaching behavior is
+  included. Those are separate milestones after v0.5.0 phone acceptance.
+
 ## v0.4.2 — 2026-08-03 — Saved planning milestones (phone-only)
 
 ### Added

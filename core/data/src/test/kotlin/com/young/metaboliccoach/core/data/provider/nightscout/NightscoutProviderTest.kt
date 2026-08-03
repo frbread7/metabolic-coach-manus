@@ -108,6 +108,25 @@ class NightscoutProviderTest {
     }
 
     @Test
+    fun `bounded history range uses range endpoint without publishing an older current state`() =
+        runTest {
+            val start = NOW - DAY
+            val end = NOW - FIVE_MINUTES
+            val fixture = provider(
+                settings = settings(),
+                responses = listOf(
+                    ok(bodyAt(value = 105, remoteId = "older-range", measuredAt = end)),
+                ),
+            )
+
+            val readings = fixture.provider.readHistoryRange(start, end)
+
+            assertEquals(listOf(105), readings.map { it.valueMgDl })
+            assertEquals(listOf("range"), fixture.apiClient.events)
+            assertEquals(GlucoseProviderState.Idle, fixture.provider.observeState().first())
+        }
+
+    @Test
     fun `retryable failures use bounded exponential delays before success`() = runTest {
         val fixture = provider(
             settings = settings(
