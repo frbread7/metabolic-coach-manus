@@ -1,5 +1,12 @@
 # v0.5.0 Local History Foundation
 
+## Physical acceptance status
+
+`USER_REPORTED_PASS` on 2026-08-04. The privacy-sanitized result is recorded in
+[V0_5_0_PHYSICAL_ACCEPTANCE.md](acceptance/V0_5_0_PHYSICAL_ACCEPTANCE.md). The exact installed
+artifact hash was not re-supplied with the report; the CI artifact remains the reproducible build
+evidence.
+
 ## Scope
 
 v0.5.0 is the phone-only history foundation approved after the architecture review. It makes
@@ -60,23 +67,23 @@ v0.5.1.
 Record only pass/fail and sanitized notes; do not record glucose values, server URLs, tokens, or
 credentials.
 
-- [ ] Install the v0.5.0 phone APK over the accepted same-certificate phone build.
-- [ ] Existing current glucose still refreshes and displays with the same age/trend/delta behavior.
-- [ ] Settings shows stored row count and oldest/newest local dates after a successful refresh.
-- [ ] The default 90-day policy is visible and no deletion occurs before confirmation.
-- [ ] Selecting 1 year requires a new confirmation; confirming does not remove recent history.
-- [ ] Selecting Keep all downloaded requires a new confirmation and does not silently prune rows.
-- [ ] One older-range download advances the checkpoint and updates the local date range when data is
+- [x] Install the v0.5.0 phone APK over the accepted same-certificate phone build.
+- [x] Existing current glucose still refreshes and displays with the same age/trend/delta behavior.
+- [x] Settings shows stored row count and oldest/newest local dates after a successful refresh.
+- [x] The default 90-day policy is visible and no deletion occurs before confirmation.
+- [x] Selecting 1 year requires a new confirmation; confirming does not remove recent history.
+- [x] Selecting Keep all downloaded requires a new confirmation and does not silently prune rows.
+- [x] One older-range download advances the checkpoint and updates the local date range when data is
       returned.
-- [ ] A temporary network loss reports failure/paused state and a subsequent retry resumes the same
+- [x] A temporary network loss reports failure/paused state and a subsequent retry resumes the same
       bounded operation without a network storm.
-- [ ] Force-closing and reopening presents an interrupted running checkpoint as resumable/paused.
-- [ ] Switching configured Nightscout servers does not mix row counts/date ranges or backfill state.
-- [ ] Export includes history rows and management-state tables without credentials or endpoints.
-- [ ] Erase confirmation clears local rows/checkpoints and leaves source records untouched.
-- [ ] No chart, GMI, Wear payload, watch-face, coaching, notification, or quick-action behavior
+- [x] Force-closing and reopening presents an interrupted running checkpoint as resumable/paused.
+- [x] Switching configured Nightscout servers does not mix row counts/date ranges or backfill state.
+- [x] Export includes history rows and management-state tables without credentials or endpoints.
+- [x] Erase confirmation clears local rows/checkpoints and leaves source records untouched.
+- [x] No chart, GMI, Wear payload, watch-face, coaching, notification, or quick-action behavior
       changes are observed.
-- [ ] No crash, ANR, or unacceptable battery/network behavior is observed during the test.
+- [x] No crash, ANR, or unacceptable battery/network behavior is observed during the test.
 
 Stop after this checklist. Do not begin v0.5.1 chart/GMI implementation until the results are
 reviewed in the architecture conversation.

@@ -24,6 +24,12 @@ All notable Metabolic Coach package changes are recorded here.
 - No trend chart, selected-period GMI, analytics, AI recommendation, or new coaching behavior is
   included. Those are separate milestones after v0.5.0 phone acceptance.
 
+### Phone acceptance
+
+- The user reported the v0.5.0 physical phone checklist passed on 2026-08-04. The sanitized record
+  retains categorical results only; the exact installed artifact hash was not re-supplied with the
+  report.
+
 ## v0.4.2 — 2026-08-03 — Saved planning milestones (phone-only)
 
 ### Added

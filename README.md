@@ -16,10 +16,10 @@ Samsung Galaxy Watch8.
 > Watch8 `v0.3` acceptance was user-reported complete on 2026-08-02 and is recorded in a
 > privacy-sanitized acceptance record. Android instrumentation, production-signing, and
 > store-policy gates remain outstanding. The user accepted the phone-side `v0.4.1` freshness fix.
-> `v0.4.2` was physically accepted by user report. `v0.5.0` is the phone-only local-history
-> foundation: it adds explicit retention, source-scoped resumable Nightscout backfill, and data
-> management status. Trend chart, selected-period GMI, and new coaching behavior remain gated for
-> later milestones. Wear, watch-face, coaching, and notification behavior remain unchanged.
+> `v0.4.2` was physically accepted by user report. The user reported the `v0.5.0` phone-only local-
+> history gate passed on 2026-08-04. Trend chart and selected-period GMI are the next reviewed
+> milestone; new coaching behavior remains gated for later. Wear, watch-face, coaching, and
+> notification behavior remain unchanged.
 > It is a wellness tool, not a medical device, and must not replace the CGM vendor app, glucose
 > alarms, professional advice, or a personal care plan.
 
@@ -35,8 +35,8 @@ synchronization and coaching foundations remain frozen while the current milesto
 | `v0.3` | Watch synchronization: validate the existing Data Layer path and packaged watch components on a physical phone and Galaxy Watch8 | Accepted by user report 2026-08-02; sanitized record stored |
 | `v0.4` | Glycemic Goal Planner plus current-glucose freshness validation | `v0.4.1` phone acceptance reported complete; superseded by the `v0.4.2` planner milestone gate |
 | `v0.4.2` | Saved planning milestones: multiple targets, one selected detail, fixed dates, migration, and export | Accepted by user report |
-| `v0.5.0` | Phone-only local history foundation: explicit retention, source-scoped resumable backfill, export/reset safety | Engineering implementation; phone physical acceptance pending |
-| `v0.5.1` | Phone-only local trend chart and selected-period GMI after history acceptance | Planned |
+| `v0.5.0` | Phone-only local history foundation: explicit retention, source-scoped resumable backfill, export/reset safety | Accepted by user report 2026-08-04 |
+| `v0.5.1` | Phone-only local trend chart and selected-period GMI after history acceptance | Architecture review in progress |
 | `v0.6.0` | One narrowly scoped coaching increment after chart/GMI review | Planned |
 | `v0.5` | One-week personal beta with documented reliability, battery, and safety observations | Planned after feature gates |
 | `v1.0` | Stable daily-use release with production signing and all release gates complete | Planned |
@@ -49,7 +49,8 @@ not change Wear synchronization, the watch face, coaching rules, or notification
 saved phone-only milestones on top of that foundation and preserves the same boundary. `v0.5.0`
 adds the explicit local-history foundation; its chart and selected-period GMI remain a later gate.
 See the
-[milestone process](docs/MILESTONE_PROCESS.md), [v0.3 Wear acceptance checklist](docs/V0.3_WEAR_ACCEPTANCE.md),
+[milestone process](docs/MILESTONE_PROCESS.md), [physical acceptance checklists by milestone](docs/PHYSICAL_ACCEPTANCE_CHECKLISTS.md),
+[v0.3 Wear acceptance checklist](docs/V0.3_WEAR_ACCEPTANCE.md),
 and [the v0.3 acceptance record](docs/acceptance/V0_3_PHYSICAL_ACCEPTANCE.md).
 
 ## What is implemented
@@ -163,10 +164,12 @@ engineering artifacts, not production releases. A signed release requires enviro
 - [Architecture](docs/ARCHITECTURE.md)
 - [Nightscout, Health Connect activity, and future provider integrations](docs/INTEGRATIONS.md)
 - [Milestone development and cross-session handoff process](docs/MILESTONE_PROCESS.md)
+- [Physical acceptance checklists by milestone](docs/PHYSICAL_ACCEPTANCE_CHECKLISTS.md)
 - [v0.3 Galaxy Watch8 physical acceptance checklist](docs/V0.3_WEAR_ACCEPTANCE.md)
 - [v0.3 privacy-sanitized physical acceptance record](docs/acceptance/V0_3_PHYSICAL_ACCEPTANCE.md)
 - [v0.4.1 current-glucose freshness hotfix report](docs/V0.4_1_FRESHNESS_HOTFIX.md)
 - [v0.5.0 local history foundation and phone acceptance gate](docs/V0_5_0_HISTORY_FOUNDATION.md)
+- [v0.5.0 privacy-sanitized phone acceptance record](docs/acceptance/V0_5_0_PHYSICAL_ACCEPTANCE.md)
 - [v0.4.2 saved planning milestones architecture and phone acceptance gate](docs/V0.4_2_SAVED_MILESTONES.md)
 - [Development and build guide](docs/DEVELOPMENT.md)
 - [Testing strategy, milestone acceptance, and release gates](docs/TESTING.md)

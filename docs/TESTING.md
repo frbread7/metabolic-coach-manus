@@ -82,6 +82,11 @@ Execute the migration suite on an Android runtime with:
 
 ## Milestone test gates
 
+The physical-device rows for every milestone are indexed in
+[Physical acceptance checklists by milestone](PHYSICAL_ACCEPTANCE_CHECKLISTS.md). That index
+distinguishes accepted evidence from pending or draft gates; the detailed v0.3 and v0.5.0 documents
+remain authoritative for their respective runs.
+
 - `v0.2` implementation gate: the full static pipeline, isolated provider/repository tests,
   parsing, retry, cache, server switching, manifests, documentation, and debug package must pass.
 - `v0.2` live acceptance gate: accepted by the user on 2026-08-01 after phone-side validation of
@@ -104,8 +109,10 @@ Execute the migration suite on an Android runtime with:
   coaching/notification/watch-face regression suites. Physical phone acceptance must verify that
   the default 90-day history is preserved, policy changes require confirmation, pruning is
   source-scoped, one older range can pause/resume, process interruption presents a resumable
-  checkpoint, and no network work is triggered by future chart surfaces. Stop after that acceptance;
-  v0.5.1 is not unlocked automatically.
+  checkpoint, and no network work is triggered by future chart surfaces. The user reported this
+  physical phone gate passed on 2026-08-04; see the
+  [privacy-sanitized acceptance record](acceptance/V0_5_0_PHYSICAL_ACCEPTANCE.md). v0.5.1 still
+  requires its APOS architecture review and its own pinned artifact gate.
 
 ## Current local verification
 

@@ -22,6 +22,9 @@ Every milestone follows this order:
 6. Architecture review evaluates the evidence, defects, and whether the milestone can close.
 7. Only then is the next milestone planned and unlocked.
 
+The version-by-version checklist index is [PHYSICAL_ACCEPTANCE_CHECKLISTS.md](PHYSICAL_ACCEPTANCE_CHECKLISTS.md).
+It is an index and planning aid; a detailed milestone record remains authoritative when one exists.
+
 Automated success never substitutes for physical acceptance. Physical acceptance never substitutes
 for source review, reproducible builds, or automated tests.
 
@@ -112,10 +115,11 @@ non-conflicting earlier constraints, and avoid inferring acceptance that the use
 - Automated preflight: the historical v0.3 sync/phone/Wear pre-install suite passed with all 200
   selected Gradle tasks executed. The current v0.4.2 authoritative local package run passed 333
   selected tasks, 52 local test suites/288 executions, lint, APK/WFF validation, and packaging.
-- Production-code freeze: the reviewed `v0.5.0` local-history scope is implemented. Wear,
-  watch-face, coaching, notification, and current-glucose freshness behavior remain frozen.
-- `v0.5.0` gate: active until GitHub Actions produces the versionName `0.5.0`/versionCode `7`
-  artifact and the user completes the phone-only history acceptance checklist. Chart, selected-
-  period GMI, and new coaching work remain locked until that acceptance is reviewed.
+- `v0.5.0` physical acceptance: the user reported the phone-only history checklist passed on
+  2026-08-04. The privacy-sanitized record is
+  [V0_5_0_PHYSICAL_ACCEPTANCE.md](acceptance/V0_5_0_PHYSICAL_ACCEPTANCE.md).
+- Current gate: request the required APOS architecture review for the phone-only v0.5.1 trend chart
+  and selected-period GMI. Wear, watch-face, coaching, notification, and current-glucose freshness
+  behavior remain frozen unless the review explicitly changes the boundary.
 
 The completed physical test was defined in [V0.3_WEAR_ACCEPTANCE.md](V0.3_WEAR_ACCEPTANCE.md).
