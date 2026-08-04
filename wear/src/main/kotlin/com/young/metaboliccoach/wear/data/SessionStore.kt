@@ -128,6 +128,9 @@ class SessionStore @Inject constructor(
                         values[PENDING_RECOMMENDATION_CREATED_AT],
                     triggerContextId = values[PENDING_TRIGGER_CONTEXT_ID],
                     triggerAtEpochMillis = values[PENDING_TRIGGER_AT],
+                    glucoseSourceId = values[PENDING_GLUCOSE_SOURCE_ID],
+                    safetyReadingId = values[PENDING_SAFETY_READING_ID],
+                    safetyReadingAtEpochMillis = values[PENDING_SAFETY_READING_AT],
                     dataResetId = values[PENDING_DATA_RESET_ID],
                 )
             }
@@ -175,6 +178,11 @@ class SessionStore @Inject constructor(
             }
             command.triggerContextId?.let { values[PENDING_TRIGGER_CONTEXT_ID] = it }
             command.triggerAtEpochMillis?.let { values[PENDING_TRIGGER_AT] = it }
+            command.glucoseSourceId?.let { values[PENDING_GLUCOSE_SOURCE_ID] = it }
+            command.safetyReadingId?.let { values[PENDING_SAFETY_READING_ID] = it }
+            command.safetyReadingAtEpochMillis?.let {
+                values[PENDING_SAFETY_READING_AT] = it
+            }
             command.dataResetId?.let { values[PENDING_DATA_RESET_ID] = it }
         }
         replica.pendingMutation?.let { values[PENDING_MUTATION] = it.name }
@@ -210,6 +218,9 @@ class SessionStore @Inject constructor(
             longPreferencesKey("pending_recommendation_created_at")
         val PENDING_TRIGGER_CONTEXT_ID = stringPreferencesKey("pending_trigger_context_id")
         val PENDING_TRIGGER_AT = longPreferencesKey("pending_trigger_at")
+        val PENDING_GLUCOSE_SOURCE_ID = stringPreferencesKey("pending_glucose_source_id")
+        val PENDING_SAFETY_READING_ID = stringPreferencesKey("pending_safety_reading_id")
+        val PENDING_SAFETY_READING_AT = longPreferencesKey("pending_safety_reading_at")
         val PENDING_DATA_RESET_ID = stringPreferencesKey("pending_data_reset_id")
         val PENDING_MUTATION = stringPreferencesKey("pending_mutation")
         val PENDING_TRANSPORTED = booleanPreferencesKey("pending_transported")

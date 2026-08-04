@@ -78,4 +78,53 @@ class SyncSchedulerTest {
 
         assertFalse(policy.enabled)
     }
+
+    @Test
+    fun `post meal work targets the configured meal-relative time`() {
+        assertEquals(
+            20 * 60_000L,
+            postMealInitialDelayMillis(
+                mealAtEpochMillis = 1_000_000L,
+                delayMinutes = 30,
+                nowEpochMillis = 1_600_000L,
+            ),
+        )
+    }
+
+    @Test
+    fun `late post meal work runs immediately instead of adding another full delay`() {
+        assertEquals(
+            0L,
+            postMealInitialDelayMillis(
+                mealAtEpochMillis = 1_000_000L,
+                delayMinutes = 5,
+                nowEpochMillis = 1_400_000L,
+            ),
+        )
+    }
+
+    @Test
+    fun `post meal failure retries only inside its window and attempt budget`() {
+        assertTrue(
+            shouldRetryPostMealWork(
+                runAttemptCount = 0,
+                nowEpochMillis = 1_000,
+                expiresAtEpochMillis = 2_000,
+            ),
+        )
+        assertFalse(
+            shouldRetryPostMealWork(
+                runAttemptCount = 2,
+                nowEpochMillis = 1_000,
+                expiresAtEpochMillis = 2_000,
+            ),
+        )
+        assertFalse(
+            shouldRetryPostMealWork(
+                runAttemptCount = 0,
+                nowEpochMillis = 2_000,
+                expiresAtEpochMillis = 2_000,
+            ),
+        )
+    }
 }

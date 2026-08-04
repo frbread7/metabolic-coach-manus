@@ -161,11 +161,11 @@ The executable, privacy-safe checklist is maintained in
 and custom range contract, GMI eligibility, local-only reads, stale-result races, frozen regressions,
 and the post-test stop condition. The user reported this gate passed on 2026-08-04.
 
-## v0.6.0 — One coaching increment (draft gate)
+## v0.6.0 — Post-meal walk coaching
 
-The exact coaching increment must be approved in architecture review before the rows below are
-made feature-specific. The gate must remain narrow; it cannot silently include a chart, new
-provider, AI recommendation, or unrelated UI redesign.
+The APOS-reviewed executable checklist is maintained in
+[V0_6_0_POST_MEAL_COACHING.md](V0_6_0_POST_MEAL_COACHING.md). The gate is limited to one real
+meal-scoped delayed walk recommendation and its Start/Snooze/completion lifecycle.
 
 | ID | Expected physical result | Status |
 | --- | --- | --- |

@@ -71,6 +71,18 @@ class CoachActionReceiver : BroadcastReceiver() {
                     ).takeIf {
                         intent.hasExtra(CoachNotificationManager.EXTRA_TRIGGER_AT)
                     },
+                    glucoseSourceId = intent.getStringExtra(
+                        CoachNotificationManager.EXTRA_GLUCOSE_SOURCE_ID,
+                    ),
+                    safetyReadingId = intent.getStringExtra(
+                        CoachNotificationManager.EXTRA_SAFETY_READING_ID,
+                    ),
+                    safetyReadingAtEpochMillis = intent.getLongExtra(
+                        CoachNotificationManager.EXTRA_SAFETY_READING_AT,
+                        Long.MIN_VALUE,
+                    ).takeIf {
+                        intent.hasExtra(CoachNotificationManager.EXTRA_SAFETY_READING_AT)
+                    },
                 )
                 val result = mutationGate.withLock {
                     handler.handle(command)

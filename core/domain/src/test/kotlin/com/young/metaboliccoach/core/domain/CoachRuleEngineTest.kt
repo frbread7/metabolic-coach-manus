@@ -31,7 +31,7 @@ class CoachRuleEngineTest {
         assertEquals(settings.walkingDurationMinutes, recommendation.durationMinutes)
         assertEquals("reading", recommendation.triggerContextId)
         assertEquals(now, recommendation.triggerAtEpochMillis)
-        assertEquals(1, recommendation.algorithmVersion)
+        assertEquals(2, recommendation.algorithmVersion)
         assertEquals(
             now + settings.staleReadingMinutes * 60_000L,
             recommendation.validUntilEpochMillis,
@@ -132,6 +132,46 @@ class CoachRuleEngineTest {
         val action = recommendation as CoachRecommendation.Action
         assertEquals(meal.id, action.triggerContextId)
         assertEquals(meal.occurredAtEpochMillis, action.triggerAtEpochMillis)
+        assertEquals("test", action.glucoseSourceId)
+        assertEquals("reading", action.safetyReadingId)
+        assertEquals(now, action.safetyReadingAtEpochMillis)
+    }
+
+    @Test
+    fun `post meal identity stays stable when a newer safe reading arrives`() {
+        val meal = MealMarker(
+            id = "meal-stable",
+            occurredAtEpochMillis = now - settings.postMealDelayMinutes * 60_000L,
+        )
+        val first = engine.recommend(
+            context(glucose = glucose(130, 0.0), meal = meal),
+            settings,
+            allowedActionReasons = setOf(CoachReason.POST_MEAL_WINDOW),
+        ) as CoachRecommendation.Action
+        val second = engine.recommend(
+            context(
+                glucose = glucose(132, 0.0).copy(
+                    id = "new-reading",
+                    measuredAtEpochMillis = now + 1_000L,
+                ),
+                meal = meal,
+            ).copy(nowEpochMillis = now + 1_000L),
+            settings,
+            allowedActionReasons = setOf(CoachReason.POST_MEAL_WINDOW),
+        ) as CoachRecommendation.Action
+
+        assertEquals(first.id, second.id)
+    }
+
+    @Test
+    fun `post meal production mode cannot emit rapid rise action`() {
+        val recommendation = engine.recommend(
+            context(glucose = glucose(146, 3.0)),
+            settings,
+            allowedActionReasons = setOf(CoachReason.POST_MEAL_WINDOW),
+        )
+
+        assertNull(recommendation)
     }
 
     @Test

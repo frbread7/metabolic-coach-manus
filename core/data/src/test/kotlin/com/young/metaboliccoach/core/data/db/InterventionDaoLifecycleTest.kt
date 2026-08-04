@@ -22,6 +22,52 @@ class InterventionDaoLifecycleTest {
         assertEquals(listOf(first), dao.savedSessions())
     }
 
+    @Test
+    fun `coached start consumes recommendation and inserts session as one transaction`() = runTest {
+        val dao = FakeInterventionDao()
+        val candidate = session("coached").copy(recommendationId = "recommendation")
+
+        assertEquals(
+            candidate,
+            dao.startForRecommendationIfAvailable(candidate, "recommendation", 0),
+        )
+        assertEquals("recommendation", dao.getCoachState()?.consumedRecommendationId)
+        assertEquals(
+            candidate,
+            dao.startForRecommendationIfAvailable(
+                candidate.copy(targetDurationMinutes = 20),
+                "recommendation",
+                0,
+            ),
+        )
+        assertEquals(listOf(candidate), dao.savedSessions())
+    }
+
+    @Test
+    fun `consumed recommendation without a session cannot start later`() = runTest {
+        val dao = FakeInterventionDao()
+        dao.upsertCoachState(
+            CoachStateEntity(
+                lastRecommendationAtEpochMillis = 1_000,
+                lastRecommendationId = "recommendation",
+                snoozedUntilEpochMillis = null,
+                notificationDayStartEpochMillis = 0,
+                notificationsSentToday = 1,
+                consumedRecommendationId = "recommendation",
+            ),
+        )
+
+        assertEquals(
+            null,
+            dao.startForRecommendationIfAvailable(
+                session("coached").copy(recommendationId = "recommendation"),
+                "recommendation",
+                0,
+            ),
+        )
+        assertEquals(emptyList<InterventionSessionEntity>(), dao.savedSessions())
+    }
+
     private fun session(
         id: String,
         type: InterventionType = InterventionType.WALK,
@@ -47,10 +93,15 @@ class InterventionDaoLifecycleTest {
 
     private class FakeInterventionDao : InterventionDao {
         private val sessions = linkedMapOf<String, InterventionSessionEntity>()
+        private var coachState: CoachStateEntity? = null
 
         fun savedSessions() = sessions.values.toList()
 
         override suspend fun getById(sessionId: String) = sessions[sessionId]
+
+        override suspend fun getByRecommendationId(
+            recommendationId: String,
+        ) = sessions.values.firstOrNull { it.recommendationId == recommendationId }
 
         override suspend fun latestActive() = sessions.values.lastOrNull {
             it.status == InterventionStatus.STARTED.name
@@ -72,6 +123,12 @@ class InterventionDaoLifecycleTest {
 
         override suspend fun upsert(session: InterventionSessionEntity) {
             sessions[session.id] = session
+        }
+
+        override suspend fun getCoachState(): CoachStateEntity? = coachState
+
+        override suspend fun upsertCoachState(state: CoachStateEntity) {
+            coachState = state
         }
 
         override suspend fun completeStarted(

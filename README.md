@@ -18,7 +18,8 @@ Samsung Galaxy Watch8.
 > store-policy gates remain outstanding. The user accepted the phone-side `v0.4.1` freshness fix.
 > `v0.4.2` was physically accepted by user report. The user reported both the `v0.5.0` phone-only
 > local-history gate and the APOS-reviewed `v0.5.1` History Explorer gate passed on 2026-08-04.
-> Coaching remains unchanged until a new APOS-reviewed milestone is approved.
+> APOS approved `v0.6.0` with conditions; the bounded post-meal walk coaching increment is now in
+> local engineering validation and awaits physical acceptance.
 > It is a wellness tool, not a medical device, and must not replace the CGM vendor app, glucose
 > alarms, professional advice, or a personal care plan.
 
@@ -36,7 +37,7 @@ synchronization and coaching foundations remain frozen while the current milesto
 | `v0.4.2` | Saved planning milestones: multiple targets, one selected detail, fixed dates, migration, and export | Accepted by user report |
 | `v0.5.0` | Phone-only local history foundation: explicit retention, source-scoped resumable backfill, export/reset safety | Accepted by user report 2026-08-04 |
 | `v0.5.1` | Phone-only local trend chart and selected-period GMI after history acceptance | Accepted by user report 2026-08-04 |
-| `v0.6.0` | One narrowly scoped coaching increment after chart/GMI review | Planned |
+| `v0.6.0` | One post-meal delayed walk prompt with exact-source safety, Start/Snooze, completion, and descriptive follow-up | Awaiting physical acceptance |
 | `v0.5` | One-week personal beta with documented reliability, battery, and safety observations | Planned after feature gates |
 | `v1.0` | Stable daily-use release with production signing and all release gates complete | Planned |
 
@@ -57,10 +58,10 @@ and [the v0.3 acceptance record](docs/acceptance/V0_3_PHYSICAL_ACCEPTANCE.md).
 
 | Area | Current implementation |
 | --- | --- |
-| Phone hub | Nightscout glucose retrieval with explicit multi-server selection, bounded retry/cache retention, source-scoped local history and resumable range backfill; a local-only exact-source trend explorer and selected-period GMI; Health Connect activity reads; Room schema v9 history-management state and saved planner milestones; configurable Glycemic Goal Planner metrics/scenarios; settings; coaching rules; notifications; daily summary; streaming JSON export; confirmation-gated local erase; and revisioned Wear Data Layer publishing |
+| Phone hub | Nightscout glucose retrieval with explicit multi-server selection, bounded retry/cache retention, source-scoped local history and resumable range backfill; a local-only exact-source trend explorer and selected-period GMI; Health Connect activity reads; Room schema v10 coaching provenance and saved planner milestones; configurable Glycemic Goal Planner metrics/scenarios; settings; coaching rules; notifications; daily summary; streaming JSON export; confirmation-gated local erase; and revisioned Wear Data Layer publishing |
 | Wear app | Three-page touch-only horizontal pager, glucose/activity display, walk and stair actions, home countdown with completion haptic, explicit queued/rejected action results, durable snooze outbox, pending-session reconciliation, direct watch notifications, and complication providers; no bezel dependency |
 | Watch face | Separate WFF v4 resource-only package with clock, glucose/trend/delta/age, steps/floors, battery, coach action, reduced ambient content, and selectable accent configuration |
-| Coaching | Rapid-rise, post-meal, and inactivity rules with a walk fallback when stair reminders are disabled, stable recommendation IDs, explicit validity windows, minute-boundary reevaluation, quiet/working hours, cooldown, snooze, daily limit, and shared missing/future/stale/low/fast-fall safety policy |
+| Coaching | The `v0.6.0` production capability is one meal-scoped delayed walk recommendation with stable identity, immutable exact-source safety provenance, bounded snooze redelivery, and shared missing/future/stale/low/fast-fall safety policy. Rapid-rise and inactivity/stair rules remain non-production foundations for later review. |
 | Intervention lifecycle | Idempotent start/complete commands, immutable phone-authored recommendation snapshots, deferred completion reconciliation, configurable start/snooze expiry, durable completion of an existing offline session, terminal expiry for orphan completions, and exact trigger, recommendation, activity-dose, baseline, source, and follow-up provenance |
 | Personal observations | Cautious effect summaries plus prospective-only timing observations. Generic/post-meal bucket widths, per-bucket sample floor, comparable-bucket count, follow-up matching width, and baseline glucose band are configurable (conservative defaults: 5/15 minutes, 8 samples, 2 buckets, 15 minutes, and 20 mg/dL); a unique lowest observed median must also have strict quartile separation. Results never change coaching automatically and remain experimental |
 | Synchronization | Versioned `DataMap` state with persistent phone instance/revision/reset metadata, stale pre-erase command rejection, terminal replay deduplication for every quick action, a bounded Wear outbox for non-session commands such as snooze, and a pending-mutation/tombstone session replica over Wear OS Data Layer (`play-services-wearable` 20.0.1) |
@@ -111,7 +112,7 @@ and [the v0.3 acceptance record](docs/acceptance/V0_3_PHYSICAL_ACCEPTANCE.md).
 | --- | --- |
 | `:core:model` | Platform-neutral glucose, activity, history, settings, Glycemic Goal Planner, coaching, session, and sync models |
 | `:core:domain` | Repository contracts, provider-independent time-weighted glycemic calculations/scenarios, coaching and shared exercise-safety rules, follow-up selection, settings validation, and personal observation analysis |
-| `:core:data` | Room schema v9 with exported schemas 1–9, DataStore, asynchronous Nightscout client/parser/cache/retry/range-backfill implementation, source-scoped history checkpoints and pruning, planner-settings/milestone export, immutable recommendation snapshots, retained future-provider boundaries, and repository implementations |
+| `:core:data` | Room schema v10 with exported schemas 1–10, DataStore, asynchronous Nightscout client/parser/cache/retry/range-backfill implementation, source-scoped history checkpoints and pruning, planner-settings/milestone export, immutable recommendation snapshots, retained future-provider boundaries, and repository implementations |
 | `:core:sync` | Wear Data Layer transport, versioned codec, paths, and sync repository |
 | `:phone` | Android companion UI, permissions, background refresh, notifications, and watch-command handling |
 | `:wear` | Wear OS UI, local state/session storage, notifications, and complication data sources |

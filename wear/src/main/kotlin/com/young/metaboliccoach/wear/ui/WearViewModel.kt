@@ -223,6 +223,10 @@ class WearViewModel @Inject constructor(
                         triggerContextId = effectiveRecommendation?.triggerContextId,
                         triggerAtEpochMillis =
                             effectiveRecommendation?.triggerAtEpochMillis,
+                        glucoseSourceId = effectiveRecommendation?.glucoseSourceId,
+                        safetyReadingId = effectiveRecommendation?.safetyReadingId,
+                        safetyReadingAtEpochMillis =
+                            effectiveRecommendation?.safetyReadingAtEpochMillis,
                         dataResetId = persistedWatchState.dataResetId,
                     ),
                 )
@@ -254,11 +258,26 @@ class WearViewModel @Inject constructor(
                 }
             }
             QuickActionType.SNOOZE -> {
+                val recommendation = persistedWatchState.recommendation
+                    as? CoachRecommendation.Action
                 commandOutbox.enqueue(
                     QuickActionCommand(
                         id = commandId,
                         type = type,
                         createdAtEpochMillis = now,
+                        recommendationId = recommendation?.id,
+                        recommendationValidUntilEpochMillis =
+                            recommendation?.validUntilEpochMillis,
+                        recommendationReason = recommendation?.reason,
+                        recommendationAlgorithmVersion = recommendation?.algorithmVersion,
+                        recommendationCreatedAtEpochMillis =
+                            recommendation?.createdAtEpochMillis,
+                        triggerContextId = recommendation?.triggerContextId,
+                        triggerAtEpochMillis = recommendation?.triggerAtEpochMillis,
+                        glucoseSourceId = recommendation?.glucoseSourceId,
+                        safetyReadingId = recommendation?.safetyReadingId,
+                        safetyReadingAtEpochMillis =
+                            recommendation?.safetyReadingAtEpochMillis,
                         dataResetId = persistedWatchState.dataResetId,
                     ),
                 )

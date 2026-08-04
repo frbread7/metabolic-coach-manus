@@ -16,6 +16,7 @@ import com.young.metaboliccoach.core.domain.GlucoseRepository
 import com.young.metaboliccoach.core.domain.ObservationAnalyzer
 import com.young.metaboliccoach.core.domain.SettingsRepository
 import com.young.metaboliccoach.core.model.CoachContext
+import com.young.metaboliccoach.core.model.CoachReason
 import com.young.metaboliccoach.core.model.CoachRecommendation
 import com.young.metaboliccoach.core.model.CoachSettings
 import com.young.metaboliccoach.core.model.DailySummary
@@ -74,7 +75,7 @@ class CoachingRepositoryImpl @Inject constructor(
         timeSource.minuteTicks(),
     ) { (settings, glucose), activity, meal, state, now ->
         val currentState = state.forCurrentDay(now)
-        ruleEngine.recommend(
+        val generated = ruleEngine.recommend(
             context = CoachContext(
                 nowEpochMillis = now,
                 minuteOfDay = Instant.ofEpochMilli(now)
@@ -88,11 +89,38 @@ class CoachingRepositoryImpl @Inject constructor(
                 mostRecentMeal = meal?.toModel(),
                 lastRecommendationAtEpochMillis =
                     currentState.lastRecommendationAtEpochMillis,
+                lastRecommendationId = currentState.lastRecommendationId,
                 snoozedUntilEpochMillis = currentState.snoozedUntilEpochMillis,
                 notificationsSentToday = currentState.notificationsSentToday,
+                consumedRecommendationId = currentState.consumedRecommendationId,
             ),
             settings = settings,
+            allowedActionReasons = setOf(CoachReason.POST_MEAL_WINDOW),
         )
+        val lastSnapshot = currentState.lastRecommendationId?.let {
+            recommendationSnapshotDao.getById(it)?.toModel()
+        }
+        when {
+            generated is CoachRecommendation.Information -> generated
+            generated is CoachRecommendation.Action &&
+                generated.id == currentState.consumedRecommendationId -> null
+            generated is CoachRecommendation.Action &&
+                lastSnapshot?.triggerContextId == generated.triggerContextId &&
+                lastSnapshot?.glucoseSourceId != generated.glucoseSourceId -> null
+            generated is CoachRecommendation.Action &&
+                lastSnapshot?.triggerContextId == generated.triggerContextId ->
+                lastSnapshot?.takeIf { it.validUntilEpochMillis > now }
+            generated is CoachRecommendation.Action -> generated
+            (currentState.snoozedUntilEpochMillis ?: Long.MIN_VALUE) > now -> null
+            currentState.lastRecommendationId == null -> null
+            currentState.lastRecommendationId == currentState.consumedRecommendationId -> null
+            else -> lastSnapshot
+                ?.takeIf { snapshot ->
+                    snapshot.validUntilEpochMillis > now &&
+                        snapshot.glucoseSourceId == glucose?.sourceId &&
+                        snapshot.triggerContextId == meal?.id
+                }
+        }
     }
 
     override fun observeTodaySummary(): Flow<DailySummary> = combine(
@@ -162,11 +190,31 @@ class CoachingRepositoryImpl @Inject constructor(
         mealDao.upsert(marker.toEntity())
     }
 
+    override suspend fun latestMealMarker(): MealMarker? = mealDao.latest()?.toModel()
+
     override suspend fun startSession(session: InterventionSession): InterventionSession {
         require(session.status == InterventionStatus.STARTED) {
             "A new intervention session must have STARTED status."
         }
         return interventionDao.startIfNoActive(session.toEntity()).toModel()
+    }
+
+    override suspend fun startSessionForRecommendation(
+        session: InterventionSession,
+        recommendationId: String,
+        nowEpochMillis: Long,
+    ): InterventionSession? {
+        require(session.status == InterventionStatus.STARTED) {
+            "A new intervention session must have STARTED status."
+        }
+        require(session.recommendationId == recommendationId) {
+            "The session must identify the recommendation it consumes."
+        }
+        return interventionDao.startForRecommendationIfAvailable(
+            candidate = session.toEntity(),
+            recommendationId = recommendationId,
+            currentDayStartEpochMillis = startOfToday(nowEpochMillis),
+        )?.toModel()
     }
 
     override suspend fun completeSession(
@@ -186,6 +234,10 @@ class CoachingRepositoryImpl @Inject constructor(
 
     override suspend fun session(sessionId: String): InterventionSession? =
         interventionDao.getById(sessionId)?.toModel()
+
+    override suspend fun sessionForRecommendation(
+        recommendationId: String,
+    ): InterventionSession? = interventionDao.getByRecommendationId(recommendationId)?.toModel()
 
     override suspend fun latestActiveSession(): InterventionSession? =
         interventionDao.latestActive()?.toModel()
@@ -239,6 +291,14 @@ class CoachingRepositoryImpl @Inject constructor(
         require(recommendation.validUntilEpochMillis > recommendation.createdAtEpochMillis) {
             "Recommendation validity must end after creation."
         }
+        val safetyProvenance = listOf(
+            recommendation.glucoseSourceId,
+            recommendation.safetyReadingId,
+            recommendation.safetyReadingAtEpochMillis,
+        )
+        require(safetyProvenance.all { it != null } || safetyProvenance.all { it == null }) {
+            "Recommendation safety-reading provenance must be stored together."
+        }
         recommendationSnapshotDao.deleteExpiredBefore(
             recommendation.createdAtEpochMillis - RECOMMENDATION_RETENTION_MILLIS,
         )
@@ -257,13 +317,40 @@ class CoachingRepositoryImpl @Inject constructor(
         recommendationId: String,
         nowEpochMillis: Long,
     ): Boolean {
+        val authoritative = recommendationSnapshotDao.getById(recommendationId)
+            ?: return false
+        if (authoritative.validUntilEpochMillis <= nowEpochMillis) return false
         val current = coachStateDao.get().forCurrentDay(nowEpochMillis)
-        if (current.lastRecommendationId == recommendationId) return false
+        val sameRecommendation = current.lastRecommendationId == recommendationId
+        val deliveryCount = if (sameRecommendation) {
+            current.deliveryCountForLastRecommendation
+        } else {
+            0
+        }
+        if (current.consumedRecommendationId == recommendationId || deliveryCount >= 2) {
+            return false
+        }
+        if (
+            sameRecommendation &&
+            deliveryCount == 1 &&
+            (
+                current.snoozedUntilEpochMillis == null ||
+                    current.snoozedUntilEpochMillis > nowEpochMillis
+                )
+        ) {
+            return false
+        }
         coachStateDao.upsert(
             current.copy(
                 lastRecommendationAtEpochMillis = nowEpochMillis,
                 lastRecommendationId = recommendationId,
                 notificationsSentToday = current.notificationsSentToday + 1,
+                deliveryCountForLastRecommendation = deliveryCount + 1,
+                snoozedUntilEpochMillis = if (sameRecommendation) {
+                    current.snoozedUntilEpochMillis
+                } else {
+                    null
+                },
             ),
         )
         return true
@@ -278,6 +365,8 @@ class CoachingRepositoryImpl @Inject constructor(
                 snoozedUntilEpochMillis = this?.snoozedUntilEpochMillis,
                 notificationDayStartEpochMillis = today,
                 notificationsSentToday = 0,
+                deliveryCountForLastRecommendation = this?.deliveryCountForLastRecommendation ?: 0,
+                consumedRecommendationId = this?.consumedRecommendationId,
             )
         }
         return this

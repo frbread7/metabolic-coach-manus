@@ -122,6 +122,9 @@ fun RecommendationSnapshotEntity.toModel() = CoachRecommendation.Action(
     algorithmVersion = algorithmVersion,
     triggerContextId = triggerContextId,
     triggerAtEpochMillis = triggerAtEpochMillis,
+    glucoseSourceId = glucoseSourceId,
+    safetyReadingId = safetyReadingId,
+    safetyReadingAtEpochMillis = safetyReadingAtEpochMillis,
 )
 
 fun CoachRecommendation.Action.toEntity() = RecommendationSnapshotEntity(
@@ -137,6 +140,9 @@ fun CoachRecommendation.Action.toEntity() = RecommendationSnapshotEntity(
     algorithmVersion = algorithmVersion,
     triggerContextId = triggerContextId,
     triggerAtEpochMillis = triggerAtEpochMillis,
+    glucoseSourceId = glucoseSourceId,
+    safetyReadingId = safetyReadingId,
+    safetyReadingAtEpochMillis = safetyReadingAtEpochMillis,
 )
 
 fun GlycemicPlanningMilestoneEntity.toModel() = GlycemicPlanningMilestone(

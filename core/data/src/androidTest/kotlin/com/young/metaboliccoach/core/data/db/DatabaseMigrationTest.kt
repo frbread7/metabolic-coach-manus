@@ -20,7 +20,7 @@ class DatabaseMigrationTest {
 
     @Test
     @Throws(IOException::class)
-    fun migrateFromVersion1To9PreservesRowsAndAddsSafeDefaults() {
+    fun migrateFromVersion1To10PreservesRowsAndAddsSafeDefaults() {
         helper.createDatabase(TEST_DATABASE, 1).apply {
             execSQL(
                 """
@@ -56,7 +56,7 @@ class DatabaseMigrationTest {
 
         helper.runMigrationsAndValidate(
             TEST_DATABASE,
-            9,
+            10,
             true,
             *DatabaseMigrations.ALL,
         ).use { database ->
@@ -111,6 +111,12 @@ class DatabaseMigrationTest {
                 cursor.moveToFirst()
                 assertEquals(0, cursor.getInt(0))
             }
+            database.query(
+                "SELECT deliveryCountForLastRecommendation, consumedRecommendationId " +
+                    "FROM coach_state",
+            ).use { cursor ->
+                assertEquals(false, cursor.moveToFirst())
+            }
             database.query("SELECT COUNT(*) FROM glucose_history_settings").use { cursor ->
                 cursor.moveToFirst()
                 assertEquals(0, cursor.getInt(0))
@@ -120,16 +126,57 @@ class DatabaseMigrationTest {
 
     @Test
     @Throws(IOException::class)
-    fun everySupportedStartingVersionHasAValidatedPathToVersion8() {
-        for (startVersion in 2..7) {
+    fun everySupportedStartingVersionHasAValidatedPathToVersion10() {
+        for (startVersion in 2..9) {
             val databaseName = "$TEST_DATABASE-$startVersion"
             helper.createDatabase(databaseName, startVersion).close()
             helper.runMigrationsAndValidate(
                 databaseName,
-                9,
+                10,
                 true,
                 *DatabaseMigrations.ALL,
             ).close()
+        }
+    }
+
+    @Test
+    @Throws(IOException::class)
+    fun migrateFromVersion9AddsCoachingProvenanceDefaults() {
+        helper.createDatabase("$TEST_DATABASE-v9", 9).apply {
+            execSQL(
+                "INSERT INTO coach_state VALUES (1, NULL, 'recommendation', NULL, 0, 1)",
+            )
+            execSQL(
+                "INSERT INTO recommendation_snapshots VALUES " +
+                    "('recommendation', 'POST_MEAL_WINDOW', 1000, 2000, 'WALK', " +
+                    "'Walk?', 'START WALK', 10, NULL, 1, 'meal', 500)",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(
+            "$TEST_DATABASE-v9",
+            10,
+            true,
+            *DatabaseMigrations.ALL,
+        ).use { database ->
+            database.query(
+                "SELECT deliveryCountForLastRecommendation, consumedRecommendationId " +
+                    "FROM coach_state WHERE singletonId = 1",
+            ).use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(0, cursor.getInt(0))
+                assertEquals(true, cursor.isNull(1))
+            }
+            database.query(
+                "SELECT glucoseSourceId, safetyReadingId, safetyReadingAtEpochMillis " +
+                    "FROM recommendation_snapshots WHERE id = 'recommendation'",
+            ).use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(true, cursor.isNull(0))
+                assertEquals(true, cursor.isNull(1))
+                assertEquals(true, cursor.isNull(2))
+            }
         }
     }
 

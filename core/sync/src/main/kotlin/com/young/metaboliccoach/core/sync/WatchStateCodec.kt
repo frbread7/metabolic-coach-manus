@@ -81,6 +81,11 @@ class WatchStateCodec @Inject constructor() {
         }
         command.triggerContextId?.let { putString(Keys.COMMAND_TRIGGER_CONTEXT_ID, it) }
         command.triggerAtEpochMillis?.let { putLong(Keys.COMMAND_TRIGGER_AT, it) }
+        command.glucoseSourceId?.let { putString(Keys.COMMAND_GLUCOSE_SOURCE_ID, it) }
+        command.safetyReadingId?.let { putString(Keys.COMMAND_SAFETY_READING_ID, it) }
+        command.safetyReadingAtEpochMillis?.let {
+            putLong(Keys.COMMAND_SAFETY_READING_AT, it)
+        }
         command.dataResetId?.let { putString(Keys.DATA_RESET_ID, it) }
     }
 
@@ -103,6 +108,10 @@ class WatchStateCodec @Inject constructor() {
                     dataMap.optionalLong(Keys.COMMAND_RECOMMENDATION_CREATED_AT),
                 triggerContextId = dataMap.getString(Keys.COMMAND_TRIGGER_CONTEXT_ID),
                 triggerAtEpochMillis = dataMap.optionalLong(Keys.COMMAND_TRIGGER_AT),
+                glucoseSourceId = dataMap.getString(Keys.COMMAND_GLUCOSE_SOURCE_ID),
+                safetyReadingId = dataMap.getString(Keys.COMMAND_SAFETY_READING_ID),
+                safetyReadingAtEpochMillis =
+                    dataMap.optionalLong(Keys.COMMAND_SAFETY_READING_AT),
                 dataResetId = dataMap.getString(Keys.DATA_RESET_ID),
             )
         }.getOrNull()
@@ -271,6 +280,15 @@ class WatchStateCodec @Inject constructor() {
                 recommendation.triggerAtEpochMillis?.let {
                     putLong(Keys.RECOMMENDATION_TRIGGER_AT, it)
                 }
+                recommendation.glucoseSourceId?.let {
+                    putString(Keys.RECOMMENDATION_GLUCOSE_SOURCE_ID, it)
+                }
+                recommendation.safetyReadingId?.let {
+                    putString(Keys.RECOMMENDATION_SAFETY_READING_ID, it)
+                }
+                recommendation.safetyReadingAtEpochMillis?.let {
+                    putLong(Keys.RECOMMENDATION_SAFETY_READING_AT, it)
+                }
             }
 
             is CoachRecommendation.Information -> {
@@ -301,6 +319,10 @@ class WatchStateCodec @Inject constructor() {
                     map.intOrDefault(Keys.RECOMMENDATION_ALGORITHM_VERSION, 1),
                 triggerContextId = map.getString(Keys.RECOMMENDATION_TRIGGER_CONTEXT_ID),
                 triggerAtEpochMillis = map.optionalLong(Keys.RECOMMENDATION_TRIGGER_AT),
+                glucoseSourceId = map.getString(Keys.RECOMMENDATION_GLUCOSE_SOURCE_ID),
+                safetyReadingId = map.getString(Keys.RECOMMENDATION_SAFETY_READING_ID),
+                safetyReadingAtEpochMillis =
+                    map.optionalLong(Keys.RECOMMENDATION_SAFETY_READING_AT),
             )
 
             RecommendationKind.INFORMATION -> CoachRecommendation.Information(
@@ -533,6 +555,9 @@ class WatchStateCodec @Inject constructor() {
         const val RECOMMENDATION_ALGORITHM_VERSION = "recommendationAlgorithmVersion"
         const val RECOMMENDATION_TRIGGER_CONTEXT_ID = "recommendationTriggerContextId"
         const val RECOMMENDATION_TRIGGER_AT = "recommendationTriggerAt"
+        const val RECOMMENDATION_GLUCOSE_SOURCE_ID = "recommendationGlucoseSourceId"
+        const val RECOMMENDATION_SAFETY_READING_ID = "recommendationSafetyReadingId"
+        const val RECOMMENDATION_SAFETY_READING_AT = "recommendationSafetyReadingAt"
         const val INTERVENTION_TYPE = "interventionType"
         const val TITLE = "title"
         const val DETAIL = "detail"
@@ -571,6 +596,9 @@ class WatchStateCodec @Inject constructor() {
         const val COMMAND_RECOMMENDATION_REASON = "commandRecommendationReason"
         const val COMMAND_RECOMMENDATION_ALGORITHM_VERSION =
             "commandRecommendationAlgorithmVersion"
+        const val COMMAND_GLUCOSE_SOURCE_ID = "commandGlucoseSourceId"
+        const val COMMAND_SAFETY_READING_ID = "commandSafetyReadingId"
+        const val COMMAND_SAFETY_READING_AT = "commandSafetyReadingAt"
         const val COMMAND_RECOMMENDATION_CREATED_AT = "commandRecommendationCreatedAt"
         const val COMMAND_TRIGGER_CONTEXT_ID = "commandTriggerContextId"
         const val COMMAND_TRIGGER_AT = "commandTriggerAt"

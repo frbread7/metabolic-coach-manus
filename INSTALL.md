@@ -62,7 +62,17 @@ acceptance for those components.
 After installation, use [the v0.4.2 acceptance checklist](docs/V0.4_2_SAVED_MILESTONES.md) and
 stop after recording the phone results.
 
-## v0.5.1 CI artifact preflight
+## v0.6.0 local engineering artifact preflight
+
+The v0.6.0 package is a debug-signed engineering candidate for the APOS-reviewed post-meal walk
+coaching increment. Verify the ZIP SHA-256, commit SHA, versionName `0.6.0`, versionCode `9`, and
+signing certificate before installing all three APKs over the accepted build without clearing app
+data. This is not a production-signed release.
+
+After installation, use [the v0.6.0 physical acceptance document](docs/V0_6_0_POST_MEAL_COACHING.md).
+Stop after reporting the checklist; do not proceed to another feature milestone.
+
+## Historical v0.5.1 CI artifact preflight
 
 The v0.5.1 package is a debug-signed engineering candidate for the phone-only local History
 Explorer and selected-period GMI. Verify the ZIP SHA-256, commit SHA, versionName `0.5.1`,

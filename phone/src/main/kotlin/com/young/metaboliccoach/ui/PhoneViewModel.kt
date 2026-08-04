@@ -732,6 +732,20 @@ class PhoneViewModel @Inject constructor(
                 nightscoutSettingsRepository.updateNightscoutSettings(normalizedNightscout)
             }
             syncScheduler.configurePeriodic()
+            syncScheduler.cancelPostMealEvaluations()
+            if (settings.postMealRemindersEnabled) {
+                coachingRepository.latestMealMarker()?.let { marker ->
+                    val expiresAt = marker.occurredAtEpochMillis +
+                        (settings.postMealDelayMinutes + settings.postMealWindowMinutes) * 60_000L
+                    if (expiresAt > System.currentTimeMillis()) {
+                        syncScheduler.schedulePostMealEvaluation(
+                            marker,
+                            settings.postMealDelayMinutes,
+                            settings.postMealWindowMinutes,
+                        )
+                    }
+                }
+            }
             refreshCoordinator.refresh(refreshProviders = true)
         }
     }
@@ -739,9 +753,17 @@ class PhoneViewModel @Inject constructor(
     fun markMeal() {
         runOperation("Meal marked.") {
             val now = System.currentTimeMillis()
-            mutationGate.withLock {
-                coachingRepository.saveMealMarker(
-                    MealMarker(UUID.randomUUID().toString(), now),
+            val marker = MealMarker(UUID.randomUUID().toString(), now)
+            val settings = mutationGate.withLock {
+                coachingRepository.saveMealMarker(marker)
+                settingsRepository.observe().first()
+            }
+            if (settings.postMealRemindersEnabled) {
+                syncScheduler.cancelPostMealEvaluations()
+                syncScheduler.schedulePostMealEvaluation(
+                    marker,
+                    settings.postMealDelayMinutes,
+                    settings.postMealWindowMinutes,
                 )
             }
             refreshCoordinator.refresh(refreshProviders = false)
@@ -788,7 +810,8 @@ class PhoneViewModel @Inject constructor(
                             action.interventionType.name == "WALK"
                         QuickActionType.START_STAIRS ->
                             action.interventionType.name == "STAIRS"
-                        else -> false
+                        QuickActionType.SNOOZE -> true
+                        QuickActionType.MARK_COMPLETED -> false
                     }
                 }
             val result = mutationGate.withLock {
@@ -816,6 +839,10 @@ class PhoneViewModel @Inject constructor(
                         authoritativeRecommendation?.createdAtEpochMillis,
                     triggerContextId = authoritativeRecommendation?.triggerContextId,
                     triggerAtEpochMillis = authoritativeRecommendation?.triggerAtEpochMillis,
+                    glucoseSourceId = authoritativeRecommendation?.glucoseSourceId,
+                    safetyReadingId = authoritativeRecommendation?.safetyReadingId,
+                    safetyReadingAtEpochMillis =
+                        authoritativeRecommendation?.safetyReadingAtEpochMillis,
                 )
                 quickActionHandler.handle(command)
             }

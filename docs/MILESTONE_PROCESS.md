@@ -122,5 +122,8 @@ non-conflicting earlier constraints, and avoid inferring acceptance that the use
   phone-only local trend chart and selected-period GMI, and the user reported the
   [phone physical gate](V0_5_1_HISTORY_EXPLORER.md) passed on 2026-08-04. Wear, watch-face,
   coaching, notification, and current-glucose freshness behavior remained frozen.
+- `v0.6.0` architecture gate: APOS returned `GO WITH CONDITIONS` for one post-meal delayed walk
+  workflow. Implementation is limited to this trigger and stops for the phone/Galaxy Watch8
+  checklist in [V0_6_0_POST_MEAL_COACHING.md](V0_6_0_POST_MEAL_COACHING.md).
 
 The completed physical test was defined in [V0.3_WEAR_ACCEPTANCE.md](V0.3_WEAR_ACCEPTANCE.md).

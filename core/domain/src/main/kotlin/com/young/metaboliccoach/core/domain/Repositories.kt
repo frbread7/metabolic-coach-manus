@@ -107,13 +107,20 @@ interface CoachingRepository {
     fun observePersonalObservations(): Flow<List<PersonalObservation>>
     fun observeActiveSession(): Flow<InterventionSession?>
     suspend fun saveMealMarker(marker: MealMarker)
+    suspend fun latestMealMarker(): MealMarker?
     suspend fun startSession(session: InterventionSession): InterventionSession
+    suspend fun startSessionForRecommendation(
+        session: InterventionSession,
+        recommendationId: String,
+        nowEpochMillis: Long,
+    ): InterventionSession?
     suspend fun completeSession(
         sessionId: String,
         endedAtEpochMillis: Long,
         followUpDueAtEpochMillis: Long,
     ): InterventionSession?
     suspend fun session(sessionId: String): InterventionSession?
+    suspend fun sessionForRecommendation(recommendationId: String): InterventionSession?
     suspend fun latestActiveSession(): InterventionSession?
     suspend fun pendingFollowUpSessions(): List<InterventionSession>
     suspend fun finalizeFollowUp(

@@ -53,6 +53,31 @@ class QuickActionHandlerTest {
     }
 
     @Test
+    fun `mixed version coached action without complete safety provenance is rejected`() = runTest {
+        val action = recommendation(
+            id = "legacy-action",
+            validUntilEpochMillis = NOW + 60_000,
+        )
+        val fixture = fixture(
+            readings = listOf(reading("current", "health-connect:caresens", NOW - 1_000)),
+            recommendations = listOf(action),
+        )
+
+        val result = fixture.handler.handle(
+            command(
+                recommendationId = action.id,
+                recommendationValidUntilEpochMillis = action.validUntilEpochMillis,
+            ),
+        )
+
+        assertEquals(
+            CommandHandlingResult.Rejected(SessionCommandOutcome.REJECTED_CONFLICT),
+            result,
+        )
+        assertNull(fixture.coaching.active)
+    }
+
+    @Test
     fun `start stores the exact baseline reading provenance`() = runTest {
         val newest = reading("newest", "health-connect:caresens", NOW - 1_000)
         val fixture = fixture(readings = listOf(reading("older", "other", NOW - 2_000), newest))
@@ -63,6 +88,38 @@ class QuickActionHandlerTest {
         assertEquals(newest.id, stored?.baselineGlucoseReadingId)
         assertEquals(newest.sourceId, stored?.baselineGlucoseSourceId)
         assertEquals(newest.measuredAtEpochMillis, stored?.baselineGlucoseMeasuredAtEpochMillis)
+    }
+
+    @Test
+    fun `coached start is rejected after active glucose source changes`() = runTest {
+        val baseline = reading("baseline", "health-connect:caresens", NOW - 1_000).copy(
+            rateMgDlPerMinute = 1.5,
+        )
+        val action = recommendation(
+            id = "recommendation",
+            validUntilEpochMillis = NOW + 60_000,
+            includeTimingProvenance = true,
+            durationMinutes = 12,
+        )
+        val fixture = fixture(
+            readings = listOf(
+                baseline,
+                reading("other-source-newer", "other", NOW),
+            ),
+            recommendations = listOf(action),
+        )
+
+        assertEquals(
+            CommandHandlingResult.Rejected(SessionCommandOutcome.REJECTED_CONFLICT),
+            fixture.handler.handle(
+                command(
+                    recommendationId = "recommendation",
+                    recommendationValidUntilEpochMillis = NOW + 60_000,
+                    includeTimingProvenance = true,
+                ),
+            ),
+        )
+        assertNull(fixture.coaching.active)
     }
 
     @Test
@@ -87,11 +144,14 @@ class QuickActionHandlerTest {
                 command(
                     recommendationId = "recommendation",
                     recommendationValidUntilEpochMillis = NOW + 60_000,
+                    includeTimingProvenance = true,
                 ),
             ),
         )
 
         val stored = fixture.coaching.active
+        assertEquals(baseline.id, stored?.baselineGlucoseReadingId)
+        assertEquals(baseline.sourceId, stored?.baselineGlucoseSourceId)
         assertEquals("recommendation", stored?.recommendationId)
         assertEquals(CoachReason.RAPID_GLUCOSE_RISE, stored?.recommendationReason)
         assertEquals(1, stored?.recommendationAlgorithmVersion)
@@ -127,6 +187,7 @@ class QuickActionHandlerTest {
                 recommendation(
                     id = "current-action",
                     validUntilEpochMillis = NOW + 60_000,
+                    includeTimingProvenance = true,
                 ),
             ),
         )
@@ -135,6 +196,7 @@ class QuickActionHandlerTest {
             command(
                 recommendationId = "current-action",
                 recommendationValidUntilEpochMillis = NOW + 60_000,
+                includeTimingProvenance = true,
             ),
         )
 
@@ -167,6 +229,7 @@ class QuickActionHandlerTest {
                     validUntilEpochMillis = actionAt + 60_000,
                     includeTimingProvenance = true,
                     triggerAtEpochMillis = actionAt - 2_000,
+                    safetyReadingAtEpochMillis = actionAt - 1_000,
                 ),
             ),
         )
@@ -443,6 +506,10 @@ class QuickActionHandlerTest {
         triggerContextId = "reading-trigger".takeIf { includeTimingProvenance },
         triggerAtEpochMillis =
             (createdAtEpochMillis - 2_000).takeIf { includeTimingProvenance },
+        glucoseSourceId = "health-connect:caresens".takeIf { includeTimingProvenance },
+        safetyReadingId = "published-reading".takeIf { includeTimingProvenance },
+        safetyReadingAtEpochMillis =
+            (createdAtEpochMillis - 1_000).takeIf { includeTimingProvenance },
     )
 
     private fun recommendation(
@@ -452,6 +519,7 @@ class QuickActionHandlerTest {
         includeTimingProvenance: Boolean = false,
         durationMinutes: Int = 10,
         triggerAtEpochMillis: Long = createdAtEpochMillis - 1_000,
+        safetyReadingAtEpochMillis: Long = createdAtEpochMillis,
     ) = CoachRecommendation.Action(
         reason = CoachReason.RAPID_GLUCOSE_RISE,
         id = id,
@@ -465,6 +533,10 @@ class QuickActionHandlerTest {
         algorithmVersion = 1,
         triggerContextId = "reading-trigger".takeIf { includeTimingProvenance },
         triggerAtEpochMillis = triggerAtEpochMillis.takeIf { includeTimingProvenance },
+        glucoseSourceId = "health-connect:caresens".takeIf { includeTimingProvenance },
+        safetyReadingId = "published-reading".takeIf { includeTimingProvenance },
+        safetyReadingAtEpochMillis =
+            safetyReadingAtEpochMillis.takeIf { includeTimingProvenance },
     )
 
     private fun reading(id: String, sourceId: String, measuredAt: Long) = GlucoseReading(
@@ -530,6 +602,7 @@ class QuickActionHandlerTest {
         val recommendations =
             initialRecommendations.associateByTo(linkedMapOf(), CoachRecommendation.Action::id)
         var active: InterventionSession? = null
+        private val consumed = mutableSetOf<String>()
 
         override fun observeCurrentRecommendation(): Flow<CoachRecommendation?> = flowOf(null)
         override fun observeTodaySummary(): Flow<DailySummary> = flowOf(
@@ -541,10 +614,24 @@ class QuickActionHandlerTest {
 
         override fun observeActiveSession(): Flow<InterventionSession?> = flowOf(active)
         override suspend fun saveMealMarker(marker: MealMarker) = Unit
+        override suspend fun latestMealMarker(): MealMarker? = null
 
         override suspend fun startSession(session: InterventionSession): InterventionSession {
             sessions[session.id]?.let { return it }
             active?.let { return it }
+            sessions[session.id] = session
+            active = session
+            return session
+        }
+
+        override suspend fun startSessionForRecommendation(
+            session: InterventionSession,
+            recommendationId: String,
+            nowEpochMillis: Long,
+        ): InterventionSession? {
+            sessionForRecommendation(recommendationId)?.let { return it }
+            active?.let { return it }
+            if (!consumed.add(recommendationId)) return null
             sessions[session.id] = session
             active = session
             return session
@@ -568,6 +655,12 @@ class QuickActionHandlerTest {
 
         override suspend fun session(sessionId: String): InterventionSession? =
             sessions[sessionId]
+
+        override suspend fun sessionForRecommendation(
+            recommendationId: String,
+        ): InterventionSession? = sessions.values.firstOrNull {
+            it.recommendationId == recommendationId
+        }
 
         override suspend fun latestActiveSession(): InterventionSession? = active
         override suspend fun pendingFollowUpSessions(): List<InterventionSession> = emptyList()
@@ -596,6 +689,7 @@ class QuickActionHandlerTest {
             recommendationId: String,
             nowEpochMillis: Long,
         ): Boolean = true
+
     }
 
     private companion object {

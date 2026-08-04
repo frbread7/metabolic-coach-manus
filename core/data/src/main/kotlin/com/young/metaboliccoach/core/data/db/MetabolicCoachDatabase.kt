@@ -15,7 +15,7 @@ import androidx.room.RoomDatabase
         RecommendationSnapshotEntity::class,
         GlycemicPlanningMilestoneEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class MetabolicCoachDatabase : RoomDatabase() {

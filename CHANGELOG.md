@@ -2,6 +2,29 @@
 
 All notable Metabolic Coach package changes are recorded here.
 
+## v0.6.0 — 2026-08-04 — Post-meal walk coaching
+
+### Added
+
+- A real meal marker schedules one unique, configurable delayed Nightscout refresh and post-meal
+  safety evaluation.
+- One phone/notification/Wear walk recommendation can be started or snoozed, completed once, and
+  followed by the existing same-source descriptive observation path.
+- Durable meal-trigger consumption and bounded one-time snooze redelivery prevent repeat sessions
+  or repeated prompts for the same meal.
+- Coached Start atomically consumes its recommendation and inserts one session; active-source
+  changes invalidate old-source actions, and delayed refresh retries stop at the meal-window or
+  three-attempt boundary.
+
+### Safety and scope
+
+- Production action generation is limited to `POST_MEAL_WINDOW`; rapid-rise and inactivity/stair
+  automation are explicitly deferred.
+- Missing, future, stale, low, or rapidly falling glucose suppresses the action. Action-time safety
+  uses the exact source captured in an immutable phone-authored recommendation snapshot.
+- The wording is wellness guidance, not a medical claim or treatment instruction. Physical phone
+  and Galaxy Watch8 acceptance is required before another feature milestone.
+
 ## v0.5.1 — 2026-08-04 — Local History Explorer and selected-period GMI (phone-only)
 
 ### Added

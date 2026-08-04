@@ -60,6 +60,9 @@ class WatchStateCodecTest {
                 algorithmVersion = 2,
                 triggerContextId = "health-connect:1720000000000",
                 triggerAtEpochMillis = 1_720_000_000_000,
+                glucoseSourceId = "health-connect",
+                safetyReadingId = "reading-1",
+                safetyReadingAtEpochMillis = 1_720_000_000_000,
             ),
             settings = DefaultCoachSettings.create().copy(
                 glucoseProviderMode = GlucoseProviderMode.XDRIP_BROADCAST,
@@ -221,6 +224,9 @@ class WatchStateCodecTest {
             recommendationCreatedAtEpochMillis = 1_720_000_000_000,
             triggerContextId = "activity:1719990000000",
             triggerAtEpochMillis = 1_719_990_000_000,
+            glucoseSourceId = "health-connect",
+            safetyReadingId = "reading-1",
+            safetyReadingAtEpochMillis = 1_720_000_000_000,
             dataResetId = "data-reset-2",
         )
 

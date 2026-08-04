@@ -25,6 +25,9 @@ sealed interface CoachRecommendation {
         val algorithmVersion: Int = 1,
         val triggerContextId: String? = null,
         val triggerAtEpochMillis: Long? = null,
+        val glucoseSourceId: String? = null,
+        val safetyReadingId: String? = null,
+        val safetyReadingAtEpochMillis: Long? = null,
     ) : CoachRecommendation
 
     data class Information(
@@ -41,8 +44,10 @@ data class CoachContext(
     val activity: ActivitySnapshot?,
     val mostRecentMeal: MealMarker?,
     val lastRecommendationAtEpochMillis: Long?,
+    val lastRecommendationId: String? = null,
     val snoozedUntilEpochMillis: Long?,
     val notificationsSentToday: Int,
+    val consumedRecommendationId: String? = null,
 )
 
 enum class PersonalObservationKind {

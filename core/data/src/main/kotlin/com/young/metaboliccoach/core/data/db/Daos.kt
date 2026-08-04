@@ -205,6 +205,12 @@ interface InterventionDao {
     suspend fun getById(sessionId: String): InterventionSessionEntity?
 
     @Query(
+        "SELECT * FROM intervention_sessions WHERE recommendationId = :recommendationId " +
+            "ORDER BY startedAtEpochMillis ASC LIMIT 1",
+    )
+    suspend fun getByRecommendationId(recommendationId: String): InterventionSessionEntity?
+
+    @Query(
         """
         SELECT * FROM intervention_sessions
         WHERE status = 'STARTED'
@@ -249,6 +255,12 @@ interface InterventionDao {
 
     @Upsert
     suspend fun upsert(session: InterventionSessionEntity)
+
+    @Query("SELECT * FROM coach_state WHERE singletonId = 1")
+    suspend fun getCoachState(): CoachStateEntity?
+
+    @Upsert
+    suspend fun upsertCoachState(state: CoachStateEntity)
 
     @Query(
         """
@@ -303,12 +315,48 @@ interface InterventionDao {
         upsert(candidate)
         return candidate
     }
+
+    @Transaction
+    suspend fun startForRecommendationIfAvailable(
+        candidate: InterventionSessionEntity,
+        recommendationId: String,
+        currentDayStartEpochMillis: Long,
+    ): InterventionSessionEntity? {
+        getByRecommendationId(recommendationId)?.let { return it }
+        getById(candidate.id)?.let { return it }
+        latestActive()?.let { return it }
+        val storedState = getCoachState()
+        val currentState = if (
+            storedState == null ||
+            storedState.notificationDayStartEpochMillis != currentDayStartEpochMillis
+        ) {
+            CoachStateEntity(
+                lastRecommendationAtEpochMillis = storedState?.lastRecommendationAtEpochMillis,
+                lastRecommendationId = storedState?.lastRecommendationId,
+                snoozedUntilEpochMillis = storedState?.snoozedUntilEpochMillis,
+                notificationDayStartEpochMillis = currentDayStartEpochMillis,
+                notificationsSentToday = 0,
+                deliveryCountForLastRecommendation =
+                    storedState?.deliveryCountForLastRecommendation ?: 0,
+                consumedRecommendationId = storedState?.consumedRecommendationId,
+            )
+        } else {
+            storedState
+        }
+        if (currentState.consumedRecommendationId == recommendationId) return null
+        upsertCoachState(currentState.copy(consumedRecommendationId = recommendationId))
+        upsert(candidate)
+        return candidate
+    }
 }
 
 @Dao
 interface MealDao {
     @Query("SELECT * FROM meal_markers ORDER BY occurredAtEpochMillis DESC LIMIT 1")
     fun observeLatest(): Flow<MealMarkerEntity?>
+
+    @Query("SELECT * FROM meal_markers ORDER BY occurredAtEpochMillis DESC LIMIT 1")
+    suspend fun latest(): MealMarkerEntity?
 
     @Query("SELECT * FROM meal_markers ORDER BY occurredAtEpochMillis ASC")
     fun observeAll(): Flow<List<MealMarkerEntity>>

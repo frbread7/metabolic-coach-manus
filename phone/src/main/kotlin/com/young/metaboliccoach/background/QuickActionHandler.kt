@@ -60,9 +60,26 @@ class QuickActionHandler @Inject constructor(
         if (
             recommendation != null &&
             (
-                interventionType != recommendation.interventionType ||
+                (interventionType != null &&
+                    interventionType != recommendation.interventionType) ||
                     !command.matches(recommendation)
             )
+        ) {
+            return CommandHandlingResult.Rejected(SessionCommandOutcome.REJECTED_CONFLICT)
+        }
+        if (
+            recommendation != null &&
+            listOf(
+                recommendation.glucoseSourceId,
+                recommendation.safetyReadingId,
+                recommendation.safetyReadingAtEpochMillis,
+            ).any { it == null }
+        ) {
+            return CommandHandlingResult.Rejected(SessionCommandOutcome.REJECTED_CONFLICT)
+        }
+        if (
+            recommendation?.glucoseSourceId != null &&
+            glucoseRepository.observeLatest().first()?.sourceId != recommendation.glucoseSourceId
         ) {
             return CommandHandlingResult.Rejected(SessionCommandOutcome.REJECTED_CONFLICT)
         }
@@ -71,6 +88,7 @@ class QuickActionHandler @Inject constructor(
             glucoseNear(
                 eventAtEpochMillis = eventAt,
                 toleranceMinutes = settings.staleReadingMinutes,
+                sourceId = recommendation?.glucoseSourceId,
             )
         }
         if (
@@ -126,6 +144,11 @@ class QuickActionHandler @Inject constructor(
         baseline: GlucoseReading?,
         recommendation: CoachRecommendation.Action?,
     ): CommandHandlingResult {
+        recommendation?.let {
+            coachingRepository.sessionForRecommendation(it.id)?.let {
+                return CommandHandlingResult.Applied
+            }
+        }
         val sessionId = command.sessionId ?: command.id
         coachingRepository.latestActiveSession()?.let { active ->
             return if (active.id == sessionId) {
@@ -134,42 +157,49 @@ class QuickActionHandler @Inject constructor(
                 CommandHandlingResult.Rejected(SessionCommandOutcome.REJECTED_CONFLICT)
             }
         }
-        val stored = coachingRepository.startSession(
-            InterventionSession(
-                id = sessionId,
-                type = type,
-                status = InterventionStatus.STARTED,
-                startedAtEpochMillis = eventAt,
-                endedAtEpochMillis = null,
-                targetDurationMinutes = if (type == InterventionType.WALK) {
-                    recommendation?.durationMinutes ?: settings.walkingDurationMinutes
-                } else {
-                    null
-                },
-                targetFloors = if (type == InterventionType.STAIRS) {
-                    recommendation?.targetFloors ?: settings.stairTargetFloors
-                } else {
-                    null
-                },
-                baselineGlucoseMgDl = baseline?.valueMgDl,
-                baselineGlucoseReadingId = baseline?.id,
-                baselineGlucoseMeasuredAtEpochMillis = baseline?.measuredAtEpochMillis,
-                baselineGlucoseSourceId = baseline?.sourceId,
-                glucoseAfterMgDl = null,
-                recommendationId = recommendation?.id,
-                recommendationReason = recommendation?.reason,
-                recommendationAlgorithmVersion = recommendation?.algorithmVersion,
-                recommendationCreatedAtEpochMillis = recommendation?.createdAtEpochMillis,
-                recommendationValidUntilEpochMillis = recommendation?.validUntilEpochMillis,
-                triggerContextId = recommendation?.triggerContextId,
-                triggerAtEpochMillis = recommendation?.triggerAtEpochMillis,
-                baselineEffectiveRateMgDlPerMinute = baseline?.let {
-                    it.rateMgDlPerMinute ?: it.trend.approximateRateMgDlPerMinute
-                },
-                lowGlucoseThresholdMgDlAtStart = settings.lowGlucoseThresholdMgDl,
-            ),
+        val candidate = InterventionSession(
+            id = sessionId,
+            type = type,
+            status = InterventionStatus.STARTED,
+            startedAtEpochMillis = eventAt,
+            endedAtEpochMillis = null,
+            targetDurationMinutes = if (type == InterventionType.WALK) {
+                recommendation?.durationMinutes ?: settings.walkingDurationMinutes
+            } else {
+                null
+            },
+            targetFloors = if (type == InterventionType.STAIRS) {
+                recommendation?.targetFloors ?: settings.stairTargetFloors
+            } else {
+                null
+            },
+            baselineGlucoseMgDl = baseline?.valueMgDl,
+            baselineGlucoseReadingId = baseline?.id,
+            baselineGlucoseMeasuredAtEpochMillis = baseline?.measuredAtEpochMillis,
+            baselineGlucoseSourceId = baseline?.sourceId,
+            glucoseAfterMgDl = null,
+            recommendationId = recommendation?.id,
+            recommendationReason = recommendation?.reason,
+            recommendationAlgorithmVersion = recommendation?.algorithmVersion,
+            recommendationCreatedAtEpochMillis = recommendation?.createdAtEpochMillis,
+            recommendationValidUntilEpochMillis = recommendation?.validUntilEpochMillis,
+            triggerContextId = recommendation?.triggerContextId,
+            triggerAtEpochMillis = recommendation?.triggerAtEpochMillis,
+            baselineEffectiveRateMgDlPerMinute = baseline?.let {
+                it.rateMgDlPerMinute ?: it.trend.approximateRateMgDlPerMinute
+            },
+            lowGlucoseThresholdMgDlAtStart = settings.lowGlucoseThresholdMgDl,
         )
-        return if (stored.id == sessionId) {
+        val stored = if (recommendation != null) {
+            coachingRepository.startSessionForRecommendation(
+                session = candidate,
+                recommendationId = recommendation.id,
+                nowEpochMillis = eventAt,
+            )
+        } else {
+            coachingRepository.startSession(candidate)
+        }
+        return if (stored?.id == sessionId) {
             CommandHandlingResult.Applied
         } else {
             CommandHandlingResult.Rejected(SessionCommandOutcome.REJECTED_CONFLICT)
@@ -208,12 +238,22 @@ class QuickActionHandler @Inject constructor(
     private suspend fun glucoseNear(
         eventAtEpochMillis: Long,
         toleranceMinutes: Int,
+        sourceId: String?,
     ): GlucoseReading? {
         val toleranceMillis = toleranceMinutes * MILLIS_PER_MINUTE
-        return glucoseRepository.readingsBetween(
-            startEpochMillis = eventAtEpochMillis - toleranceMillis,
-            endEpochMillis = eventAtEpochMillis,
-        ).maxWithOrNull(
+        val readings = if (sourceId != null) {
+            glucoseRepository.readingsBetweenExactSource(
+                sourceId = sourceId,
+                startEpochMillis = eventAtEpochMillis - toleranceMillis,
+                endEpochMillis = eventAtEpochMillis,
+            )
+        } else {
+            glucoseRepository.readingsBetween(
+                startEpochMillis = eventAtEpochMillis - toleranceMillis,
+                endEpochMillis = eventAtEpochMillis,
+            )
+        }
+        return readings.maxWithOrNull(
             compareBy<GlucoseReading> { it.measuredAtEpochMillis }.thenBy { it.id },
         )
     }
@@ -221,15 +261,15 @@ class QuickActionHandler @Inject constructor(
     private fun QuickActionCommand.matches(
         recommendation: CoachRecommendation.Action,
     ): Boolean =
-        recommendationValidUntilEpochMillis
-            ?.let { it == recommendation.validUntilEpochMillis } != false &&
-            recommendationReason?.let { it == recommendation.reason } != false &&
-            recommendationAlgorithmVersion
-                ?.let { it == recommendation.algorithmVersion } != false &&
-            recommendationCreatedAtEpochMillis
-                ?.let { it == recommendation.createdAtEpochMillis } != false &&
-            triggerContextId?.let { it == recommendation.triggerContextId } != false &&
-            triggerAtEpochMillis?.let { it == recommendation.triggerAtEpochMillis } != false
+        recommendationValidUntilEpochMillis == recommendation.validUntilEpochMillis &&
+            recommendationReason == recommendation.reason &&
+            recommendationAlgorithmVersion == recommendation.algorithmVersion &&
+            recommendationCreatedAtEpochMillis == recommendation.createdAtEpochMillis &&
+            triggerContextId == recommendation.triggerContextId &&
+            triggerAtEpochMillis == recommendation.triggerAtEpochMillis &&
+            glucoseSourceId == recommendation.glucoseSourceId &&
+            safetyReadingId == recommendation.safetyReadingId &&
+            safetyReadingAtEpochMillis == recommendation.safetyReadingAtEpochMillis
 
     private companion object {
         const val MILLIS_PER_MINUTE = 60_000L

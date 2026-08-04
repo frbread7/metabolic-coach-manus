@@ -66,7 +66,7 @@ class CoachNotificationManager @Inject constructor(
             .addAction(
                 0,
                 "Snooze",
-                actionPendingIntent(QuickActionType.SNOOZE, REQUEST_SNOOZE),
+                actionPendingIntent(QuickActionType.SNOOZE, REQUEST_SNOOZE, recommendation),
             )
             .build()
         NotificationManagerCompat.from(context).notify(COACH_NOTIFICATION_ID, notification)
@@ -92,6 +92,11 @@ class CoachNotificationManager @Inject constructor(
                     putExtra(EXTRA_RECOMMENDATION_ALGORITHM_VERSION, it.algorithmVersion)
                     putExtra(EXTRA_RECOMMENDATION_CREATED_AT, it.createdAtEpochMillis)
                     putExtra(EXTRA_TRIGGER_CONTEXT_ID, it.triggerContextId)
+                    putExtra(EXTRA_GLUCOSE_SOURCE_ID, it.glucoseSourceId)
+                    putExtra(EXTRA_SAFETY_READING_ID, it.safetyReadingId)
+                    it.safetyReadingAtEpochMillis?.let { readingAt ->
+                        putExtra(EXTRA_SAFETY_READING_AT, readingAt)
+                    }
                     it.triggerAtEpochMillis?.let { triggerAt ->
                         putExtra(EXTRA_TRIGGER_AT, triggerAt)
                     }
@@ -117,6 +122,9 @@ class CoachNotificationManager @Inject constructor(
         const val EXTRA_RECOMMENDATION_CREATED_AT = "recommendation_created_at"
         const val EXTRA_TRIGGER_CONTEXT_ID = "trigger_context_id"
         const val EXTRA_TRIGGER_AT = "trigger_at"
+        const val EXTRA_GLUCOSE_SOURCE_ID = "glucose_source_id"
+        const val EXTRA_SAFETY_READING_ID = "safety_reading_id"
+        const val EXTRA_SAFETY_READING_AT = "safety_reading_at"
         private const val COACH_CHANNEL = "metabolic_coaching"
         private const val COACH_NOTIFICATION_ID = 138
         private const val REQUEST_START = 1

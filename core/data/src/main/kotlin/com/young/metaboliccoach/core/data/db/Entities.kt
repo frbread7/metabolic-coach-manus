@@ -112,6 +112,8 @@ data class CoachStateEntity(
     val snoozedUntilEpochMillis: Long?,
     val notificationDayStartEpochMillis: Long,
     val notificationsSentToday: Int,
+    val deliveryCountForLastRecommendation: Int = 0,
+    val consumedRecommendationId: String? = null,
 ) {
     companion object {
         const val SINGLETON_ID = 1
@@ -135,6 +137,9 @@ data class RecommendationSnapshotEntity(
     val algorithmVersion: Int,
     val triggerContextId: String?,
     val triggerAtEpochMillis: Long?,
+    val glucoseSourceId: String? = null,
+    val safetyReadingId: String? = null,
+    val safetyReadingAtEpochMillis: Long? = null,
 )
 
 @Entity(

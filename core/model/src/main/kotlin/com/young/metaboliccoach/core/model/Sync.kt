@@ -33,6 +33,9 @@ data class QuickActionCommand(
     val recommendationCreatedAtEpochMillis: Long? = null,
     val triggerContextId: String? = null,
     val triggerAtEpochMillis: Long? = null,
+    val glucoseSourceId: String? = null,
+    val safetyReadingId: String? = null,
+    val safetyReadingAtEpochMillis: Long? = null,
     val dataResetId: String? = null,
 )
 

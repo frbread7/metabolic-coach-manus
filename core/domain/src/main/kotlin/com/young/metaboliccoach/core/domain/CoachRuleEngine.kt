@@ -10,6 +10,7 @@ class CoachRuleEngine {
     fun recommend(
         context: CoachContext,
         settings: CoachSettings,
+        allowedActionReasons: Set<CoachReason> = ACTION_REASONS,
     ): CoachRecommendation? {
         val glucose = context.glucose
         when (ExerciseSafetyPolicy.evaluate(glucose, settings, context.nowEpochMillis)) {
@@ -58,6 +59,7 @@ class CoachRuleEngine {
         val effectiveRate = glucose.rateMgDlPerMinute
             ?: glucose.trend.approximateRateMgDlPerMinute
         if (
+            CoachReason.RAPID_GLUCOSE_RISE in allowedActionReasons &&
             settings.walkingRemindersEnabled &&
             effectiveRate >= settings.rapidRiseThresholdMgDlPerMinute
         ) {
@@ -73,7 +75,11 @@ class CoachRuleEngine {
             )
         }
 
-        if (settings.postMealRemindersEnabled && isInPostMealWindow(context, settings)) {
+        if (
+            CoachReason.POST_MEAL_WINDOW in allowedActionReasons &&
+            settings.postMealRemindersEnabled &&
+            isInPostMealWindow(context, settings)
+        ) {
             val meal = requireNotNull(context.mostRecentMeal)
             return walkRecommendation(
                 reason = CoachReason.POST_MEAL_WINDOW,
@@ -99,6 +105,7 @@ class CoachRuleEngine {
             isInWorkingHours(context.minuteOfDay, settings) &&
             inactiveMinutes != null &&
             inactiveMinutes >= settings.prolongedInactivityMinutes &&
+            CoachReason.PROLONGED_INACTIVITY in allowedActionReasons &&
             (settings.stairRemindersEnabled || settings.walkingRemindersEnabled)
         ) {
             val inactivityActivity = requireNotNull(context.activity)
@@ -127,6 +134,9 @@ class CoachRuleEngine {
                     algorithmVersion = ALGORITHM_VERSION,
                     triggerContextId = triggerContextId,
                     triggerAtEpochMillis = triggerAtEpochMillis,
+                    glucoseSourceId = glucose.sourceId,
+                    safetyReadingId = glucose.id,
+                    safetyReadingAtEpochMillis = glucose.measuredAtEpochMillis,
                 )
             } else {
                 walkRecommendation(
@@ -156,11 +166,16 @@ class CoachRuleEngine {
         triggerAtEpochMillis: Long,
     ) = CoachRecommendation.Action(
         reason = reason,
-        id = actionId(
-            reason,
-            glucoseReadingId,
-            context.mostRecentMeal?.id.takeIf { reason == CoachReason.POST_MEAL_WINDOW },
-        ),
+        id = if (reason == CoachReason.POST_MEAL_WINDOW) {
+            listOf(
+                reason.name,
+                requireNotNull(context.mostRecentMeal).id,
+                requireNotNull(context.glucose).sourceId,
+                ALGORITHM_VERSION,
+            ).joinToString(":")
+        } else {
+            actionId(reason, glucoseReadingId, null)
+        },
         createdAtEpochMillis = context.nowEpochMillis,
         validUntilEpochMillis = validUntilEpochMillis,
         interventionType = InterventionType.WALK,
@@ -171,6 +186,9 @@ class CoachRuleEngine {
         algorithmVersion = ALGORITHM_VERSION,
         triggerContextId = triggerContextId,
         triggerAtEpochMillis = triggerAtEpochMillis,
+        glucoseSourceId = context.glucose?.sourceId,
+        safetyReadingId = context.glucose?.id,
+        safetyReadingAtEpochMillis = context.glucose?.measuredAtEpochMillis,
     )
 
     private fun isRateLimited(
@@ -179,6 +197,24 @@ class CoachRuleEngine {
     ): Boolean {
         if (context.notificationsSentToday >= settings.maximumNotificationsPerDay) return true
         val lastRecommendation = context.lastRecommendationAtEpochMillis ?: return false
+        val postMealIdentity = context.mostRecentMeal?.let { meal ->
+            context.glucose?.let { glucose ->
+                listOf(
+                    CoachReason.POST_MEAL_WINDOW.name,
+                    meal.id,
+                    glucose.sourceId,
+                    ALGORITHM_VERSION,
+                ).joinToString(":")
+            }
+        }
+        val snoozedUntil = context.snoozedUntilEpochMillis
+        if (
+            context.lastRecommendationId == postMealIdentity &&
+            snoozedUntil != null &&
+            snoozedUntil <= context.nowEpochMillis
+        ) {
+            return false
+        }
         val elapsedMinutes =
             (context.nowEpochMillis - lastRecommendation).coerceAtLeast(0) / MILLIS_PER_MINUTE
         return elapsedMinutes < settings.reminderCooldownMinutes
@@ -218,7 +254,12 @@ class CoachRuleEngine {
 
     companion object {
         private const val MILLIS_PER_MINUTE = 60_000L
-        private const val ALGORITHM_VERSION = 1
+        private const val ALGORITHM_VERSION = 2
+        private val ACTION_REASONS = setOf(
+            CoachReason.RAPID_GLUCOSE_RISE,
+            CoachReason.POST_MEAL_WINDOW,
+            CoachReason.PROLONGED_INACTIVITY,
+        )
 
         private fun actionId(
             reason: CoachReason,

@@ -12,6 +12,7 @@ import androidx.work.await
 import androidx.work.workDataOf
 import com.young.metaboliccoach.core.data.provider.HealthConnectPermissions
 import com.young.metaboliccoach.core.domain.NightscoutSettingsRepository
+import com.young.metaboliccoach.core.model.MealMarker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -96,18 +97,71 @@ class SyncScheduler @Inject constructor(
         ).await()
     }
 
+    suspend fun schedulePostMealEvaluation(
+        marker: MealMarker,
+        delayMinutes: Int,
+        windowMinutes: Int,
+    ) {
+        val delayMillis = postMealInitialDelayMillis(
+            marker.occurredAtEpochMillis,
+            delayMinutes,
+            System.currentTimeMillis(),
+        )
+        val request = OneTimeWorkRequestBuilder<PostMealCoachWorker>()
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build(),
+            )
+            .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
+            .setInputData(
+                workDataOf(
+                    MEAL_ID_INPUT to marker.id,
+                    POST_MEAL_EXPIRES_AT_INPUT to marker.occurredAtEpochMillis +
+                        TimeUnit.MINUTES.toMillis(
+                            (delayMinutes + windowMinutes).toLong(),
+                        ),
+                ),
+            )
+            .addTag(POST_MEAL_WORK_TAG)
+            .build()
+        workManager.enqueueUniqueWork(
+            postMealWorkName(marker.id),
+            ExistingWorkPolicy.REPLACE,
+            request,
+        ).await()
+    }
+
+    suspend fun cancelPostMealEvaluations() {
+        workManager.cancelAllWorkByTag(POST_MEAL_WORK_TAG).await()
+    }
+
     suspend fun cancelAll() {
         workManager.cancelUniqueWork(PERIODIC_WORK).await()
         workManager.cancelUniqueWork(IMMEDIATE_WORK).await()
+        cancelPostMealEvaluations()
     }
 
     companion object {
         const val REFRESH_PROVIDERS_INPUT = "refresh_providers"
         const val REQUIRE_DELIVERY_INPUT = "require_delivery"
+        const val MEAL_ID_INPUT = "meal_id"
+        const val POST_MEAL_EXPIRES_AT_INPUT = "post_meal_expires_at"
         private const val PERIODIC_WORK = "metabolic_periodic_refresh"
         private const val IMMEDIATE_WORK = "metabolic_immediate_refresh"
+        private const val POST_MEAL_WORK_TAG = "metabolic_post_meal"
+
+        private fun postMealWorkName(mealId: String) = "$POST_MEAL_WORK_TAG:$mealId"
     }
 }
+
+internal fun postMealInitialDelayMillis(
+    mealAtEpochMillis: Long,
+    delayMinutes: Int,
+    nowEpochMillis: Long,
+): Long = (
+    mealAtEpochMillis + TimeUnit.MINUTES.toMillis(delayMinutes.toLong()) - nowEpochMillis
+    ).coerceAtLeast(0L)
 
 internal data class PeriodicRefreshPolicy(
     val enabled: Boolean,
