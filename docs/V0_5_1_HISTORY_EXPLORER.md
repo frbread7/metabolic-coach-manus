@@ -2,8 +2,8 @@
 
 ## Status
 
-`v0.5.1` is a phone-only physical-acceptance candidate. It must not unlock `v0.6.0` or any new
-coaching behavior until the checklist below is completed and reviewed.
+`v0.5.1` was physically accepted by user report on 2026-08-04. This closes the phone-only History
+Explorer gate and permits architecture planning for `v0.6.0`; it does not itself add coaching.
 
 The required APOS architecture review used the existing repository-scoped `main` conversation and
 returned **GO WITH CONDITIONS** on 2026-08-04. The implementation follows those conditions: local
@@ -64,14 +64,14 @@ values, server addresses, credentials, or screenshots containing private health 
 | V051-REG-02 | Confirm Settings history retention/backfill controls and Planner saved milestones still behave as accepted. | PASS |
 | V051-REG-03 | Confirm opening History does not itself show backfill/provider activity or alter the current reading. | PASS |
 | V051-WEAR-01 | Confirm the connected watch and watch face continue to show current synchronized state with no new History/GMI surface. | PASS |
-| V051-STB-01 | Exercise History repeatedly and confirm no crash, ANR, visibly unbounded rendering delay, or unexpected battery/heat behavior. | NOT TESTED — physical stability exercise is still pending. |
+| V051-STB-01 | Exercise History repeatedly and confirm no crash, ANR, visibly unbounded rendering delay, or unexpected battery/heat behavior. | PASS |
 
 ## Physical acceptance progress
 
-Partial results were reported on 2026-08-04. No v0.5.1 failure has been reported. The installed
-version and retained settings are confirmed. Acceptance remains open until the stability check is
-completed. Conditional single-source and low-warning checks may remain `NOT TESTED` with the
-observations above.
+The user reported the v0.5.1 phone gate passed on 2026-08-04. No failure was reported. The installed
+version, retained settings, and stability check are confirmed. Conditional single-source and low-
+warning checks remain `NOT TESTED` with the observations above because their preconditions were not
+available; they do not block this acceptance.
 
 The following requests are recorded for the next architecture discussion and are not interpreted as
 v0.5.1 defects: interactive chart zoom/pan, 6-hour and 12-hour windows, and qualified estimates for
@@ -79,5 +79,5 @@ short or incomplete periods. APOS review is required before any of them is imple
 
 ## Stop condition
 
-After reporting this checklist, stop for architecture/acceptance review. Do not implement coaching,
-chart interaction, analytics, a new provider, or another milestone until `v0.5.1` is accepted.
+The acceptance gate is closed. Request a new APOS architecture review before implementing coaching,
+chart interaction, analytics, a new provider, or another milestone.

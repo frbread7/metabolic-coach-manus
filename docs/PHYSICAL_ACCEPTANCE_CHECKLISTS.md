@@ -37,7 +37,7 @@ new pinned run.
 | `v0.4.1` | Phone current-glucose freshness regression gate | Accepted by user report | [v0.4.1 hotfix report](V0.4_1_FRESHNESS_HOTFIX.md) |
 | `v0.4.2` | Phone saved planning milestones and planner regressions | Accepted by user report | [v0.4.2 checklist](V0.4_2_SAVED_MILESTONES.md) |
 | `v0.5.0` | Phone local history retention, backfill, export/reset | Accepted by user report 2026-08-04 | [v0.5.0 history checklist](V0_5_0_HISTORY_FOUNDATION.md) and [sanitized record](acceptance/V0_5_0_PHYSICAL_ACCEPTANCE.md) |
-| `v0.5.1` | Phone trend chart and selected-period GMI | Pending physical acceptance | [v0.5.1 phone checklist](V0_5_1_HISTORY_EXPLORER.md) |
+| `v0.5.1` | Phone trend chart and selected-period GMI | Accepted by user report 2026-08-04 | [v0.5.1 phone checklist](V0_5_1_HISTORY_EXPLORER.md) |
 | `v0.6.0` | One approved coaching increment | Planned; scope must be approved before this gate is pinned | This document, §v0.6.0 (draft gate) |
 | `v0.5` beta | One-week daily-use reliability and safety observation | Planned after feature gates | This document, §one-week beta |
 | `v1.0` | Production daily-use release | Planned | This document, §v1.0 |
@@ -159,7 +159,7 @@ returned `GO WITH CONDITIONS`.
 The executable, privacy-safe checklist is maintained in
 [V0_5_1_HISTORY_EXPLORER.md](V0_5_1_HISTORY_EXPLORER.md). It covers the exact 24h/7/14/30/90-day
 and custom range contract, GMI eligibility, local-only reads, stale-result races, frozen regressions,
-and the post-test stop condition.
+and the post-test stop condition. The user reported this gate passed on 2026-08-04.
 
 ## v0.6.0 — One coaching increment (draft gate)
 

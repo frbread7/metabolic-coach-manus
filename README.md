@@ -16,11 +16,9 @@ Samsung Galaxy Watch8.
 > Watch8 `v0.3` acceptance was user-reported complete on 2026-08-02 and is recorded in a
 > privacy-sanitized acceptance record. Android instrumentation, production-signing, and
 > store-policy gates remain outstanding. The user accepted the phone-side `v0.4.1` freshness fix.
-> `v0.4.2` was physically accepted by user report. The user reported the `v0.5.0` phone-only local-
-> history gate passed on 2026-08-04. The required APOS review approved the phone-only `v0.5.1`
-> History Explorer with conditions; its physical acceptance is pending. New coaching behavior
-> remains gated for later. Wear, watch-face, coaching, and
-> notification behavior remain unchanged.
+> `v0.4.2` was physically accepted by user report. The user reported both the `v0.5.0` phone-only
+> local-history gate and the APOS-reviewed `v0.5.1` History Explorer gate passed on 2026-08-04.
+> Coaching remains unchanged until a new APOS-reviewed milestone is approved.
 > It is a wellness tool, not a medical device, and must not replace the CGM vendor app, glucose
 > alarms, professional advice, or a personal care plan.
 
@@ -37,7 +35,7 @@ synchronization and coaching foundations remain frozen while the current milesto
 | `v0.4` | Glycemic Goal Planner plus current-glucose freshness validation | `v0.4.1` phone acceptance reported complete; superseded by the `v0.4.2` planner milestone gate |
 | `v0.4.2` | Saved planning milestones: multiple targets, one selected detail, fixed dates, migration, and export | Accepted by user report |
 | `v0.5.0` | Phone-only local history foundation: explicit retention, source-scoped resumable backfill, export/reset safety | Accepted by user report 2026-08-04 |
-| `v0.5.1` | Phone-only local trend chart and selected-period GMI after history acceptance | Physical acceptance candidate |
+| `v0.5.1` | Phone-only local trend chart and selected-period GMI after history acceptance | Accepted by user report 2026-08-04 |
 | `v0.6.0` | One narrowly scoped coaching increment after chart/GMI review | Planned |
 | `v0.5` | One-week personal beta with documented reliability, battery, and safety observations | Planned after feature gates |
 | `v1.0` | Stable daily-use release with production signing and all release gates complete | Planned |
