@@ -46,7 +46,7 @@ values, server addresses, credentials, or screenshots containing private health 
 | ID | Check | Result |
 | --- | --- | --- |
 | V051-IN-01 | Install the `v0.5.1` phone APK over the accepted `v0.5.0` build without clearing app data. | PASS |
-| V051-IN-02 | Confirm the app reports version `0.5.1` and existing Nightscout/history/planner settings remain present. | NOT TESTED — settings remain present; installed-version display has not yet been located. |
+| V051-IN-02 | Confirm the app reports version `0.5.1` and existing Nightscout/history/planner settings remain present. | PASS |
 | V051-NAV-01 | Confirm the bottom order is Today, History, Planner, Settings and all four destinations remain usable. | PASS |
 | V051-HIS-01 | Open History and confirm the default/last fixed period loads from local storage without a manual backfill action. | PASS — interactive zoom/pan was requested as future scope. |
 | V051-HIS-02 | Check 24h, 7d, 14d, 30d, and 90d selections; changes must not crash, freeze, or show a previous selection after the new one finishes. | PASS — 6-hour and 12-hour presets were requested as future scope. |
@@ -68,9 +68,10 @@ values, server addresses, credentials, or screenshots containing private health 
 
 ## Physical acceptance progress
 
-Partial results were reported on 2026-08-04. No v0.5.1 failure has been reported. Acceptance remains
-open until the installed version and stability checks are completed. Conditional single-source and
-low-warning checks may remain `NOT TESTED` with the observations above.
+Partial results were reported on 2026-08-04. No v0.5.1 failure has been reported. The installed
+version and retained settings are confirmed. Acceptance remains open until the stability check is
+completed. Conditional single-source and low-warning checks may remain `NOT TESTED` with the
+observations above.
 
 The following requests are recorded for the next architecture discussion and are not interpreted as
 v0.5.1 defects: interactive chart zoom/pan, 6-hour and 12-hour windows, and qualified estimates for
