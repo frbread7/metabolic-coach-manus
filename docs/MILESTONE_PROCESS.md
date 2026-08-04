@@ -118,8 +118,9 @@ non-conflicting earlier constraints, and avoid inferring acceptance that the use
 - `v0.5.0` physical acceptance: the user reported the phone-only history checklist passed on
   2026-08-04. The privacy-sanitized record is
   [V0_5_0_PHYSICAL_ACCEPTANCE.md](acceptance/V0_5_0_PHYSICAL_ACCEPTANCE.md).
-- Current gate: request the required APOS architecture review for the phone-only v0.5.1 trend chart
-  and selected-period GMI. Wear, watch-face, coaching, notification, and current-glucose freshness
-  behavior remain frozen unless the review explicitly changes the boundary.
+- `v0.5.1` review: the required APOS review returned `GO WITH CONDITIONS` for the phone-only local
+  trend chart and selected-period GMI. The next gate is its pinned artifact plus
+  [phone physical acceptance](V0_5_1_HISTORY_EXPLORER.md). Wear, watch-face, coaching,
+  notification, and current-glucose freshness behavior remain frozen.
 
 The completed physical test was defined in [V0.3_WEAR_ACCEPTANCE.md](V0.3_WEAR_ACCEPTANCE.md).

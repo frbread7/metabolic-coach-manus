@@ -50,6 +50,33 @@ object GlycemicGoalPlanner {
         maxInterpolationGapMinutes = maxInterpolationGapMinutes,
     )
 
+    /**
+     * Reuses the accepted rolling-metric contract for an immutable descriptive history range.
+     * The DAYS_90 marker is internal only; callers must present the exact supplied range.
+     */
+    fun calculateSelectedPeriodMetrics(
+        readings: List<GlucoseReading>,
+        rangeStartEpochMillis: Long,
+        rangeEndExclusiveEpochMillis: Long,
+        targetLowerMgDl: Int,
+        targetUpperMgDl: Int,
+        lowGlucoseThresholdMgDl: Int,
+        veryLowGlucoseThresholdMgDl: Int,
+        maxInterpolationGapMinutes: Long = DEFAULT_MAX_INTERPOLATION_GAP_MINUTES,
+        cancellationCheck: () -> Unit = {},
+    ): RollingGlycemicMetrics = calculateWindowMetrics(
+        readings = readings,
+        window = GlycemicWindow.DAYS_90,
+        windowEndEpochMillis = rangeEndExclusiveEpochMillis,
+        requestedDurationMillis = rangeEndExclusiveEpochMillis - rangeStartEpochMillis,
+        targetLowerMgDl = targetLowerMgDl,
+        targetUpperMgDl = targetUpperMgDl,
+        lowGlucoseThresholdMgDl = lowGlucoseThresholdMgDl,
+        veryLowGlucoseThresholdMgDl = veryLowGlucoseThresholdMgDl,
+        maxInterpolationGapMinutes = maxInterpolationGapMinutes,
+        cancellationCheck = cancellationCheck,
+    )
+
     fun calculateGoalScenario(
         readings: List<GlucoseReading>,
         horizon: GlycemicWindow,
@@ -362,7 +389,9 @@ object GlycemicGoalPlanner {
         lowGlucoseThresholdMgDl: Int,
         veryLowGlucoseThresholdMgDl: Int,
         maxInterpolationGapMinutes: Long,
+        cancellationCheck: () -> Unit = {},
     ): RollingGlycemicMetrics {
+        cancellationCheck()
         val windowStart = windowEndEpochMillis - requestedDurationMillis
         val windowDurationMillis = windowEndEpochMillis - windowStart
         if (
@@ -380,6 +409,7 @@ object GlycemicGoalPlanner {
         }
         val candidateReadings = readings
             .asSequence()
+            .onEach { cancellationCheck() }
             .filter {
                 it.measuredAtEpochMillis in
                     (windowStart - maxInterpolationGapMinutes * 60_000L)..windowEndEpochMillis
@@ -423,6 +453,7 @@ object GlycemicGoalPlanner {
         val maxGapMillis = maxInterpolationGapMinutes * 60_000L
 
         points.zipWithNext().forEach { (first, second) ->
+            cancellationCheck()
             val gapMillis = second.measuredAtEpochMillis - first.measuredAtEpochMillis
             if (gapMillis <= 0L) return@forEach
             largestGapMillis = maxOf(largestGapMillis, gapMillis)

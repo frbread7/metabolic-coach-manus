@@ -17,8 +17,9 @@ Samsung Galaxy Watch8.
 > privacy-sanitized acceptance record. Android instrumentation, production-signing, and
 > store-policy gates remain outstanding. The user accepted the phone-side `v0.4.1` freshness fix.
 > `v0.4.2` was physically accepted by user report. The user reported the `v0.5.0` phone-only local-
-> history gate passed on 2026-08-04. Trend chart and selected-period GMI are the next reviewed
-> milestone; new coaching behavior remains gated for later. Wear, watch-face, coaching, and
+> history gate passed on 2026-08-04. The required APOS review approved the phone-only `v0.5.1`
+> History Explorer with conditions; its physical acceptance is pending. New coaching behavior
+> remains gated for later. Wear, watch-face, coaching, and
 > notification behavior remain unchanged.
 > It is a wellness tool, not a medical device, and must not replace the CGM vendor app, glucose
 > alarms, professional advice, or a personal care plan.
@@ -36,7 +37,7 @@ synchronization and coaching foundations remain frozen while the current milesto
 | `v0.4` | Glycemic Goal Planner plus current-glucose freshness validation | `v0.4.1` phone acceptance reported complete; superseded by the `v0.4.2` planner milestone gate |
 | `v0.4.2` | Saved planning milestones: multiple targets, one selected detail, fixed dates, migration, and export | Accepted by user report |
 | `v0.5.0` | Phone-only local history foundation: explicit retention, source-scoped resumable backfill, export/reset safety | Accepted by user report 2026-08-04 |
-| `v0.5.1` | Phone-only local trend chart and selected-period GMI after history acceptance | Architecture review in progress |
+| `v0.5.1` | Phone-only local trend chart and selected-period GMI after history acceptance | Physical acceptance candidate |
 | `v0.6.0` | One narrowly scoped coaching increment after chart/GMI review | Planned |
 | `v0.5` | One-week personal beta with documented reliability, battery, and safety observations | Planned after feature gates |
 | `v1.0` | Stable daily-use release with production signing and all release gates complete | Planned |
@@ -47,7 +48,8 @@ freshness hotfix: bounded Nightscout
 history backfill, provider-independent calculations, configurable targets, and phone UI. It does
 not change Wear synchronization, the watch face, coaching rules, or notifications. `v0.4.2` adds
 saved phone-only milestones on top of that foundation and preserves the same boundary. `v0.5.0`
-adds the explicit local-history foundation; its chart and selected-period GMI remain a later gate.
+adds the explicit local-history foundation. `v0.5.1` adds a read-only exact-source History Explorer
+and descriptive selected-period GMI without changing current glucose, Wear, or coaching paths.
 See the
 [milestone process](docs/MILESTONE_PROCESS.md), [physical acceptance checklists by milestone](docs/PHYSICAL_ACCEPTANCE_CHECKLISTS.md),
 [v0.3 Wear acceptance checklist](docs/V0.3_WEAR_ACCEPTANCE.md),
@@ -57,7 +59,7 @@ and [the v0.3 acceptance record](docs/acceptance/V0_3_PHYSICAL_ACCEPTANCE.md).
 
 | Area | Current implementation |
 | --- | --- |
-| Phone hub | Nightscout glucose retrieval with explicit multi-server selection, bounded retry/cache retention, source-scoped local history and resumable range backfill; Health Connect activity reads; Room schema v9 history-management state and saved planner milestones; configurable Glycemic Goal Planner metrics/scenarios; settings; coaching rules; notifications; daily summary; streaming JSON export; confirmation-gated local erase; and revisioned Wear Data Layer publishing |
+| Phone hub | Nightscout glucose retrieval with explicit multi-server selection, bounded retry/cache retention, source-scoped local history and resumable range backfill; a local-only exact-source trend explorer and selected-period GMI; Health Connect activity reads; Room schema v9 history-management state and saved planner milestones; configurable Glycemic Goal Planner metrics/scenarios; settings; coaching rules; notifications; daily summary; streaming JSON export; confirmation-gated local erase; and revisioned Wear Data Layer publishing |
 | Wear app | Three-page touch-only horizontal pager, glucose/activity display, walk and stair actions, home countdown with completion haptic, explicit queued/rejected action results, durable snooze outbox, pending-session reconciliation, direct watch notifications, and complication providers; no bezel dependency |
 | Watch face | Separate WFF v4 resource-only package with clock, glucose/trend/delta/age, steps/floors, battery, coach action, reduced ambient content, and selectable accent configuration |
 | Coaching | Rapid-rise, post-meal, and inactivity rules with a walk fallback when stair reminders are disabled, stable recommendation IDs, explicit validity windows, minute-boundary reevaluation, quiet/working hours, cooldown, snooze, daily limit, and shared missing/future/stale/low/fast-fall safety policy |
@@ -101,10 +103,9 @@ and [the v0.3 acceptance record](docs/acceptance/V0_3_PHYSICAL_ACCEPTANCE.md).
   evaluation. They are not laboratory HbA1c results, treatment instructions, insulin/dose
   guidance, or promises that a target will be achieved. Wear synchronization and coaching do not
   consume planner output.
-- **v0.5.0 stores downloaded history locally but does not yet show a chart or calculate a
-  selected-period GMI.** The normal refresh stores recent bounded history; Settings can explicitly
-  retain and backfill older ranges. v0.5.1 will add a phone-only read-only chart and selected-period
-  GMI only after this storage foundation passes physical acceptance.
+- **v0.5.1 reads downloaded history locally for a trend chart and selected-period GMI.** The normal
+  refresh and explicit Settings backfill remain the only ways data is collected. Opening History
+  never performs network or backfill work, and 24-hour/7-day periods never show numeric GMI.
 
 ## Project structure
 
@@ -142,14 +143,14 @@ and watch-face lint tasks, assembles all three APKs for that variant (debug by d
 the built watch-face APK, verifies APK signatures, checks that the phone and Wear certificates
 match, copies deliverables into `artifacts/`, and creates a versioned five-file installation ZIP.
 
-The current milestone packages as `artifacts/MetabolicCoach-v0.5.0.zip`, containing `phone.apk`,
+The current milestone packages as `artifacts/MetabolicCoach-v0.5.1.zip`, containing `phone.apk`,
 `wear.apk`, `watchface.apk`, `CHANGELOG.md`, and an archive-specific `INSTALL.md`. The version is
 derived from all three APK manifests and packaging fails if they disagree. Run
 `./scripts/package-release.sh` to repackage already-verified artifacts without rebuilding. A
 repeat debug build refreshes its same-version engineering ZIP only while that archive remains a
 debug build. Debug APKs can never replace a same-version release archive. A different release
 archive for an existing version is not overwritten unless `MC_PACKAGE_OVERWRITE=1` is set
-intentionally. GitHub Actions is the canonical v0.5.0 build path for this ARM development host;
+intentionally. GitHub Actions is the canonical v0.5.1 build path for this ARM development host;
 the workflow validates the artifact gate and uploads the ZIP plus the three APKs only after all
 checks pass.
 
@@ -170,6 +171,7 @@ engineering artifacts, not production releases. A signed release requires enviro
 - [v0.4.1 current-glucose freshness hotfix report](docs/V0.4_1_FRESHNESS_HOTFIX.md)
 - [v0.5.0 local history foundation and phone acceptance gate](docs/V0_5_0_HISTORY_FOUNDATION.md)
 - [v0.5.0 privacy-sanitized phone acceptance record](docs/acceptance/V0_5_0_PHYSICAL_ACCEPTANCE.md)
+- [v0.5.1 History Explorer architecture and phone acceptance checklist](docs/V0_5_1_HISTORY_EXPLORER.md)
 - [v0.4.2 saved planning milestones architecture and phone acceptance gate](docs/V0.4_2_SAVED_MILESTONES.md)
 - [Development and build guide](docs/DEVELOPMENT.md)
 - [Testing strategy, milestone acceptance, and release gates](docs/TESTING.md)

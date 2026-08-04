@@ -284,8 +284,21 @@ user can safely resume it. The normal refresh remains the existing current-first
 
 The v0.5.0 history card is phone-only. It exposes local row count/date range and retention/backfill
 state, while Android backup rules continue to exclude raw history from cloud backup and device
-transfer. A future chart must read Room only, never start a provider request, and must remain
-provider-, Wear-, coaching-, and notification-independent.
+transfer.
+
+The v0.5.1 phone History destination is a read-only presentation path over that store. It captures
+one source identity and one immutable UTC half-open interval, then calls only
+`GlucoseRepository.readingsBetweenExactSource`. Its loader has no provider, refresh, or backfill
+dependency. A request-generation gate prevents results from an older period, an old source, or a
+hidden History screen from publishing.
+
+`HistoryRangeResolver` owns rolling and local-calendar semantics. Custom selections contain 14–90
+completed local days and are converted once through the device time zone, including daylight-
+saving transitions. `GlucoseTrendSeriesBuilder` orders and de-duplicates deterministically, leaves
+gaps over 20 minutes disconnected, and bounds render buckets while preserving extrema and time-
+weighted values. `SelectedPeriodGmiCalculator` reuses the accepted planner metrics contract. Only
+the last fixed presentation preset is stored in DataStore; there is no Room schema migration and
+no Wear, coaching, notification, or current-reading consumer.
 
 ### Refresh and coaching
 

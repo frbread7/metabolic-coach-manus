@@ -5,9 +5,9 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 variant="${MC_BUILD_VARIANT:-debug}"
-release_version="${MC_EXPECTED_VERSION_NAME:-0.5.0}"
+release_version="${MC_EXPECTED_VERSION_NAME:-0.5.1}"
 expected_version_name="$release_version"
-expected_version_code="${MC_EXPECTED_VERSION_CODE:-7}"
+expected_version_code="${MC_EXPECTED_VERSION_CODE:-8}"
 expected_certificate="${MC_EXPECTED_V03_CERT_SHA256:-}"
 artifacts_dir="$repo_root/artifacts"
 
@@ -106,6 +106,15 @@ if [[ "$actual_entries" != "$expected_entries" ]]; then
 fi
 
 archive_text="$(unzip -p "$archive" CHANGELOG.md INSTALL.md)"
+install_text="$(unzip -p "$archive" INSTALL.md)"
+if ! grep -Fq -- "- APK version name: \`$expected_version_name\`" <<<"$install_text"; then
+    echo "The embedded installation guide does not identify APK version $expected_version_name." >&2
+    exit 1
+fi
+if ! grep -Fq -- "versionCode \`$expected_version_code\`" <<<"$install_text"; then
+    echo "The embedded installation guide does not identify versionCode $expected_version_code." >&2
+    exit 1
+fi
 if grep -nE '(NIGHTSCOUT_TOKEN|API_SECRET|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY)' <<<"$archive_text"; then
     echo "A credential or private key marker was found in the v${release_version} archive." >&2
     exit 1

@@ -12,6 +12,8 @@ import androidx.activity.viewModels
 import androidx.core.net.toUri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,7 +60,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -79,6 +87,8 @@ import com.young.metaboliccoach.core.model.GlucoseHistoryBackfillStatus
 import com.young.metaboliccoach.core.model.GlucoseHistoryRetentionPolicy
 import com.young.metaboliccoach.core.model.GlucoseHistorySettings
 import com.young.metaboliccoach.core.model.GlucoseHistoryStatus
+import com.young.metaboliccoach.core.model.GlucoseChartResult
+import com.young.metaboliccoach.core.model.GlucoseChartStatus
 import com.young.metaboliccoach.core.model.GlucoseProviderMode
 import com.young.metaboliccoach.core.model.GlucoseUnit
 import com.young.metaboliccoach.core.model.GlycemicMetricsStatus
@@ -89,10 +99,15 @@ import com.young.metaboliccoach.core.model.GlycemicPlanningMilestoneEvaluation
 import com.young.metaboliccoach.core.model.GlycemicScenarioStatus
 import com.young.metaboliccoach.core.model.GlycemicTargetProvenance
 import com.young.metaboliccoach.core.model.GlycemicWindow
+import com.young.metaboliccoach.core.model.HistoryPeriodPreset
+import com.young.metaboliccoach.core.model.HistoryRange
 import com.young.metaboliccoach.core.model.MilestoneEvaluationState
 import com.young.metaboliccoach.core.model.MilestoneLifecycleState
 import com.young.metaboliccoach.core.model.MilestoneTemporalState
 import com.young.metaboliccoach.core.model.RollingGlycemicMetrics
+import com.young.metaboliccoach.core.model.SelectedPeriodGmiAvailability
+import com.young.metaboliccoach.core.model.SelectedPeriodGmiQualifier
+import com.young.metaboliccoach.core.model.SelectedPeriodGmiResult
 import com.young.metaboliccoach.core.model.InterventionSession
 import com.young.metaboliccoach.core.model.InterventionType
 import com.young.metaboliccoach.core.model.NightscoutServerConfig
@@ -100,6 +115,8 @@ import com.young.metaboliccoach.core.model.NightscoutSettings
 import com.young.metaboliccoach.core.model.QuickActionType
 import com.young.metaboliccoach.ui.PhoneUiState
 import com.young.metaboliccoach.ui.PhoneViewModel
+import com.young.metaboliccoach.ui.HistoryExplorerLoadStatus
+import com.young.metaboliccoach.ui.HistoryExplorerUiState
 import dagger.hilt.android.AndroidEntryPoint
 import java.time.Instant
 import java.time.LocalDate
@@ -151,6 +168,11 @@ class MainActivity : ComponentActivity() {
                     onSaveGlucoseHistorySettings = viewModel::saveGlucoseHistorySettings,
                     onConfirmGlucoseHistoryRetention = viewModel::confirmGlucoseHistoryRetention,
                     onBackfillGlucoseHistory = viewModel::backfillGlucoseHistory,
+                    onHistoryVisibilityChanged = viewModel::setHistoryVisible,
+                    onSelectHistoryPreset = viewModel::selectHistoryPreset,
+                    onCustomHistoryStartChanged = viewModel::updateCustomHistoryStartDate,
+                    onCustomHistoryEndChanged = viewModel::updateCustomHistoryEndDate,
+                    onApplyCustomHistoryRange = viewModel::applyCustomHistoryRange,
                     onConnectHealth = {
                         when (healthConnectSdkStatus.intValue) {
                             HealthConnectClient.SDK_AVAILABLE -> {
@@ -204,7 +226,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class PhoneDestination { TODAY, PLANNER, SETTINGS }
+private enum class PhoneDestination { TODAY, HISTORY, PLANNER, SETTINGS }
 
 @Composable
 private fun MetabolicCoachApp(
@@ -233,10 +255,21 @@ private fun MetabolicCoachApp(
     onSaveGlucoseHistorySettings: (GlucoseHistorySettings) -> Unit,
     onConfirmGlucoseHistoryRetention: () -> Unit,
     onBackfillGlucoseHistory: () -> Unit,
+    onHistoryVisibilityChanged: (Boolean, String?) -> Unit,
+    onSelectHistoryPreset: (HistoryPeriodPreset) -> Unit,
+    onCustomHistoryStartChanged: (String) -> Unit,
+    onCustomHistoryEndChanged: (String) -> Unit,
+    onApplyCustomHistoryRange: () -> Unit,
     onConnectHealth: () -> Unit,
     onEnableNotifications: () -> Unit,
 ) {
     var destination by remember { mutableStateOf(PhoneDestination.TODAY) }
+    LaunchedEffect(destination, uiState.glucose?.sourceId) {
+        onHistoryVisibilityChanged(
+            destination == PhoneDestination.HISTORY,
+            uiState.glucose?.sourceId,
+        )
+    }
     Scaffold(
         bottomBar = {
             NavigationBar {
@@ -247,16 +280,22 @@ private fun MetabolicCoachApp(
                     label = { Text("Today") },
                 )
                 NavigationBarItem(
-                    selected = destination == PhoneDestination.SETTINGS,
-                    onClick = { destination = PhoneDestination.SETTINGS },
-                    icon = { Text("⚙") },
-                    label = { Text("Settings") },
+                    selected = destination == PhoneDestination.HISTORY,
+                    onClick = { destination = PhoneDestination.HISTORY },
+                    icon = { Text("∿") },
+                    label = { Text("History") },
                 )
                 NavigationBarItem(
                     selected = destination == PhoneDestination.PLANNER,
                     onClick = { destination = PhoneDestination.PLANNER },
                     icon = { Text("◎") },
                     label = { Text("Planner") },
+                )
+                NavigationBarItem(
+                    selected = destination == PhoneDestination.SETTINGS,
+                    onClick = { destination = PhoneDestination.SETTINGS },
+                    icon = { Text("⚙") },
+                    label = { Text("Settings") },
                 )
             }
         },
@@ -270,6 +309,15 @@ private fun MetabolicCoachApp(
                 onConnectHealth = onConnectHealth,
                 onEnableNotifications = onEnableNotifications,
                 healthConnectSdkStatus = healthConnectSdkStatus,
+                contentPadding = padding,
+            )
+            PhoneDestination.HISTORY -> HistoryExplorerScreen(
+                state = uiState.historyExplorer,
+                glucoseUnit = uiState.settings.glucoseUnit,
+                onSelectPreset = onSelectHistoryPreset,
+                onCustomStartChanged = onCustomHistoryStartChanged,
+                onCustomEndChanged = onCustomHistoryEndChanged,
+                onApplyCustomRange = onApplyCustomHistoryRange,
                 contentPadding = padding,
             )
             PhoneDestination.SETTINGS -> SettingsScreen(
@@ -300,6 +348,336 @@ private fun MetabolicCoachApp(
         }
     }
 }
+
+@Composable
+private fun HistoryExplorerScreen(
+    state: HistoryExplorerUiState,
+    glucoseUnit: GlucoseUnit,
+    onSelectPreset: (HistoryPeriodPreset) -> Unit,
+    onCustomStartChanged: (String) -> Unit,
+    onCustomEndChanged: (String) -> Unit,
+    onApplyCustomRange: () -> Unit,
+    contentPadding: PaddingValues,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            end = 20.dp,
+            top = contentPadding.calculateTopPadding() + 24.dp,
+            bottom = contentPadding.calculateBottomPadding() + 24.dp,
+        ),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("History", style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    "Read-only glucose trends from this phone's local history.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                HistoryPeriodPreset.entries.forEach { preset ->
+                    FilterChip(
+                        selected = state.selectedPreset == preset,
+                        onClick = { onSelectPreset(preset) },
+                        label = {
+                            Text(
+                                when (preset) {
+                                    HistoryPeriodPreset.HOURS_24 -> "24h"
+                                    HistoryPeriodPreset.DAYS_7 -> "7d"
+                                    HistoryPeriodPreset.DAYS_14 -> "14d"
+                                    HistoryPeriodPreset.DAYS_30 -> "30d"
+                                    HistoryPeriodPreset.DAYS_90 -> "90d"
+                                    HistoryPeriodPreset.CUSTOM -> "Custom"
+                                },
+                            )
+                        },
+                    )
+                }
+            }
+        }
+        if (state.selectedPreset == HistoryPeriodPreset.CUSTOM) {
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text("Completed local calendar days", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Choose 14 to 90 days. The end date must be yesterday or earlier.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        OutlinedTextField(
+                            value = state.customDraft.startDateInput,
+                            onValueChange = onCustomStartChanged,
+                            label = { Text("Start date (YYYY-MM-DD)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = state.customDraft.endDateInput,
+                            onValueChange = onCustomEndChanged,
+                            label = { Text("End date (YYYY-MM-DD)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        state.customDraft.inputError?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error)
+                        }
+                        Button(
+                            onClick = onApplyCustomRange,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Apply custom period") }
+                    }
+                }
+            }
+        }
+        item {
+            when (state.loadStatus) {
+                HistoryExplorerLoadStatus.LOADING -> Text("Loading local history…")
+                HistoryExplorerLoadStatus.ERROR -> Text(
+                    state.detail,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                HistoryExplorerLoadStatus.IDLE -> Text(
+                    state.detail,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                HistoryExplorerLoadStatus.READY -> Unit
+            }
+        }
+        state.chart?.let { chart ->
+            item { GlucoseHistoryChartCard(chart, glucoseUnit) }
+        }
+        state.selectedPeriodGmi?.let { result ->
+            item { SelectedPeriodGmiCard(result, glucoseUnit) }
+        }
+    }
+}
+
+@Composable
+private fun GlucoseHistoryChartCard(
+    chart: GlucoseChartResult,
+    glucoseUnit: GlucoseUnit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(historyRangeLabel(chart.range), style = MaterialTheme.typography.titleLarge)
+            if (chart.status != GlucoseChartStatus.AVAILABLE) {
+                Text(chart.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                return@Column
+            }
+            val buckets = chart.segments.flatMap { it.buckets }
+            GlucoseTrendCanvas(chart)
+            val minimum = buckets.minOfOrNull { it.minimumMgDl }
+            val maximum = buckets.maxOfOrNull { it.maximumMgDl }
+            Text(
+                "Range ${formatGlucose(minimum, glucoseUnit)} – " +
+                    formatGlucose(maximum, glucoseUnit),
+            )
+            Text(
+                "Coverage ${formatPercent(chart.coverage.coveragePercent)} • " +
+                    "${chart.coverage.gapCount} gap(s) • largest " +
+                    formatDuration(chart.coverage.largestGapMillis),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (chart.coverage.gapCount > 0) {
+                Text(
+                    "Missing periods are left disconnected.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlucoseTrendCanvas(chart: GlucoseChartResult) {
+    val buckets = chart.segments.flatMap { it.buckets }
+    if (buckets.isEmpty()) return
+    val observedMinimum = buckets.minOf { it.minimumMgDl }
+    val observedMaximum = buckets.maxOf { it.maximumMgDl }
+    val padding = ((observedMaximum - observedMinimum) * 0.08).coerceAtLeast(8.0)
+    val minimum = observedMinimum - padding
+    val maximum = observedMaximum + padding
+    val glucoseSpan = (maximum - minimum).coerceAtLeast(1.0)
+    val timeSpan = chart.range.durationMillis.coerceAtLeast(1L).toDouble()
+    val lineColor = MaterialTheme.colorScheme.primary
+    val rangeColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+    val axisColor = MaterialTheme.colorScheme.outlineVariant
+    val firstMean = buckets.first().timeWeightedMeanMgDl
+    val lastMean = buckets.last().timeWeightedMeanMgDl
+    val trendSummary = when {
+        lastMean - firstMean > 5.0 -> "Overall displayed trend rises."
+        firstMean - lastMean > 5.0 -> "Overall displayed trend falls."
+        else -> "Overall displayed trend is broadly level."
+    }
+    val accessibility = "Glucose trend with ${chart.segments.size} disconnected segment(s), " +
+        "${"%.1f".format(chart.coverage.coveragePercent)} percent coverage. " +
+        "Missing periods are not connected. $trendSummary"
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(220.dp)
+            .semantics { contentDescription = accessibility }
+            .drawWithCache {
+                fun x(epochMillis: Long): Float = (
+                    (epochMillis - chart.range.startEpochMillis) / timeSpan * size.width
+                    ).toFloat().coerceIn(0f, size.width)
+                fun y(valueMgDl: Double): Float = (
+                    size.height - ((valueMgDl - minimum) / glucoseSpan * size.height)
+                    ).toFloat().coerceIn(0f, size.height)
+
+                val cachedSegments = chart.segments.map { segment ->
+                    val path = Path()
+                    val ranges = segment.buckets.mapIndexed { index, bucket ->
+                        val center = bucket.startEpochMillis +
+                            (bucket.endExclusiveEpochMillis - bucket.startEpochMillis) / 2L
+                        val pointX = x(center)
+                        val pointY = y(bucket.timeWeightedMeanMgDl)
+                        if (index == 0) {
+                            path.moveTo(pointX, pointY)
+                        } else {
+                            path.lineTo(pointX, pointY)
+                        }
+                        Offset(pointX, y(bucket.minimumMgDl)) to
+                            Offset(pointX, y(bucket.maximumMgDl))
+                    }
+                    path to ranges
+                }
+                onDrawBehind {
+                    drawLine(
+                        axisColor,
+                        start = Offset(0f, size.height),
+                        end = Offset(size.width, size.height),
+                    )
+                    cachedSegments.forEach { (path, ranges) ->
+                        ranges.forEach { (start, end) ->
+                            drawLine(
+                                color = rangeColor,
+                                start = start,
+                                end = end,
+                                strokeWidth = 2f,
+                                cap = StrokeCap.Round,
+                            )
+                        }
+                        drawPath(
+                            path = path,
+                            color = lineColor,
+                            style = Stroke(width = 4f, cap = StrokeCap.Round),
+                        )
+                    }
+                }
+            },
+    )
+}
+
+@Composable
+private fun SelectedPeriodGmiCard(
+    result: SelectedPeriodGmiResult,
+    glucoseUnit: GlucoseUnit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            Text("Selected-period GMI", style = MaterialTheme.typography.titleLarge)
+            Text(historyDateRange(result.range), style = MaterialTheme.typography.bodySmall)
+            if (result.availability == SelectedPeriodGmiAvailability.AVAILABLE) {
+                Text(
+                    "${formatPercent(result.gmiPercent)} GMI",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text("Time-weighted mean: ${formatGlucose(result.timeWeightedMeanMgDl, glucoseUnit)}")
+                Text(
+                    "Coverage ${formatPercent(result.coveragePercent)} • " +
+                        "TIR ${formatPercent(result.timeInRangePercent)} • " +
+                        "TBR ${formatPercent(result.timeBelowRangePercent)}",
+                )
+                Text(
+                    "Missing ${formatDuration(result.missingDurationMillis)} • " +
+                        "largest gap ${formatDuration(result.largestGapMillis)}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                if (SelectedPeriodGmiQualifier.LOW_GLUCOSE_EXPOSURE in result.qualifiers) {
+                    Text(
+                        "This period includes low-glucose exposure. Review the safety metrics " +
+                            "without treating a lower GMI as a positive result by itself.",
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                if (SelectedPeriodGmiQualifier.CONCENTRATED_GAPS in result.qualifiers) {
+                    Text("Coverage includes a concentrated missing-data period.")
+                }
+                if (SelectedPeriodGmiQualifier.PARTIAL_LATEST_DAY in result.qualifiers) {
+                    Text("This rolling period includes part of the current local day.")
+                }
+            } else {
+                Text(gmiAvailabilityLabel(result.availability), fontWeight = FontWeight.Bold)
+                Text(result.detail)
+                Text("Coverage: ${formatPercent(result.coveragePercent)}")
+            }
+            Text(
+                "Selected-period GMI is calculated from CGM mean glucose. It is not a " +
+                    "laboratory HbA1c measurement and may differ from one. Missing data can " +
+                    "affect the result.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+private fun historyRangeLabel(range: HistoryRange): String = when (range.preset) {
+    HistoryPeriodPreset.HOURS_24 -> "Last 24 hours"
+    HistoryPeriodPreset.DAYS_7 -> "Last 7 days"
+    HistoryPeriodPreset.DAYS_14 -> "Last 14 days"
+    HistoryPeriodPreset.DAYS_30 -> "Last 30 days"
+    HistoryPeriodPreset.DAYS_90 -> "Last 90 days"
+    HistoryPeriodPreset.CUSTOM -> "Custom ${range.calendarDayCount}-day period"
+}
+
+private fun historyDateRange(range: HistoryRange): String {
+    val zone = ZoneId.of(range.displayTimeZoneId)
+    val start = Instant.ofEpochMilli(range.startEpochMillis).atZone(zone).toLocalDate()
+    val end = Instant.ofEpochMilli(range.endExclusiveEpochMillis - 1L).atZone(zone).toLocalDate()
+    return "$start to $end"
+}
+
+private fun gmiAvailabilityLabel(availability: SelectedPeriodGmiAvailability): String =
+    when (availability) {
+        SelectedPeriodGmiAvailability.AVAILABLE -> "Available"
+        SelectedPeriodGmiAvailability.INSUFFICIENT_DURATION -> "GMI requires at least 14 days"
+        SelectedPeriodGmiAvailability.INSUFFICIENT_COVERAGE -> "Not enough local coverage"
+        SelectedPeriodGmiAvailability.NO_DATA -> "No local data"
+        SelectedPeriodGmiAvailability.SOURCE_DISCONTINUITY -> "Source discontinuity"
+        SelectedPeriodGmiAvailability.INVALID_RANGE -> "Invalid period"
+        SelectedPeriodGmiAvailability.CALCULATION_ERROR -> "Calculation unavailable"
+    }
 
 @Composable
 private fun TodayScreen(

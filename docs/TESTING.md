@@ -29,6 +29,8 @@ The current source includes these JVM and Android local-test suites:
 | `GlucoseHistoryRetentionPolicyTest` | Deterministic 90-day/1-year cutoffs and no-cutoff keep-all behavior |
 | `NightscoutProviderTest` range case | Bounded older-range reads use the range endpoint without publishing an older current state |
 | `GlycemicGoalPlannerTest` | GMI conversion, time-weighted 14/30/60/90-day metrics, coverage and long-gap handling, source discontinuity, horizon equations, remaining-window milestones, temporal states, deterministic ordering, and low-glucose-risk suppression |
+| `HistoryExplorerTest` | Fixed/custom/DST range resolution, deterministic exact-source chart ordering, disconnected gaps, bounded aggregation with extrema preservation, duration/coverage gates, and neutral low-glucose GMI qualification |
+| `HistoryExplorerLoaderTest` | Exact-source local-only loading with no refresh/provider call plus stale-result rejection after newer periods, source changes, custom-draft invalidation, and navigation away |
 | `OkHttpNightscoutApiClientTest` | MockWebServer request path/query/headers, conditional responses, redirect refusal, bounded declared/streamed response size, and future-authenticator hook without a real server |
 | `NightscoutSettingsJsonCodecTest` | Stable multi-server DataStore encoding/decoding and malformed stored-value recovery |
 | `XdripGlucoseIngestorTest` | Retained inactive-adapter input validation; it does not prove or enable a Version 1 broadcast route |
@@ -111,8 +113,12 @@ remain authoritative for their respective runs.
   source-scoped, one older range can pause/resume, process interruption presents a resumable
   checkpoint, and no network work is triggered by future chart surfaces. The user reported this
   physical phone gate passed on 2026-08-04; see the
-  [privacy-sanitized acceptance record](acceptance/V0_5_0_PHYSICAL_ACCEPTANCE.md). v0.5.1 still
-  requires its APOS architecture review and its own pinned artifact gate.
+  [privacy-sanitized acceptance record](acceptance/V0_5_0_PHYSICAL_ACCEPTANCE.md).
+- `v0.5.1` gate: the APOS architecture review returned `GO WITH CONDITIONS`. Run the History
+  range/chart/GMI/local-loader race tests, complete unchanged module suites, lint, release
+  isolation, WFF validation, and aligned version/signature/ZIP audit. Then execute
+  [the v0.5.1 phone checklist](V0_5_1_HISTORY_EXPLORER.md). No later coaching milestone is
+  unlocked until that result is reviewed.
 
 ## Current local verification
 
@@ -249,6 +255,40 @@ fce9de3ba029a064f439956456484b7ed158336908c924d014cfbf42c4fa8397  metabolic-coac
 These are local engineering artifacts only. The GitHub Actions run must repeat the certificate,
 metadata, privacy, and ZIP checks from the pushed revision. Physical phone acceptance is still
 required and must stop before chart/GMI or coaching work is unlocked.
+
+### v0.5.1 local engineering artifact gate
+
+On 2026-08-04, the v0.5.1 History Explorer candidate passed the authoritative local package script:
+
+```text
+QEMU_LD_PREFIX=/usr/x86_64-linux-gnu ./scripts/build-apks.sh
+BUILD SUCCESSFUL in 7m37s
+333 actionable tasks: 333 executed
+```
+
+The run passed model/domain/data-debug/data-release/sync/phone/Wear unit suites, Android migration-
+test source compilation, phone/Wear/watch-face debug lint and assembly, WFF v4 schema and memory
+validation, APK signature checks, and the exact five-file ZIP contract. The fresh reports contain
+57 suites and 321 test executions with 0 failures, 0 errors, and 0 skipped. Android instrumentation
+was compiled but not executed because no Android runtime was attached.
+
+The separate CI-equivalent unsigned release check passed in 7m03s with 243 actionable tasks (73
+executed, 16 from cache, 154 up-to-date). Release lint and assembly passed for all three modules,
+and three generated phone release manifests contained no unofficial xDrip permission or receiver.
+
+The final local debug package passed the version/signature/ZIP/credential verifier with version
+name `0.5.1`, version code `8`, and the accepted v0.3 engineering certificate
+`7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6667da26c5fad4`:
+
+```text
+645f449093a69b00244088253499a7cce1c0e27e0d508573edc5b87c21f86a67  metabolic-coach-phone-debug.apk
+a3faab446c77d714630b51be86220868ee1570419abb0f54e594b75a0cc51e6f  metabolic-coach-wear-debug.apk
+189617641d0023150f6b47ca8771f6fc25b9c2c5ebb4f32318f5dfee2dd54242  metabolic-coach-watchface-debug.apk
+2d64a613e957867441c68bef7acbfc84e727ba9cac61948e5fd02044cf4a0761  MetabolicCoach-v0.5.1.zip
+```
+
+This is a local engineering candidate, not a physical acceptance result. The v0.5.1 phone checklist
+must pass before any coaching milestone begins.
 
 Historical v0.2 debug artifact SHA-256 values:
 

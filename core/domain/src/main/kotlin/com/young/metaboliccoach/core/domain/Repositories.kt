@@ -9,6 +9,7 @@ import com.young.metaboliccoach.core.model.GlucoseHistorySettings
 import com.young.metaboliccoach.core.model.GlucoseHistoryStatus
 import com.young.metaboliccoach.core.model.GlucoseProviderState
 import com.young.metaboliccoach.core.model.GlucoseReading
+import com.young.metaboliccoach.core.model.HistoryPeriodPreset
 import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
 import com.young.metaboliccoach.core.model.GlycemicPlanningMilestone
 import com.young.metaboliccoach.core.model.InterventionSession
@@ -47,6 +48,12 @@ interface GlucoseHistoryRepository {
     suspend fun updateSettings(settings: GlucoseHistorySettings)
     suspend fun confirmRetentionPolicy()
     suspend fun backfillNextChunk()
+}
+
+/** Small phone presentation preferences only; no history data or source identity is persisted. */
+interface HistoryExplorerPreferencesRepository {
+    fun observeLastFixedPreset(): Flow<HistoryPeriodPreset>
+    suspend fun updateLastFixedPreset(preset: HistoryPeriodPreset)
 }
 
 interface ActivityRepository {

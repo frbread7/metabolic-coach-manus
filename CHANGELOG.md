@@ -2,6 +2,27 @@
 
 All notable Metabolic Coach package changes are recorded here.
 
+## v0.5.1 — 2026-08-04 — Local History Explorer and selected-period GMI (phone-only)
+
+### Added
+
+- A fourth phone destination with fixed 24-hour/7/14/30/90-day local trend periods and custom
+  14–90 completed-local-day periods.
+- A dependency-free Compose Canvas trend that preserves disconnected gaps and bounded,
+  deterministic min/max/time-weighted aggregation.
+- Descriptive selected-period GMI for eligible periods with coverage, range, missing-data, and
+  low-glucose qualifiers plus explicit laboratory-HbA1c wording.
+- Exact-source local loader and request-generation guards for rapid range changes, source changes,
+  and navigation away during loading.
+
+### Safety and scope
+
+- History navigation cannot call provider refresh, Nightscout range APIs, or backfill and cannot
+  mutate the current-reading path.
+- There is no Room migration, Wear/watch-face change, coaching change, notification change, chart
+  gesture, or new provider.
+- Physical phone acceptance is required before any later milestone.
+
 ## v0.5.0 — 2026-08-03 — Local glucose history foundation (phone-only)
 
 ### Added

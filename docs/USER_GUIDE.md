@@ -179,8 +179,20 @@ and pruning is isolated per source while preserving each source's newest record.
 After confirming 1 year or Keep all downloaded, press **Download one older range** to request one
 bounded 90-day range and repeat for another range. The operation is resumable and reports paused or
 failed state after interruption/network loss. It does not alter the current glucose state or watch.
-v0.5.0 does not include a trend chart or selected-period GMI; those are planned only after the
-history foundation is physically accepted.
+### History Explorer (v0.5.1)
+
+Open **History** to read glucose already stored on this phone. Choose 24 hours, 7 days, 14 days,
+30 days, or 90 days. **Custom** accepts 14–90 completed local calendar days and must end before
+today. Missing periods are shown as disconnected segments; coverage and largest-gap labels explain
+how complete the period is.
+
+Numeric selected-period GMI is available only for eligible periods of at least 14 days with
+sufficient coverage. The screen also shows time-weighted mean, time-in-range/below-range metrics,
+missing duration, and safety qualifiers. This is a CGM-derived estimate, not a laboratory HbA1c
+measurement, treatment instruction, or medication target.
+
+Opening History does not download data. Use the existing Settings history controls when older data
+must be downloaded. The last fixed period is remembered; custom dates are not a saved goal.
 
 ### Wear app
 

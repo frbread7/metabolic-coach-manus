@@ -15,6 +15,7 @@ import com.young.metaboliccoach.core.domain.NightscoutSettingsRepository
 import com.young.metaboliccoach.core.domain.NightscoutSettingsValidator
 import com.young.metaboliccoach.core.domain.GlycemicGoalRepository
 import com.young.metaboliccoach.core.domain.GlycemicPlannerBounds
+import com.young.metaboliccoach.core.domain.HistoryExplorerPreferencesRepository
 import com.young.metaboliccoach.core.domain.requiresRecommendationInvalidation
 import com.young.metaboliccoach.core.model.CoachSettings
 import com.young.metaboliccoach.core.model.CoachTheme
@@ -25,6 +26,7 @@ import com.young.metaboliccoach.core.model.GlucoseUnit
 import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
 import com.young.metaboliccoach.core.model.GlycemicTargetProvenance
 import com.young.metaboliccoach.core.model.GlycemicWindow
+import com.young.metaboliccoach.core.model.HistoryPeriodPreset
 import com.young.metaboliccoach.core.model.NightscoutSettings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -44,7 +46,10 @@ class SettingsRepositoryImpl @Inject constructor(
     private val validator: SettingsValidator,
     private val nightscoutValidator: NightscoutSettingsValidator,
     private val recommendationSnapshotDao: RecommendationSnapshotDao,
-) : SettingsRepository, NightscoutSettingsRepository, GlycemicGoalRepository {
+) : SettingsRepository,
+    NightscoutSettingsRepository,
+    GlycemicGoalRepository,
+    HistoryExplorerPreferencesRepository {
     override fun observe(): Flow<CoachSettings> = context.settingsDataStore.data.map { values ->
         val defaults = DefaultCoachSettings.create()
         CoachSettings(
@@ -360,6 +365,23 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun observeLastFixedPreset(): Flow<HistoryPeriodPreset> =
+        context.settingsDataStore.data.map { values ->
+            values[Keys.historyLastFixedPreset]
+                .enumOrDefault(HistoryPeriodPreset.HOURS_24)
+                .takeUnless { it == HistoryPeriodPreset.CUSTOM }
+                ?: HistoryPeriodPreset.HOURS_24
+        }
+
+    override suspend fun updateLastFixedPreset(preset: HistoryPeriodPreset) {
+        require(preset != HistoryPeriodPreset.CUSTOM) {
+            "Only a fixed history window may be persisted."
+        }
+        context.settingsDataStore.edit { values ->
+            values[Keys.historyLastFixedPreset] = preset.name
+        }
+    }
+
     override suspend fun reset() {
         recommendationSnapshotDao.deleteAll()
         context.settingsDataStore.edit { values ->
@@ -433,6 +455,7 @@ class SettingsRepositoryImpl @Inject constructor(
         val glycemicMaximumLowPercent = doublePreferencesKey("glycemic_maximum_low_percent")
         val glycemicMaximumVeryLowPercent =
             doublePreferencesKey("glycemic_maximum_very_low_percent")
+        val historyLastFixedPreset = stringPreferencesKey("history_last_fixed_preset")
     }
 }
 

@@ -50,9 +50,9 @@ handed off.
 These are debug-signed engineering artifacts, not production releases. Regenerate and rehash them
 after every source/build change.
 
-## v0.4.2 GitHub Actions engineering artifact
+## v0.4.2 GitHub Actions engineering artifact (historical)
 
-The current engineering artifact is `v0.4.2` (versionCode `6`). It is the phone-only saved
+The v0.4.2 engineering artifact (versionCode `6`) was the phone-only saved
 planning-milestones milestone layered on the accepted v0.4.1 freshness fix. The workflow keeps the
 same signed phone/Wear/watch-face package contract, but physical acceptance is limited to the phone
 Planner behavior described in [V0_4_2_SAVED_MILESTONES.md](V0.4_2_SAVED_MILESTONES.md).
@@ -72,11 +72,12 @@ The ZIP must contain exactly `CHANGELOG.md`, `INSTALL.md`, `phone.apk`, `watchfa
 certificate. The old v0.4.0 artifact is preserved and the v0.4.1 artifact/evidence remain separate;
 neither is overwritten or relabeled.
 
-## v0.5.0 GitHub Actions engineering artifact
+## v0.5.1 GitHub Actions engineering artifact
 
-The current engineering artifact is `v0.5.0` (versionCode `7`). It is the phone-only local-history
-foundation layered on the accepted planner milestone. The workflow keeps the same signed
-phone/Wear/watch-face package contract, while the new history controls remain phone-only.
+The current engineering artifact is `v0.5.1` (versionCode `8`). It adds the phone-only local
+History Explorer and selected-period GMI over the accepted v0.5.0 foundation. The workflow keeps
+the same signed phone/Wear/watch-face package contract; Wear and watch-face behavior remain
+unchanged.
 
 The workflow requires the accepted v0.3 engineering keystore through the encrypted
 `MC_DEBUG_KEYSTORE_BASE64` repository secret and uploads:
@@ -85,13 +86,13 @@ The workflow requires the accepted v0.3 engineering keystore through the encrypt
 metabolic-coach-phone-debug.apk
 metabolic-coach-wear-debug.apk
 metabolic-coach-watchface-debug.apk
-MetabolicCoach-v0.5.0.zip
+MetabolicCoach-v0.5.1.zip
 ```
 
 The ZIP must contain exactly `CHANGELOG.md`, `INSTALL.md`, `phone.apk`, `watchface.apk`, and
-`wear.apk`. All three APKs must report `versionName=0.5.0`, `versionCode=7`, and the v0.3 signing
+`wear.apk`. All three APKs must report `versionName=0.5.1`, `versionCode=8`, and the v0.3 signing
 certificate. This artifact does not claim new Wear/watch-face/coaching behavior or physical
-acceptance; the next step is the phone-only v0.5.0 acceptance test.
+acceptance; the next step is the phone-only v0.5.1 acceptance test.
 
 ## v0.4.1 GitHub Actions engineering artifact (historical)
 

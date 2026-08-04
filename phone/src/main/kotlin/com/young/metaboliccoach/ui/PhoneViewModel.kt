@@ -1,6 +1,7 @@
 package com.young.metaboliccoach.ui
 
 import android.net.Uri
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.young.metaboliccoach.background.CommandHandlingResult
@@ -19,6 +20,9 @@ import com.young.metaboliccoach.core.domain.GlycemicGoalPlanner
 import com.young.metaboliccoach.core.domain.GlycemicGoalRepository
 import com.young.metaboliccoach.core.domain.GlycemicPlanningMilestoneRepository
 import com.young.metaboliccoach.core.domain.GLYCEMIC_MILESTONE_CALCULATION_CONTRACT_VERSION
+import com.young.metaboliccoach.core.domain.HistoryExplorerPreferencesRepository
+import com.young.metaboliccoach.core.domain.HistoryRangeResolution
+import com.young.metaboliccoach.core.domain.HistoryRangeResolver
 import com.young.metaboliccoach.core.domain.NightscoutSettingsRepository
 import com.young.metaboliccoach.core.domain.NightscoutSettingsValidator
 import com.young.metaboliccoach.core.domain.SettingsRepository
@@ -33,11 +37,15 @@ import com.young.metaboliccoach.core.model.GlucoseDataOrigin
 import com.young.metaboliccoach.core.model.GlucoseHistorySettings
 import com.young.metaboliccoach.core.model.GlucoseHistoryStatus
 import com.young.metaboliccoach.core.model.GlucoseReading
+import com.young.metaboliccoach.core.model.GlucoseChartResult
 import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
 import com.young.metaboliccoach.core.model.GlycemicPlanningMilestone
 import com.young.metaboliccoach.core.model.GlycemicPlanningMilestoneEvaluation
 import com.young.metaboliccoach.core.model.GlycemicWindow
+import com.young.metaboliccoach.core.model.HistoryPeriodPreset
+import com.young.metaboliccoach.core.model.HistoryRange
 import com.young.metaboliccoach.core.model.RollingGlycemicMetrics
+import com.young.metaboliccoach.core.model.SelectedPeriodGmiResult
 import com.young.metaboliccoach.core.model.GlycemicGoalScenario
 import com.young.metaboliccoach.core.model.InterventionSession
 import com.young.metaboliccoach.core.model.MealMarker
@@ -49,10 +57,14 @@ import com.young.metaboliccoach.core.model.QuickActionType
 import com.young.metaboliccoach.data.PersonalDataFileExporter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -64,7 +76,26 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
+
+enum class HistoryExplorerLoadStatus {
+    IDLE,
+    LOADING,
+    READY,
+    ERROR,
+}
+
+data class HistoryExplorerUiState(
+    val selectedPreset: HistoryPeriodPreset = HistoryPeriodPreset.HOURS_24,
+    val range: HistoryRange? = null,
+    val chart: GlucoseChartResult? = null,
+    val selectedPeriodGmi: SelectedPeriodGmiResult? = null,
+    val loadStatus: HistoryExplorerLoadStatus = HistoryExplorerLoadStatus.IDLE,
+    val detail: String = "Open History to review locally stored readings.",
+    val requestGeneration: Long = 0L,
+    val customDraft: HistoryCustomDraftUiState = HistoryCustomDraftUiState(),
+)
 
 data class PhoneUiState(
     val glucose: GlucoseReading? = null,
@@ -88,6 +119,7 @@ data class PhoneUiState(
     val selectedMilestoneId: String? = null,
     val selectedMilestoneEvaluation: GlycemicPlanningMilestoneEvaluation? = null,
     val milestoneMigrationNotice: Boolean = false,
+    val historyExplorer: HistoryExplorerUiState = HistoryExplorerUiState(),
 )
 
 private data class CurrentState(
@@ -122,8 +154,10 @@ private data class MilestoneInputs(
 @HiltViewModel
 @OptIn(ExperimentalCoroutinesApi::class)
 class PhoneViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     private val glucoseRepository: GlucoseRepository,
     private val glucoseHistoryRepository: GlucoseHistoryRepository,
+    private val historyPreferencesRepository: HistoryExplorerPreferencesRepository,
     private val activityRepository: ActivityRepository,
     private val coachingRepository: CoachingRepository,
     private val settingsRepository: SettingsRepository,
@@ -142,6 +176,26 @@ class PhoneViewModel @Inject constructor(
     private val operationMessage = MutableStateFlow<String?>(null)
     private val operationInProgress = MutableStateFlow(false)
     private val operationMutex = Mutex()
+    private val historyCustomDraftStore = HistoryCustomDraftStore(
+        savedStateHandle = savedStateHandle,
+        defaultEndDate = Instant.ofEpochMilli(timeSource.nowEpochMillis())
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+            .minusDays(1),
+    )
+    private val historyExplorerState = MutableStateFlow(
+        HistoryExplorerUiState(customDraft = historyCustomDraftStore.snapshot()),
+    )
+    private var historyLoadJob: Job? = null
+    private var historyVisible = false
+    private var visibleHistorySourceId: String? = null
+    private val historyRequestGate = HistoryExplorerRequestGate()
+    private val historyPresetInitializationGate = HistoryPresetInitializationGate()
+    private val historyExplorerLoader = HistoryExplorerLoader(
+        glucoseRepository = glucoseRepository,
+        glycemicGoalRepository = glycemicGoalRepository,
+        settingsRepository = settingsRepository,
+    )
 
     private val current = combine(
         glucoseRepository.observeLatest(),
@@ -281,7 +335,7 @@ class PhoneViewModel @Inject constructor(
             )
         }
 
-    val uiState = combine(
+    private val uiStateWithoutHistoryExplorer = combine(
         baseUiState,
         plannerState,
         operationMessage,
@@ -317,6 +371,15 @@ class PhoneViewModel @Inject constructor(
             selectedMilestoneEvaluation = planner.selectedEvaluation,
             milestoneMigrationNotice = planner.migrationNotice,
         )
+    }
+
+    val uiState = combine(
+        uiStateWithoutHistoryExplorer,
+        historyExplorerState,
+    ) { state, history ->
+        state.copy(
+            historyExplorer = history.forActiveSource(state.glucose?.sourceId),
+        )
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
@@ -325,6 +388,192 @@ class PhoneViewModel @Inject constructor(
 
     init {
         refresh()
+    }
+
+    fun setHistoryVisible(visible: Boolean, sourceId: String?) {
+        historyVisible = visible
+        visibleHistorySourceId = sourceId
+        historyRequestGate.updateVisibility(visible, sourceId)
+        if (!visible) {
+            historyLoadJob?.cancel()
+            return
+        }
+        val capturedSourceId = sourceId
+        viewModelScope.launch {
+            if (historyPresetInitializationGate.shouldReadPersistedPreset()) {
+                val preset = historyPreferencesRepository.observeLastFixedPreset().first()
+                historyPresetInitializationGate.acceptPersistedPreset(preset)?.let { accepted ->
+                    historyExplorerState.value = historyExplorerState.value.copy(
+                        selectedPreset = accepted,
+                    )
+                }
+            }
+            if (historyVisible && visibleHistorySourceId == capturedSourceId) {
+                loadSelectedHistory(capturedSourceId)
+            }
+        }
+    }
+
+    fun selectHistoryPreset(preset: HistoryPeriodPreset) {
+        historyPresetInitializationGate.recordUserSelection()
+        if (preset == HistoryPeriodPreset.CUSTOM) {
+            historyLoadJob?.cancel()
+            historyRequestGate.invalidate()
+            historyExplorerState.value = historyExplorerState.value.copy(
+                selectedPreset = preset,
+                range = null,
+                chart = null,
+                selectedPeriodGmi = null,
+                loadStatus = HistoryExplorerLoadStatus.IDLE,
+                detail = "Choose 14 to 90 completed local calendar days.",
+            )
+            return
+        }
+        historyExplorerState.value = historyExplorerState.value.copy(selectedPreset = preset)
+        viewModelScope.launch {
+            historyPreferencesRepository.updateLastFixedPreset(preset)
+        }
+        if (historyVisible) loadSelectedHistory(visibleHistorySourceId)
+    }
+
+    fun updateCustomHistoryStartDate(value: String) {
+        historyExplorerState.value = historyExplorerState.value.copy(
+            customDraft = historyCustomDraftStore.updateStartDate(value),
+        )
+    }
+
+    fun updateCustomHistoryEndDate(value: String) {
+        historyExplorerState.value = historyExplorerState.value.copy(
+            customDraft = historyCustomDraftStore.updateEndDate(value),
+        )
+    }
+
+    fun applyCustomHistoryRange() {
+        val draft = historyCustomDraftStore.snapshot()
+        val start = runCatching { LocalDate.parse(draft.startDateInput.trim()) }.getOrNull()
+        val end = runCatching { LocalDate.parse(draft.endDateInput.trim()) }.getOrNull()
+        if (start == null || end == null) {
+            historyExplorerState.value = historyExplorerState.value.copy(
+                customDraft = historyCustomDraftStore.updateError(
+                    "Enter both dates as YYYY-MM-DD.",
+                ),
+            )
+            return
+        }
+        selectCustomHistoryRange(start.toEpochDay(), end.toEpochDay())
+    }
+
+    private fun selectCustomHistoryRange(startDateEpochDay: Long, endDateEpochDay: Long) {
+        historyPresetInitializationGate.recordUserSelection()
+        val resolution = HistoryRangeResolver.resolveCustom(
+            startDateEpochDay = startDateEpochDay,
+            endDateEpochDay = endDateEpochDay,
+            nowEpochMillis = timeSource.nowEpochMillis(),
+            displayTimeZoneId = ZoneId.systemDefault().id,
+        )
+        when (resolution) {
+            is HistoryRangeResolution.Invalid -> {
+                historyLoadJob?.cancel()
+                historyRequestGate.invalidate()
+                historyExplorerState.value = historyExplorerState.value.copy(
+                    selectedPreset = HistoryPeriodPreset.CUSTOM,
+                    range = null,
+                    chart = null,
+                    selectedPeriodGmi = null,
+                    loadStatus = HistoryExplorerLoadStatus.ERROR,
+                    detail = resolution.detail,
+                    customDraft = historyCustomDraftStore.updateError(resolution.detail),
+                )
+            }
+            is HistoryRangeResolution.Resolved -> {
+                historyExplorerState.value = historyExplorerState.value.copy(
+                    selectedPreset = HistoryPeriodPreset.CUSTOM,
+                    range = resolution.range,
+                    customDraft = historyCustomDraftStore.updateError(null),
+                )
+                if (historyVisible) {
+                    loadHistoryRange(visibleHistorySourceId, resolution.range)
+                }
+            }
+        }
+    }
+
+    private fun loadSelectedHistory(sourceId: String?) {
+        val currentState = historyExplorerState.value
+        val range = if (currentState.selectedPreset == HistoryPeriodPreset.CUSTOM) {
+            currentState.range ?: return
+        } else {
+            when (
+                val resolution = HistoryRangeResolver.resolveFixed(
+                    preset = currentState.selectedPreset,
+                    nowEpochMillis = timeSource.nowEpochMillis(),
+                    displayTimeZoneId = ZoneId.systemDefault().id,
+                )
+            ) {
+                is HistoryRangeResolution.Invalid -> {
+                    historyExplorerState.value = currentState.copy(
+                        loadStatus = HistoryExplorerLoadStatus.ERROR,
+                        detail = resolution.detail,
+                    )
+                    return
+                }
+                is HistoryRangeResolution.Resolved -> resolution.range
+            }
+        }
+        loadHistoryRange(sourceId, range)
+    }
+
+    private fun loadHistoryRange(sourceId: String?, range: HistoryRange) {
+        historyLoadJob?.cancel()
+        historyRequestGate.invalidate()
+        val capturedSourceId = sourceId?.takeIf(String::isNotBlank)
+        if (capturedSourceId == null) {
+            historyExplorerState.value = historyExplorerState.value.copy(
+                range = range,
+                chart = null,
+                selectedPeriodGmi = null,
+                loadStatus = HistoryExplorerLoadStatus.ERROR,
+                detail = "No selected glucose source has local history.",
+            )
+            return
+        }
+        val token = historyRequestGate.begin(capturedSourceId)
+        historyExplorerState.value = historyExplorerState.value.copy(
+            range = range,
+            chart = null,
+            selectedPeriodGmi = null,
+            loadStatus = HistoryExplorerLoadStatus.LOADING,
+            detail = "Loading local history…",
+            requestGeneration = token.generation,
+        )
+        historyLoadJob = viewModelScope.launch {
+            try {
+                val result = historyExplorerLoader.load(capturedSourceId, range)
+                if (historyRequestGate.canPublish(token)) {
+                    historyExplorerState.value = historyExplorerState.value.copy(
+                        range = range,
+                        chart = result.chart,
+                        selectedPeriodGmi = result.selectedPeriodGmi,
+                        loadStatus = HistoryExplorerLoadStatus.READY,
+                        detail = result.chart.detail,
+                        requestGeneration = token.generation,
+                    )
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Throwable) {
+                if (historyRequestGate.canPublish(token)) {
+                    historyExplorerState.value = historyExplorerState.value.copy(
+                        range = range,
+                        chart = null,
+                        selectedPeriodGmi = null,
+                        loadStatus = HistoryExplorerLoadStatus.ERROR,
+                        detail = "Local history could not be loaded.",
+                        requestGeneration = token.generation,
+                    )
+                }
+            }
+        }
     }
 
     fun refresh() {

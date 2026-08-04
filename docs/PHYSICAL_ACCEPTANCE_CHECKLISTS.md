@@ -37,7 +37,7 @@ new pinned run.
 | `v0.4.1` | Phone current-glucose freshness regression gate | Accepted by user report | [v0.4.1 hotfix report](V0.4_1_FRESHNESS_HOTFIX.md) |
 | `v0.4.2` | Phone saved planning milestones and planner regressions | Accepted by user report | [v0.4.2 checklist](V0.4_2_SAVED_MILESTONES.md) |
 | `v0.5.0` | Phone local history retention, backfill, export/reset | Accepted by user report 2026-08-04 | [v0.5.0 history checklist](V0_5_0_HISTORY_FOUNDATION.md) and [sanitized record](acceptance/V0_5_0_PHYSICAL_ACCEPTANCE.md) |
-| `v0.5.1` | Phone trend chart and selected-period GMI | Architecture review required before implementation | This document, §v0.5.1 (draft gate) |
+| `v0.5.1` | Phone trend chart and selected-period GMI | Pending physical acceptance | [v0.5.1 phone checklist](V0_5_1_HISTORY_EXPLORER.md) |
 | `v0.6.0` | One approved coaching increment | Planned; scope must be approved before this gate is pinned | This document, §v0.6.0 (draft gate) |
 | `v0.5` beta | One-week daily-use reliability and safety observation | Planned after feature gates | This document, §one-week beta |
 | `v1.0` | Production daily-use release | Planned | This document, §v1.0 |
@@ -151,25 +151,15 @@ the current artifact. This milestone is phone-only; do not install it on the wat
 | V050-REG-01 | No chart, selected-period GMI, new coaching, Wear, face, notification, or quick-action behavior appears. | `PASS` | User-reported pass. |
 | V050-ST-01 | Repeated refresh, background/foreground, low network, and settings changes do not crash or create unacceptable battery/network behavior. | `PASS` | User-reported pass. |
 
-The user reported this phone gate passed on 2026-08-04. v0.5.1 remains subject to the required APOS
-architecture review before implementation.
+The user reported this phone gate passed on 2026-08-04. The required v0.5.1 APOS review subsequently
+returned `GO WITH CONDITIONS`.
 
-## v0.5.1 — Phone trend chart and selected-period GMI (draft gate)
+## v0.5.1 — Phone trend chart and selected-period GMI
 
-This is a planned checklist only. It becomes executable after the `v0.5.0` acceptance is reviewed,
-the architecture is approved, and a pinned artifact is produced. It must not be used to claim that
-chart or GMI behavior exists in `v0.5.0`.
-
-| ID | Expected physical result | Status |
-| --- | --- | --- |
-| V051-IN-01 | Install/upgrade the pinned phone artifact without losing accepted history or milestones. | `NOT RUN` |
-| V051-CH-01 | Chart renders the selected 30/60/90-day and custom periods with loading, empty, and error states. | `NOT RUN` |
-| V051-CH-02 | Chart labels, time boundaries, units, trend direction, and accessibility remain readable on supported phones. | `NOT RUN` |
-| V051-GM-01 | Selected-period GMI uses only readings inside the chosen interval and shows the documented CGM-derived wording. | `NOT RUN` |
-| V051-GM-02 | Timezone/day-boundary changes, sparse data, duplicate/out-of-order rows, and insufficient coverage produce deterministic results or an explicit unavailable state. | `NOT RUN` |
-| V051-HS-01 | Viewing chart/GMI never starts a new provider request, changes retention, or mutates stored history. | `NOT RUN` |
-| V051-REG-01 | Current freshness, planner milestones, Nightscout source isolation, export/reset, Wear payloads, coaching, and notifications remain unchanged. | `NOT RUN` |
-| V051-ST-01 | Repeated period changes, rotation, process death, and offline use do not crash or create runaway work. | `NOT RUN` |
+The executable, privacy-safe checklist is maintained in
+[V0_5_1_HISTORY_EXPLORER.md](V0_5_1_HISTORY_EXPLORER.md). It covers the exact 24h/7/14/30/90-day
+and custom range contract, GMI eligibility, local-only reads, stale-result races, frozen regressions,
+and the post-test stop condition.
 
 ## v0.6.0 — One coaching increment (draft gate)
 
