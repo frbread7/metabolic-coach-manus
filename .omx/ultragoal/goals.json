@@ -1,7 +1,7 @@
 {
   "version": 1,
   "createdAt": "2026-07-20T02:43:23.974Z",
-  "updatedAt": "2026-08-12T08:25:29.946Z",
+  "updatedAt": "2026-08-12T23:26:06.408Z",
   "briefPath": ".omx/ultragoal/brief.md",
   "goalsPath": ".omx/ultragoal/goals.json",
   "ledgerPath": ".omx/ultragoal/ledger.jsonl",
@@ -46,6 +46,16 @@
       "createdAt": "2026-08-12T08:25:29.946Z",
       "updatedAt": "2026-08-12T08:25:29.946Z",
       "evidence": "APOS v0.6.1 architecture gate returned GO WITH CONDITIONS on 2026-08-12."
+    },
+    {
+      "id": "G005-implement-v0-6-2-prolonged-inactivit",
+      "title": "Implement v0.6.2 prolonged-inactivity WALK coaching",
+      "objective": "Implement the APOS-approved engineering-only v0.6.2 inactivity WALK milestone using a pure fail-closed activity confirmation policy, shared configurable freshness ceiling, algorithm-v4 stable episode identity, WALK-only automation independent of stairs, post-meal then rapid then inactivity priority, display/Start working-hours and activity revalidation, existing Wear payload/session paths, full regression/review/package gates, and Physical DEFERRED backlog evidence without provider/scheduler/persistence/Wear-schema/safety changes.",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-08-12T23:26:06.408Z",
+      "updatedAt": "2026-08-12T23:26:06.408Z",
+      "evidence": "ChatGPT Pro APOS architecture gate 2026-08-12 returned GO WITH CONDITIONS with no blocker; receipt .devspace/runs/2026-08-12T23-20-07-230Z-chatgpt-call/receipt.json."
     }
   ],
   "codexObjective": "Complete the durable ultragoal plan in .omx/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .omx/ultragoal/ledger.jsonl as the audit trail.",

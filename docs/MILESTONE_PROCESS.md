@@ -148,5 +148,9 @@ non-conflicting earlier constraints, and avoid inferring acceptance that the use
 - Deferred sequence: `v0.6.1` rapid-rise walk, `v0.6.2` inactivity walk only, then `v0.7.0`
   integrated walk-coaching RC and batched phone/Galaxy Watch8 acceptance. Stair coaching requires a
   later separate architecture and physical gate.
+- `v0.6.2` architecture gate: APOS returned `GO WITH CONDITIONS` for fail-closed prolonged-
+  inactivity WALK only. The approved contract is recorded in
+  [V0_6_2_INACTIVITY_WALK_COACHING.md](V0_6_2_INACTIVITY_WALK_COACHING.md); no one-line allowlist or
+  automated stair activation is permitted.
 
 The completed physical test was defined in [V0.3_WEAR_ACCEPTANCE.md](V0.3_WEAR_ACCEPTANCE.md).
