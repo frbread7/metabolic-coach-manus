@@ -8,6 +8,11 @@ accepted only after the user runs the required rows against one pinned artifact 
 results. Automated builds, emulator runs, and a successful install do not replace the required
 physical gate.
 
+Deferred checks are tracked cumulatively in
+[PHYSICAL_TEST_BACKLOG.md](../PHYSICAL_TEST_BACKLOG.md). Engineering may continue under the
+APOS-approved process while those checks remain `NOT RUN`, but no deferred milestone is physically
+accepted.
+
 ## Status and evidence rules
 
 Use one status for every row:
@@ -38,7 +43,10 @@ new pinned run.
 | `v0.4.2` | Phone saved planning milestones and planner regressions | Accepted by user report | [v0.4.2 checklist](V0.4_2_SAVED_MILESTONES.md) |
 | `v0.5.0` | Phone local history retention, backfill, export/reset | Accepted by user report 2026-08-04 | [v0.5.0 history checklist](V0_5_0_HISTORY_FOUNDATION.md) and [sanitized record](acceptance/V0_5_0_PHYSICAL_ACCEPTANCE.md) |
 | `v0.5.1` | Phone trend chart and selected-period GMI | Accepted by user report 2026-08-04 | [v0.5.1 phone checklist](V0_5_1_HISTORY_EXPLORER.md) |
-| `v0.6.0` | One approved coaching increment | Planned; scope must be approved before this gate is pinned | This document, §v0.6.0 (draft gate) |
+| `v0.6.0` | Post-meal walk coaching | Engineering PASS / Physical DEFERRED | [v0.6.0 checklist](V0_6_0_POST_MEAL_COACHING.md); cumulative backlog |
+| `v0.6.1` | Confirmed rapid-rise walk coaching | Engineering in progress / Physical DEFERRED | Cumulative backlog; milestone checklist pending |
+| `v0.6.2` | Prolonged-inactivity walk coaching only | Planned / Physical DEFERRED | Checklist pending architecture gate |
+| `v0.7.0` | Integrated walk-coaching RC | Planned batched physical gate | Consolidated checklist pending |
 | `v0.5` beta | One-week daily-use reliability and safety observation | Planned after feature gates | This document, §one-week beta |
 | `v1.0` | Production daily-use release | Planned | This document, §v1.0 |
 
@@ -228,6 +236,7 @@ Tester report:
 Reviewer decision:
 ```
 
-When the user reports physical results, stop implementation. Review the evidence and decide whether
-the milestone is accepted, requires a narrowly scoped defect fix, or remains blocked before planning
-the next version.
+When the user reports physical results, record and review them before altering the affected device
+boundary. Any failure involving safety, current glucose/provider behavior, data integrity,
+notification/command replay, session duplication, reset/export, Wear compatibility, or battery
+loops stops dependent engineering until the defect is resolved and retested.

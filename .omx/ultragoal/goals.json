@@ -1,7 +1,7 @@
 {
   "version": 1,
   "createdAt": "2026-07-20T02:43:23.974Z",
-  "updatedAt": "2026-07-24T22:26:22.579Z",
+  "updatedAt": "2026-08-12T08:25:29.946Z",
   "briefPath": ".omx/ultragoal/brief.md",
   "goalsPath": ".omx/ultragoal/goals.json",
   "ledgerPath": ".omx/ultragoal/ledger.jsonl",
@@ -26,6 +26,26 @@
       "createdAt": "2026-07-24T22:26:22.579Z",
       "updatedAt": "2026-07-24T22:26:22.579Z",
       "evidence": "User design decision on 2026-07-24: the stable daily source-of-truth path is CareSens Air app to xDrip+ to Nightscout, and Version 1 must consume Nightscout only."
+    },
+    {
+      "id": "G003-adopt-deferred-physical-test-governa",
+      "title": "Adopt deferred physical-test governance",
+      "objective": "Replace the per-milestone blocking physical gate with APOS-approved two-axis engineering/physical status, maintain a privacy-safe cumulative physical-test backlog, preserve foundational stop-review boundaries, and document v0.6.0 as Engineering PASS / Physical DEFERRED without fabricating acceptance.",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-08-12T08:25:29.600Z",
+      "updatedAt": "2026-08-12T08:25:29.600Z",
+      "evidence": "User governance update on 2026-08-12 and APOS GO WITH CONDITIONS response in the bound main architecture room."
+    },
+    {
+      "id": "G004-implement-v0-6-1-rapid-rise-walk-coa",
+      "title": "Implement v0.6.1 rapid-rise walk coaching",
+      "objective": "Implement the APOS-approved engineering-only v0.6.1 rapid-rise walk milestone using two consecutive same-exact-source qualifying normalized readings, deterministic pair identity, post-meal precedence, existing shared safety and global delivery/session semantics, no provider/polling/Wear-protocol/persistence-model changes, full regression/review/package gates, and Physical DEFERRED backlog evidence.",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-08-12T08:25:29.946Z",
+      "updatedAt": "2026-08-12T08:25:29.946Z",
+      "evidence": "APOS v0.6.1 architecture gate returned GO WITH CONDITIONS on 2026-08-12."
     }
   ],
   "codexObjective": "Complete the durable ultragoal plan in .omx/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .omx/ultragoal/ledger.jsonl as the audit trail.",

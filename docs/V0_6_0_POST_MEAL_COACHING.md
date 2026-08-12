@@ -1,5 +1,7 @@
 # v0.6.0 Post-meal walk coaching
 
+Status: `Engineering: PASS / Physical: DEFERRED`.
+
 ## Architecture decision
 
 The APOS architecture gate returned `GO WITH CONDITIONS`. This release implements one real
@@ -56,4 +58,6 @@ server addresses, credentials, or health screenshots.
 | V060-REG-01 | Today freshness, History, Planner, Settings, watch glucose, and watch face remain usable with no regression. | `NOT TESTED` |
 | V060-ST-01 | Repeated normal use shows no crash, ANR, excessive heat, or obvious battery/network loop. | `NOT TESTED` |
 
-Stop after reporting this checklist. Do not start the next milestone until the result is reviewed.
+These rows remain in the cumulative root `PHYSICAL_TEST_BACKLOG.md`. Under the APOS-approved
+deferred process, later walk-coaching engineering may continue, but this milestone must not be
+called physically accepted until the user reports a passing real-device run.

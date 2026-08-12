@@ -6,41 +6,56 @@ Metabolic Coach uses gated development because it handles health data and spans 
 Google Play services, a physical watch, and a watch face. Automated verification cannot prove
 radio recovery, round-screen layout, Always-On Display behavior, or real battery impact.
 
-This process is permanent unless an architecture review explicitly replaces it.
+The APOS architecture review updated this process on 2026-08-12 to permit deferred and batched
+physical testing while preserving explicit device-verification evidence.
 
 ## Required sequence
 
-Every milestone follows this order:
+Every engineering milestone follows this order:
 
 1. Architecture discussion defines the objective, exclusions, safety boundaries, acceptance
    criteria, and artifact/version strategy.
 2. Codex implements only the approved scope.
 3. Automated verification runs and records exact commands and results.
-4. The user performs the written physical-device checklist against pinned artifacts.
-5. The user reports results using `PASS`, `FAIL`, `BLOCKED`, or `NOT RUN` without exposing private
-   health data.
-6. Architecture review evaluates the evidence, defects, and whether the milestone can close.
-7. Only then is the next milestone planned and unlocked.
+4. Independent architecture/code review runs when required by the milestone boundary.
+5. The milestone is recorded using two independent axes: `Engineering: PASS|FAIL` and
+   `Physical: NOT_REQUIRED|DEFERRED|ACCEPTED|FAILED/BLOCKED`.
+6. If physical testing is deferred, its exact phone/Galaxy Watch8 checks are appended to the root
+   [PHYSICAL_TEST_BACKLOG.md](../PHYSICAL_TEST_BACKLOG.md).
+7. Later narrow engineering milestones may proceed when their architecture gate allows it. A
+   meaningful integration release candidate consolidates the deferred physical checks.
 
 The version-by-version checklist index is [PHYSICAL_ACCEPTANCE_CHECKLISTS.md](PHYSICAL_ACCEPTANCE_CHECKLISTS.md).
 It is an index and planning aid; a detailed milestone record remains authoritative when one exists.
 
 Automated success never substitutes for physical acceptance. Physical acceptance never substitutes
-for source review, reproducible builds, or automated tests.
+for source review, reproducible builds, or automated tests. `Engineering: PASS / Physical:
+DEFERRED` must never be described simply as accepted.
 
 ## Gate rules
 
-- While a physical gate is open, production code is frozen.
-- Allowed work is limited to read-only verification, installation or test documentation, evidence
-  capture, and a critical pre-install defect that prevents safe installation or synchronization.
-- New features, opportunistic refactors, dependency changes, UI redesigns, and work assigned to a
-  later milestone are prohibited.
-- When the user reports physical results, stop implementation. Record and review the evidence before
-  deciding whether a narrowly scoped fix, a retest, or the next milestone is appropriate.
-- A milestone passes only when every required item is `PASS`. `BLOCKED` and `NOT RUN` do not count as
-  acceptance.
+- Deferred physical checks do not freeze ordinary isolated engineering work after automated and
+  review gates pass.
+- Every milestone remains narrow, separately committed, and must preserve previously accepted
+  safety, current-glucose freshness, source-isolation, export/reset, Wear synchronization, and
+  privacy behavior.
+- During implementation, run targeted tests, affected-module tests/lint, and affected-module
+  compilation. At milestone completion, run the full regression/lint/APK/WFF/package pipeline.
+- Build deterministic engineering artifacts at milestone completion, but promote an installable
+  user test bundle only at a meaningful integration checkpoint.
+- Stop for architecture review before a material change to health-safety policy, provider/current
+  glucose behavior, persistence/data integrity, Wear protocol compatibility, reset/export
+  guarantees, or another foundational boundary.
+- Require an earlier physical gate if a milestone changes phone/Watch command semantics,
+  notification action plumbing, WorkManager scheduling/cadence, background wake behavior, session
+  lifecycle, Wear schema, current glucose/provider behavior, safety policy, coaching Room data, or
+  creates device-only replay/battery uncertainty.
+- A physical milestone passes only when every required item is `PASS`. `BLOCKED` and `NOT RUN` do
+  not count as acceptance.
 - Failed items remain in the record. A retest appends new evidence and references the defect/fix;
   it does not overwrite the original result.
+- Never use synthetic production health events that can contaminate local history, sessions, or
+  observations. Isolated synthetic unit-test fixtures remain allowed.
 
 A **critical pre-install defect** is limited to an issue that prevents installation, prevents the
 required phone/watch path from functioning, corrupts or misrepresents synchronized health data,
@@ -122,8 +137,14 @@ non-conflicting earlier constraints, and avoid inferring acceptance that the use
   phone-only local trend chart and selected-period GMI, and the user reported the
   [phone physical gate](V0_5_1_HISTORY_EXPLORER.md) passed on 2026-08-04. Wear, watch-face,
   coaching, notification, and current-glucose freshness behavior remained frozen.
-- `v0.6.0` architecture gate: APOS returned `GO WITH CONDITIONS` for one post-meal delayed walk
-  workflow. Implementation is limited to this trigger and stops for the phone/Galaxy Watch8
-  checklist in [V0_6_0_POST_MEAL_COACHING.md](V0_6_0_POST_MEAL_COACHING.md).
+- `v0.6.0` post-meal walk: `Engineering: PASS / Physical: DEFERRED`. Its exact device checks are in
+  [V0_6_0_POST_MEAL_COACHING.md](V0_6_0_POST_MEAL_COACHING.md) and the cumulative root backlog.
+- `v0.6.1` architecture gate: APOS returned `GO WITH CONDITIONS` for engineering-only confirmed
+  rapid-rise walk coaching. It may proceed without a device test only if it changes no provider,
+  polling, WorkManager, safety-policy, persistence-model, session, notification-action, or Wear
+  protocol boundary.
+- Deferred sequence: `v0.6.1` rapid-rise walk, `v0.6.2` inactivity walk only, then `v0.7.0`
+  integrated walk-coaching RC and batched phone/Galaxy Watch8 acceptance. Stair coaching requires a
+  later separate architecture and physical gate.
 
 The completed physical test was defined in [V0.3_WEAR_ACCEPTANCE.md](V0.3_WEAR_ACCEPTANCE.md).
