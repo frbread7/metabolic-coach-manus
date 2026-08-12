@@ -119,6 +119,10 @@ remain authoritative for their respective runs.
   isolation, WFF validation, and aligned version/signature/ZIP audit. Then execute
   [the v0.5.1 phone checklist](V0_5_1_HISTORY_EXPLORER.md). No later coaching milestone is
   unlocked until that result is reviewed.
+- `v0.6.1` gate: APOS returned `GO WITH CONDITIONS` for a two-reading same-exact-source rapid-rise
+  walk increment. Post-meal must win overlap; production inactivity/stairs remain disabled; action
+  display and Start must fail closed on incomplete, changed-source, or superseded provenance. Run
+  the full local milestone pipeline and retain all device-only checks as physically deferred.
 
 ## Current local verification
 
@@ -289,6 +293,44 @@ a3faab446c77d714630b51be86220868ee1570419abb0f54e594b75a0cc51e6f  metabolic-coac
 
 This is a local engineering candidate, not a physical acceptance result. The v0.5.1 phone checklist
 must pass before any coaching milestone begins.
+
+### v0.6.1 local engineering artifact gate
+
+On 2026-08-12, feature revision `8b46771594809400dbf7620410eafd7dd24f504e` passed the
+authoritative local milestone pipeline:
+
+```text
+./scripts/build-apks.sh
+BUILD SUCCESSFUL in 10m 54s
+333 actionable tasks: 333 executed
+```
+
+The run passed model/domain/data-debug/data-release/sync/phone/Wear unit suites, including rapid
+pair ordering/identity, post-meal arbitration, cooldown/snooze/daily-cap behavior, immutable
+snapshot retention and invalidation, exact-source action-time revalidation, production allowlist,
+Wear codec/session replay, and phone/Wear fail-closed provenance. Android migration-test sources
+compiled; phone/Wear/watch-face lint and debug assembly passed; all APK signatures and certificate
+continuity passed; WFF v4 source/schema and APK memory-footprint validation passed; and the exact
+five-file ZIP was produced.
+
+Fresh JUnit reports contain 58 suites and 365 executions with 0 failures, 0 errors, and 0 skipped.
+Android instrumentation was compiled but not executed because no Android runtime was attached.
+Independent static review returned code `PASS` and architecture/safety `GO`, with no blockers.
+
+The final debug package passed the metadata/signature/ZIP/credential verifier with versionName
+`0.6.1`, versionCode `10`, and certificate
+`7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6667da26c5fad4`:
+
+```text
+0916fb2921d7ddbfae995414377602040f17b00656c703af6fec4434fdd14ae4  metabolic-coach-phone-debug.apk
+9a3be72f6bab8bbd683694b6ac352f00eea20ae50e1e00725d559a9dc1b0cb24  metabolic-coach-wear-debug.apk
+fa2f4f041ad56a3e36417a8f7cd428671bb26c7e87f8dd74f6e1ee2cbb4d7f0b  metabolic-coach-watchface-debug.apk
+bed24eaf69170140c261b3d6fc6d7bea1b7644c9e9cd2a5db56c0aa3cde7be91  MetabolicCoach-v0.6.1.zip
+```
+
+Status is `Engineering: PASS / Physical: DEFERRED`. The ZIP is a local engineering checkpoint, not
+the promoted integrated coaching release candidate; all device-only rows remain in the cumulative
+physical-test backlog.
 
 Historical v0.2 debug artifact SHA-256 values:
 

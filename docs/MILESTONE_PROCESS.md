@@ -128,8 +128,9 @@ non-conflicting earlier constraints, and avoid inferring acceptance that the use
   CONDITIONS` for the staged history/chart/GMI/coaching roadmap. v0.5.0 is limited to the local
   history foundation; the handoff is recorded in `docs/V0_5_0_HISTORY_FOUNDATION.md`.
 - Automated preflight: the historical v0.3 sync/phone/Wear pre-install suite passed with all 200
-  selected Gradle tasks executed. The current v0.4.2 authoritative local package run passed 333
-  selected tasks, 52 local test suites/288 executions, lint, APK/WFF validation, and packaging.
+  selected Gradle tasks executed. The current v0.6.1 authoritative local package run passed all 333
+  selected tasks, 58 local test suites/365 executions, lint, APK/WFF validation, signature/privacy
+  verification, and packaging.
 - `v0.5.0` physical acceptance: the user reported the phone-only history checklist passed on
   2026-08-04. The privacy-sanitized record is
   [V0_5_0_PHYSICAL_ACCEPTANCE.md](acceptance/V0_5_0_PHYSICAL_ACCEPTANCE.md).
@@ -139,10 +140,11 @@ non-conflicting earlier constraints, and avoid inferring acceptance that the use
   coaching, notification, and current-glucose freshness behavior remained frozen.
 - `v0.6.0` post-meal walk: `Engineering: PASS / Physical: DEFERRED`. Its exact device checks are in
   [V0_6_0_POST_MEAL_COACHING.md](V0_6_0_POST_MEAL_COACHING.md) and the cumulative root backlog.
-- `v0.6.1` architecture gate: APOS returned `GO WITH CONDITIONS` for engineering-only confirmed
-  rapid-rise walk coaching. It may proceed without a device test only if it changes no provider,
-  polling, WorkManager, safety-policy, persistence-model, session, notification-action, or Wear
-  protocol boundary.
+- `v0.6.1` confirmed rapid-rise walk: APOS returned `GO WITH CONDITIONS`; the independent final
+  reviews and authoritative local pipeline passed. Final APOS review returned `APPROVE ENGINEERING
+  PASS` with no blocker. Status is `Engineering: PASS / Physical: DEFERRED`; exact artifacts and
+  deferred checks are recorded in [V0_6_1_RAPID_RISE_COACHING.md](V0_6_1_RAPID_RISE_COACHING.md)
+  and the cumulative root backlog.
 - Deferred sequence: `v0.6.1` rapid-rise walk, `v0.6.2` inactivity walk only, then `v0.7.0`
   integrated walk-coaching RC and batched phone/Galaxy Watch8 acceptance. Stair coaching requires a
   later separate architecture and physical gate.

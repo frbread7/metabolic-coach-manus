@@ -19,9 +19,8 @@ Samsung Galaxy Watch8.
 > `v0.4.2` was physically accepted by user report. The user reported both the `v0.5.0` phone-only
 > local-history gate and the APOS-reviewed `v0.5.1` History Explorer gate passed on 2026-08-04.
 > The bounded `v0.6.0` post-meal walk increment is `Engineering: PASS / Physical: DEFERRED`.
-> The APOS-approved `v0.6.1` confirmed rapid-rise walk increment is in final engineering
-> verification with physical acceptance deferred. Deferred work is never described as physically
-> accepted.
+> The APOS-approved `v0.6.1` confirmed rapid-rise walk increment is
+> `Engineering: PASS / Physical: DEFERRED`. Deferred work is never described as physically accepted.
 > It is a wellness tool, not a medical device, and must not replace the CGM vendor app, glucose
 > alarms, professional advice, or a personal care plan.
 
@@ -40,7 +39,7 @@ synchronization and coaching foundations remain frozen while the current milesto
 | `v0.5.0` | Phone-only local history foundation: explicit retention, source-scoped resumable backfill, export/reset safety | Accepted by user report 2026-08-04 |
 | `v0.5.1` | Phone-only local trend chart and selected-period GMI after history acceptance | Accepted by user report 2026-08-04 |
 | `v0.6.0` | One post-meal delayed walk prompt with exact-source safety, Start/Snooze, completion, and descriptive follow-up | Engineering PASS / Physical DEFERRED |
-| `v0.6.1` | Confirmed two-reading rapid-rise walk coaching through the existing canonical pipeline | Engineering verification / Physical DEFERRED |
+| `v0.6.1` | Confirmed two-reading rapid-rise walk coaching through the existing canonical pipeline | Engineering PASS / Physical DEFERRED |
 | `v0.6.2` | Prolonged-inactivity walk coaching only | Planned after v0.6.1 engineering gate |
 | `v0.7.0` | Integrated walk-coaching release candidate | Planned batched phone/Galaxy Watch8 physical gate |
 | `v0.5` | One-week personal beta with documented reliability, battery, and safety observations | Planned after feature gates |

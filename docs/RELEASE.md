@@ -55,6 +55,7 @@ after every source/build change.
 The current engineering checkpoint is `v0.6.1` (versionCode `10`) across phone, Wear, and watch
 face. It adds confirmed exact-source rapid-rise walk coaching without changing the provider,
 polling/WorkManager cadence, Room schema, notification action plumbing, or Wear Data Layer schema.
+Its recorded status is `Engineering: PASS / Physical: DEFERRED`.
 
 The authoritative local milestone pipeline produces:
 
@@ -69,6 +70,19 @@ This package is an engineering artifact under the deferred-test process. It is n
 user install candidate and must not be described as physically accepted. Deferred phone and
 Galaxy Watch8 checks are tracked in `PHYSICAL_TEST_BACKLOG.md`; the intended promoted coaching
 bundle is the later `v0.7.0` integration RC.
+
+The artifact built from feature revision `8b46771594809400dbf7620410eafd7dd24f504e` has these
+SHA-256 values:
+
+```text
+0916fb2921d7ddbfae995414377602040f17b00656c703af6fec4434fdd14ae4  metabolic-coach-phone-debug.apk
+9a3be72f6bab8bbd683694b6ac352f00eea20ae50e1e00725d559a9dc1b0cb24  metabolic-coach-wear-debug.apk
+fa2f4f041ad56a3e36417a8f7cd428671bb26c7e87f8dd74f6e1ee2cbb4d7f0b  metabolic-coach-watchface-debug.apk
+bed24eaf69170140c261b3d6fc6d7bea1b7644c9e9cd2a5db56c0aa3cde7be91  MetabolicCoach-v0.6.1.zip
+```
+
+All three APKs report versionName `0.6.1`, versionCode `10`, and certificate SHA-256
+`7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6667da26c5fad4`.
 
 ## v0.4.2 GitHub Actions engineering artifact (historical)
 

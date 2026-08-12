@@ -28,7 +28,7 @@ All notable Metabolic Coach package changes are recorded here.
   canonical session lifecycle, notifications, and Wear command transport remain authoritative.
 - This milestone adds no provider request, faster polling, WorkManager job, Room migration, Wear
   schema field, stair automation, prediction, or automatic personalization.
-- Status is `Engineering: PASS / Physical: DEFERRED` only after the recorded automated/review gate;
+- The recorded automated/review gate passed. Status is `Engineering: PASS / Physical: DEFERRED`;
   real phone and Galaxy Watch8 behavior remains in `PHYSICAL_TEST_BACKLOG.md`.
 
 ## v0.6.0 — 2026-08-04 — Post-meal walk coaching
