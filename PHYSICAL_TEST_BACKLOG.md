@@ -34,7 +34,12 @@ unsanitized logs.
 | PTB-V061-TR | `v0.6.1` / commit pending | Phone | A confirmed same-source rapid rise can produce one short-walk recommendation through normal refresh evaluation; no immediacy promise. | Engineering artifact complete; ordinary fresh/safe state | `NOT RUN` | `v0.7.0` RC |
 | PTB-V061-AR | `v0.6.1` / commit pending | Phone + Watch | When post-meal and rapid-rise opportunities overlap, exactly one post-meal recommendation wins; global snooze/cooldown/cap behavior remains coherent. | Both opportunities occur naturally; no synthetic production history | `NOT RUN` | `v0.7.0` RC |
 | PTB-V061-SY | `v0.6.1` / commit pending | Phone + Watch + face | Rapid-rise reason, action, expiry, Start/Snooze, reconnect, and completion reuse the existing canonical transport without duplicates. | Pinned matched engineering artifacts | `NOT RUN` | `v0.7.0` RC |
+| PTB-V061-SF | `v0.6.1` / commit pending | Phone + Watch | A newer stable/nonqualifying reading, changed source, stale state, or incomplete state removes the rapid action; an already visible stale action cannot start a session. | Observe categories only; do not force unsafe health conditions | `NOT RUN` | `v0.7.0` RC; safety gate |
+| PTB-V061-RP | `v0.6.1` / commit pending | Phone + Watch | Repeated refresh, process restart, Bluetooth loss, queued Start, and reconnect neither republish a superseded pair nor duplicate a session/notification. | Valid naturally occurring prompt; pinned artifacts | `NOT RUN` | `v0.7.0` RC; command integrity |
+| PTB-V061-ST | `v0.6.1` / commit pending | Phone + Watch | Representative use shows no crash, ANR, excess heat, notification storm, or obvious extra battery/network loop from rapid evaluation. | Normal daily configuration | `NOT RUN` | `v0.7.0` RC |
 
 The detailed `v0.6.0` procedure remains in
-[docs/V0_6_0_POST_MEAL_COACHING.md](docs/V0_6_0_POST_MEAL_COACHING.md). The backlog will be expanded
-and consolidated before the promoted `v0.7.0` integrated walk-coaching release candidate.
+[docs/V0_6_0_POST_MEAL_COACHING.md](docs/V0_6_0_POST_MEAL_COACHING.md). The `v0.6.1` engineering
+contract is in
+[docs/V0_6_1_RAPID_RISE_COACHING.md](docs/V0_6_1_RAPID_RISE_COACHING.md). The backlog will be
+expanded and consolidated before the promoted `v0.7.0` integrated walk-coaching release candidate.

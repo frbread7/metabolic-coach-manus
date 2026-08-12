@@ -16,6 +16,7 @@ import com.young.metaboliccoach.core.domain.CoachedExerciseActionPolicy
 import com.young.metaboliccoach.core.domain.CoachingRepository
 import com.young.metaboliccoach.core.domain.GlucoseRepository
 import com.young.metaboliccoach.core.domain.GlucoseHistoryRepository
+import com.young.metaboliccoach.core.domain.hasCurrentActionProvenance
 import com.young.metaboliccoach.core.domain.GlycemicGoalPlanner
 import com.young.metaboliccoach.core.domain.GlycemicGoalRepository
 import com.young.metaboliccoach.core.domain.GlycemicPlanningMilestoneRepository
@@ -347,6 +348,7 @@ class PhoneViewModel @Inject constructor(
             recommendation is CoachRecommendation.Action &&
             (
                 now >= recommendation.validUntilEpochMillis ||
+                    !recommendation.hasCurrentActionProvenance(state.glucose) ||
                     !CoachedExerciseActionPolicy.canStart(
                         reading = state.glucose,
                         settings = state.settings,

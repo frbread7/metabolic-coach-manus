@@ -29,9 +29,12 @@ class CoachRuleEngineTest {
         assertEquals(CoachReason.RAPID_GLUCOSE_RISE, recommendation.reason)
         assertEquals(InterventionType.WALK, recommendation.interventionType)
         assertEquals(settings.walkingDurationMinutes, recommendation.durationMinutes)
-        assertEquals("reading", recommendation.triggerContextId)
+        assertTrue(recommendation.id.startsWith("RAPID_GLUCOSE_RISE:v3:"))
+        assertTrue(recommendation.triggerContextId?.startsWith("rapid-pair:v3:") == true)
         assertEquals(now, recommendation.triggerAtEpochMillis)
-        assertEquals(2, recommendation.algorithmVersion)
+        assertEquals(3, recommendation.algorithmVersion)
+        assertEquals("test", recommendation.glucoseSourceId)
+        assertEquals("reading", recommendation.safetyReadingId)
         assertEquals(
             now + settings.staleReadingMinutes * 60_000L,
             recommendation.validUntilEpochMillis,
@@ -161,6 +164,7 @@ class CoachRuleEngineTest {
         ) as CoachRecommendation.Action
 
         assertEquals(first.id, second.id)
+        assertEquals(2, first.algorithmVersion)
     }
 
     @Test
@@ -172,6 +176,36 @@ class CoachRuleEngineTest {
         )
 
         assertNull(recommendation)
+    }
+
+    @Test
+    fun `rapid rise requires a confirming predecessor`() {
+        val recommendation = engine.recommend(
+            context(glucose = glucose(146, 3.0), previousGlucose = null),
+            settings,
+            allowedActionReasons = setOf(CoachReason.RAPID_GLUCOSE_RISE),
+        )
+
+        assertNull(recommendation)
+    }
+
+    @Test
+    fun `post meal wins when rapid rise is also confirmed`() {
+        val meal = MealMarker(
+            id = "overlap-meal",
+            occurredAtEpochMillis = now - settings.postMealDelayMinutes * 60_000L,
+        )
+
+        val recommendation = engine.recommend(
+            context(glucose = glucose(146, 3.0), meal = meal),
+            settings,
+            allowedActionReasons = setOf(
+                CoachReason.POST_MEAL_WINDOW,
+                CoachReason.RAPID_GLUCOSE_RISE,
+            ),
+        )
+
+        assertEquals(CoachReason.POST_MEAL_WINDOW, recommendation?.reason)
     }
 
     @Test
@@ -350,6 +384,53 @@ class CoachRuleEngineTest {
     }
 
     @Test
+    fun `new rapid pair cannot bypass global cooldown`() {
+        val newer = glucose(value = 150, rate = 3.0).copy(
+            id = "newer-reading",
+            measuredAtEpochMillis = now,
+        )
+        val previous = glucose(value = 144, rate = 3.0).copy(
+            id = "previous-reading",
+            measuredAtEpochMillis = now - 5 * 60_000L,
+        )
+
+        assertNull(
+            engine.recommend(
+                context(
+                    glucose = newer,
+                    previousGlucose = previous,
+                    lastRecommendationAt = now - 1_000L,
+                    lastRecommendationId = "another-pair",
+                ),
+                settings,
+                allowedActionReasons = setOf(CoachReason.RAPID_GLUCOSE_RISE),
+            ),
+        )
+    }
+
+    @Test
+    fun `same rapid pair may redeliver once after snooze expires`() {
+        val initial = engine.recommend(
+            context(glucose = glucose(146, 3.0)),
+            settings,
+            allowedActionReasons = setOf(CoachReason.RAPID_GLUCOSE_RISE),
+        ) as CoachRecommendation.Action
+
+        val redelivery = engine.recommend(
+            context(
+                glucose = glucose(146, 3.0),
+                lastRecommendationAt = now - 1_000L,
+                lastRecommendationId = initial.id,
+                snoozedUntil = now,
+            ),
+            settings,
+            allowedActionReasons = setOf(CoachReason.RAPID_GLUCOSE_RISE),
+        ) as CoachRecommendation.Action
+
+        assertEquals(initial.id, redelivery.id)
+    }
+
+    @Test
     fun `snooze and daily limit suppress action reminders`() {
         val rising = glucose(value = 146, rate = 3.0)
 
@@ -410,10 +491,16 @@ class CoachRuleEngineTest {
 
     private fun context(
         glucose: GlucoseReading?,
+        previousGlucose: GlucoseReading? = glucose?.copy(
+            id = "previous-reading",
+            measuredAtEpochMillis = glucose.measuredAtEpochMillis - 5 * 60_000L,
+            receivedAtEpochMillis = glucose.receivedAtEpochMillis - 5 * 60_000L,
+        ),
         activity: ActivitySnapshot? = null,
         meal: MealMarker? = null,
         minuteOfDay: Int = 12 * 60,
         lastRecommendationAt: Long? = null,
+        lastRecommendationId: String? = null,
         snoozedUntil: Long? = null,
         notificationsSentToday: Int = 0,
     ) = CoachContext(
@@ -423,8 +510,10 @@ class CoachRuleEngineTest {
         activity = activity,
         mostRecentMeal = meal,
         lastRecommendationAtEpochMillis = lastRecommendationAt,
+        lastRecommendationId = lastRecommendationId,
         snoozedUntilEpochMillis = snoozedUntil,
         notificationsSentToday = notificationsSentToday,
+        previousGlucose = previousGlucose,
     )
 
     private fun glucose(value: Int, rate: Double) = GlucoseReading(

@@ -48,6 +48,7 @@ data class CoachContext(
     val snoozedUntilEpochMillis: Long?,
     val notificationsSentToday: Int,
     val consumedRecommendationId: String? = null,
+    val previousGlucose: GlucoseReading? = null,
 )
 
 enum class PersonalObservationKind {

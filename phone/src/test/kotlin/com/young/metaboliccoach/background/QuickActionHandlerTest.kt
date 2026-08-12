@@ -3,6 +3,7 @@ package com.young.metaboliccoach.background
 import com.young.metaboliccoach.core.domain.CoachTimeSource
 import com.young.metaboliccoach.core.domain.CoachingRepository
 import com.young.metaboliccoach.core.domain.GlucoseRepository
+import com.young.metaboliccoach.core.domain.RapidRiseConfirmationPolicy
 import com.young.metaboliccoach.core.domain.SettingsRepository
 import com.young.metaboliccoach.core.model.CoachReason
 import com.young.metaboliccoach.core.model.CoachRecommendation
@@ -100,6 +101,7 @@ class QuickActionHandlerTest {
             validUntilEpochMillis = NOW + 60_000,
             includeTimingProvenance = true,
             durationMinutes = 12,
+            reason = CoachReason.POST_MEAL_WINDOW,
         )
         val fixture = fixture(
             readings = listOf(
@@ -116,6 +118,7 @@ class QuickActionHandlerTest {
                     recommendationId = "recommendation",
                     recommendationValidUntilEpochMillis = NOW + 60_000,
                     includeTimingProvenance = true,
+                    reason = CoachReason.POST_MEAL_WINDOW,
                 ),
             ),
         )
@@ -132,6 +135,7 @@ class QuickActionHandlerTest {
             validUntilEpochMillis = NOW + 60_000,
             includeTimingProvenance = true,
             durationMinutes = 12,
+            reason = CoachReason.POST_MEAL_WINDOW,
         )
         val fixture = fixture(
             readings = listOf(baseline),
@@ -145,6 +149,7 @@ class QuickActionHandlerTest {
                     recommendationId = "recommendation",
                     recommendationValidUntilEpochMillis = NOW + 60_000,
                     includeTimingProvenance = true,
+                    reason = CoachReason.POST_MEAL_WINDOW,
                 ),
             ),
         )
@@ -153,7 +158,7 @@ class QuickActionHandlerTest {
         assertEquals(baseline.id, stored?.baselineGlucoseReadingId)
         assertEquals(baseline.sourceId, stored?.baselineGlucoseSourceId)
         assertEquals("recommendation", stored?.recommendationId)
-        assertEquals(CoachReason.RAPID_GLUCOSE_RISE, stored?.recommendationReason)
+        assertEquals(CoachReason.POST_MEAL_WINDOW, stored?.recommendationReason)
         assertEquals(1, stored?.recommendationAlgorithmVersion)
         assertEquals(NOW - 2_000, stored?.triggerAtEpochMillis)
         assertEquals(12, stored?.targetDurationMinutes)
@@ -188,6 +193,7 @@ class QuickActionHandlerTest {
                     id = "current-action",
                     validUntilEpochMillis = NOW + 60_000,
                     includeTimingProvenance = true,
+                    reason = CoachReason.POST_MEAL_WINDOW,
                 ),
             ),
         )
@@ -197,6 +203,7 @@ class QuickActionHandlerTest {
                 recommendationId = "current-action",
                 recommendationValidUntilEpochMillis = NOW + 60_000,
                 includeTimingProvenance = true,
+                reason = CoachReason.POST_MEAL_WINDOW,
             ),
         )
 
@@ -230,6 +237,7 @@ class QuickActionHandlerTest {
                     includeTimingProvenance = true,
                     triggerAtEpochMillis = actionAt - 2_000,
                     safetyReadingAtEpochMillis = actionAt - 1_000,
+                    reason = CoachReason.POST_MEAL_WINDOW,
                 ),
             ),
         )
@@ -241,6 +249,7 @@ class QuickActionHandlerTest {
                 includeTimingProvenance = true,
                 createdAtEpochMillis = actionAt,
                 recommendationCreatedAtEpochMillis = actionAt - 60_000,
+                reason = CoachReason.POST_MEAL_WINDOW,
             ),
         )
 
@@ -376,6 +385,74 @@ class QuickActionHandlerTest {
     }
 
     @Test
+    fun `confirmed rapid pair is accepted at action time`() = runTest {
+        val older = risingReading("older", NOW - 5 * 60_000L)
+        val latest = risingReading("latest", NOW - 1_000L)
+        val confirmation = requireNotNull(
+            RapidRiseConfirmationPolicy.confirm(
+                older,
+                latest,
+                DefaultCoachSettings.create(),
+            ),
+        )
+        val action = rapidRecommendation(confirmation)
+        val fixture = fixture(readings = listOf(older, latest), recommendations = listOf(action))
+
+        val result = fixture.handler.handle(commandFor(action))
+
+        assertEquals(CommandHandlingResult.Applied, result)
+        assertEquals(action.id, fixture.coaching.active?.recommendationId)
+        assertEquals(latest.id, fixture.coaching.active?.baselineGlucoseReadingId)
+    }
+
+    @Test
+    fun `rapid action is rejected when newest same-source pair no longer confirms`() = runTest {
+        val older = risingReading("older", NOW - 10 * 60_000L)
+        val publishedLatest = risingReading("published-latest", NOW - 5 * 60_000L)
+        val confirmation = requireNotNull(
+            RapidRiseConfirmationPolicy.confirm(
+                older,
+                publishedLatest,
+                DefaultCoachSettings.create(),
+            ),
+        )
+        val action = rapidRecommendation(confirmation)
+        val stableLatest = reading("stable-latest", publishedLatest.sourceId, NOW - 1_000L)
+        val fixture = fixture(
+            readings = listOf(older, publishedLatest, stableLatest),
+            recommendations = listOf(action),
+        )
+
+        val result = fixture.handler.handle(commandFor(action))
+
+        assertEquals(
+            CommandHandlingResult.Rejected(SessionCommandOutcome.REJECTED_CONFLICT),
+            result,
+        )
+        assertNull(fixture.coaching.active)
+    }
+
+    @Test
+    fun `rapid action is rejected when confirmation history is missing`() = runTest {
+        val older = risingReading("older", NOW - 5 * 60_000L)
+        val latest = risingReading("latest", NOW - 1_000L)
+        val confirmation = requireNotNull(
+            RapidRiseConfirmationPolicy.confirm(
+                older,
+                latest,
+                DefaultCoachSettings.create(),
+            ),
+        )
+        val action = rapidRecommendation(confirmation)
+        val fixture = fixture(readings = listOf(latest), recommendations = listOf(action))
+
+        assertEquals(
+            CommandHandlingResult.Rejected(SessionCommandOutcome.REJECTED_CONFLICT),
+            fixture.handler.handle(commandFor(action)),
+        )
+    }
+
+    @Test
     fun `duplicate start is idempotent and conflicting start is rejected`() = runTest {
         val fixture = fixture()
         val first = command(id = "session-a")
@@ -491,6 +568,7 @@ class QuickActionHandlerTest {
         includeTimingProvenance: Boolean = false,
         createdAtEpochMillis: Long = NOW,
         recommendationCreatedAtEpochMillis: Long = createdAtEpochMillis - 1_000,
+        reason: CoachReason = CoachReason.RAPID_GLUCOSE_RISE,
     ) = QuickActionCommand(
         id = id,
         type = QuickActionType.START_WALK,
@@ -499,7 +577,7 @@ class QuickActionHandlerTest {
         recommendationId = recommendationId,
         recommendationValidUntilEpochMillis = recommendationValidUntilEpochMillis,
         recommendationReason =
-            CoachReason.RAPID_GLUCOSE_RISE.takeIf { includeTimingProvenance },
+            reason.takeIf { includeTimingProvenance },
         recommendationAlgorithmVersion = 1.takeIf { includeTimingProvenance },
         recommendationCreatedAtEpochMillis =
             recommendationCreatedAtEpochMillis.takeIf { recommendationId != null },
@@ -520,8 +598,9 @@ class QuickActionHandlerTest {
         durationMinutes: Int = 10,
         triggerAtEpochMillis: Long = createdAtEpochMillis - 1_000,
         safetyReadingAtEpochMillis: Long = createdAtEpochMillis,
+        reason: CoachReason = CoachReason.RAPID_GLUCOSE_RISE,
     ) = CoachRecommendation.Action(
-        reason = CoachReason.RAPID_GLUCOSE_RISE,
+        reason = reason,
         id = id,
         createdAtEpochMillis = createdAtEpochMillis,
         validUntilEpochMillis = validUntilEpochMillis,
@@ -548,6 +627,50 @@ class QuickActionHandlerTest {
         measuredAtEpochMillis = measuredAt,
         receivedAtEpochMillis = measuredAt,
         sourceId = sourceId,
+    )
+
+    private fun risingReading(id: String, measuredAt: Long) =
+        reading(id, "health-connect:caresens", measuredAt).copy(
+            deltaMgDl = 10,
+            rateMgDlPerMinute = 3.0,
+            trend = GlucoseTrend.RAPIDLY_RISING,
+        )
+
+    private fun rapidRecommendation(
+        confirmation: com.young.metaboliccoach.core.domain.RapidRiseConfirmation,
+    ) = CoachRecommendation.Action(
+        reason = CoachReason.RAPID_GLUCOSE_RISE,
+        id = confirmation.recommendationId,
+        createdAtEpochMillis = NOW - 2_000L,
+        validUntilEpochMillis = NOW + 60_000L,
+        interventionType = InterventionType.WALK,
+        title = "Glucose is rising. Walk now?",
+        actionLabel = "START WALK",
+        durationMinutes = 10,
+        targetFloors = null,
+        algorithmVersion = RapidRiseConfirmationPolicy.ALGORITHM_VERSION,
+        triggerContextId = confirmation.triggerIdentity,
+        triggerAtEpochMillis = confirmation.latestReading.measuredAtEpochMillis,
+        glucoseSourceId = confirmation.latestReading.sourceId,
+        safetyReadingId = confirmation.latestReading.id,
+        safetyReadingAtEpochMillis = confirmation.latestReading.measuredAtEpochMillis,
+    )
+
+    private fun commandFor(action: CoachRecommendation.Action) = QuickActionCommand(
+        id = "rapid-session",
+        type = QuickActionType.START_WALK,
+        createdAtEpochMillis = NOW,
+        sessionId = "rapid-session",
+        recommendationId = action.id,
+        recommendationValidUntilEpochMillis = action.validUntilEpochMillis,
+        recommendationReason = action.reason,
+        recommendationAlgorithmVersion = action.algorithmVersion,
+        recommendationCreatedAtEpochMillis = action.createdAtEpochMillis,
+        triggerContextId = action.triggerContextId,
+        triggerAtEpochMillis = action.triggerAtEpochMillis,
+        glucoseSourceId = action.glucoseSourceId,
+        safetyReadingId = action.safetyReadingId,
+        safetyReadingAtEpochMillis = action.safetyReadingAtEpochMillis,
     )
 
     private data class Fixture(

@@ -2,6 +2,35 @@
 
 All notable Metabolic Coach package changes are recorded here.
 
+## v0.6.1 — 2026-08-12 — Confirmed rapid-rise walk coaching
+
+### Added
+
+- Production rapid-rise walk coaching requires two consecutive normalized readings from the same
+  exact source, strictly increasing timestamps, a configurable freshness-bounded gap, and both
+  effective rates at or above the configured threshold.
+- Rapid opportunities use an algorithm-v3 SHA-256 pair identity derived from source, both reading
+  IDs/timestamps, and algorithm version, so legacy snapshots cannot shadow a new action.
+- Phone action handling revalidates the exact rapid pair at the original tap time. Phone and Wear
+  hide incomplete, cross-source, or superseded rapid actions before Start is offered.
+
+### Changed
+
+- Post-meal remains the deterministic winner when post-meal and rapid-rise are both eligible.
+- The repository retains the same immutable rapid snapshot during global cooldown/daily-cap
+  reevaluation, but invalidates it after source change, pair change, a newer nonqualifying reading,
+  expiry, consumption, active snooze, quiet hours, or reminder disablement.
+- Phone, Wear, and watch-face modules are aligned at versionName `0.6.1`, versionCode `10`.
+
+### Safety and scope
+
+- The existing missing/future/stale/low/fast-fall policy, global snooze/cooldown/daily cap,
+  canonical session lifecycle, notifications, and Wear command transport remain authoritative.
+- This milestone adds no provider request, faster polling, WorkManager job, Room migration, Wear
+  schema field, stair automation, prediction, or automatic personalization.
+- Status is `Engineering: PASS / Physical: DEFERRED` only after the recorded automated/review gate;
+  real phone and Galaxy Watch8 behavior remains in `PHYSICAL_TEST_BACKLOG.md`.
+
 ## v0.6.0 — 2026-08-04 — Post-meal walk coaching
 
 ### Added

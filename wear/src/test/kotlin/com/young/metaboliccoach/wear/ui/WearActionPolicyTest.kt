@@ -34,13 +34,15 @@ class WearActionPolicyTest {
 
     @Test
     fun `superseded coached action has a terminal outcome`() {
+        val oldRapidId = "RAPID_GLUCOSE_RISE:v3:${"a".repeat(64)}"
+        val newRapidId = "RAPID_GLUCOSE_RISE:v3:${"b".repeat(64)}"
         assertEquals(
             WearActionRejection.STALE_RECOMMENDATION,
             WearActionPolicy.startRejection(
                 blocksNewSession = false,
-                recommendationId = "old",
+                recommendationId = oldRapidId,
                 recommendationValidUntilEpochMillis = 2_000,
-                effectiveRecommendationId = "new",
+                effectiveRecommendationId = newRapidId,
                 nowEpochMillis = 1_000,
             ),
         )
@@ -60,4 +62,3 @@ class WearActionPolicyTest {
         )
     }
 }
-

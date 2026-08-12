@@ -417,12 +417,14 @@ actions:
 1. missing, future-dated, or stale glucose information;
 2. glucose below the configured low threshold;
 3. glucose falling at or faster than the configured exercise-pause rate;
-4. notifications disabled or quiet hours;
-5. active snooze;
-6. cooldown or daily notification limit;
-7. rapid-rise walk;
-8. post-meal walk;
-9. working-hours inactivity stairs, or a walk fallback when stair reminders are disabled and
+4. select one candidate: post-meal walk, then confirmed rapid-rise walk, then working-hours
+   inactivity;
+5. notifications disabled or quiet hours;
+6. active snooze;
+7. cooldown or daily notification limit.
+
+Only post-meal and rapid-rise actions are enabled in `v0.6.1`. The retained inactivity foundation
+would choose stairs, or a walk fallback when stair reminders are disabled and
    walking reminders remain enabled.
 
 All user-facing coaching durations, thresholds, time windows, daily limits, enablement switches,
@@ -432,13 +434,20 @@ full valid ranges; quiet/working-hour editors preserve exact minutes. Defaults a
 not medical recommendations. The exercise-pause fall-rate setting accepts 0.5–10.0 mg/dL/minute and
 defaults to 2.0 mg/dL/minute.
 
-Every action has a deterministic ID, creation time, and `validUntilEpochMillis`. Rapid-rise and
-inactivity actions expire when their glucose reading becomes stale; a post-meal action expires at
-the earlier of glucose staleness and the meal window end. Phone and Wear use the same
-`effectiveRecommendation` policy, which also hides a cached action during quiet hours, when
-notifications are disabled, while a session is active, or whenever the shared exercise-safety
-policy is not `SAFE`. The ID derives from the reason, glucose reading ID, and relevant meal/activity
-context, so minute-driven reevaluation does not count or notify the same opportunity repeatedly.
+Every action has a deterministic ID, creation time, and `validUntilEpochMillis`. Rapid-rise
+confirmation uses the current reading and its immediate predecessor in exact-source deterministic
+order. Their IDs must differ, timestamps must increase strictly, their gap must not exceed the
+configured stale-reading window, and both normalized effective rates (`rate`, otherwise trend
+fallback) must meet the configured rapid-rise threshold. Missing local history, timestamp ties,
+cross-source pairs, or a nonqualifying reading fail closed without a provider request.
+
+The rapid algorithm-v3 identity is a bounded SHA-256 fingerprint of the source, both reading
+IDs/timestamps, and algorithm version. Post-meal keeps its algorithm-v2 meal/source identity.
+Rapid and inactivity actions expire when their glucose reading becomes stale; a post-meal action
+expires at the earlier of glucose staleness and the meal-window end. Phone and Wear hide a cached
+action during quiet hours, when notifications are disabled, while a session is active, or whenever
+shared exercise safety is not `SAFE`. Complete source/trigger/safety provenance is required; a
+rapid action additionally stops being current when a newer reading replaces its confirmed pair.
 
 ## Watch and watch-face design
 

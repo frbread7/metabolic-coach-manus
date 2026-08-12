@@ -19,8 +19,9 @@ Samsung Galaxy Watch8.
 > `v0.4.2` was physically accepted by user report. The user reported both the `v0.5.0` phone-only
 > local-history gate and the APOS-reviewed `v0.5.1` History Explorer gate passed on 2026-08-04.
 > The bounded `v0.6.0` post-meal walk increment is `Engineering: PASS / Physical: DEFERRED`.
-> APOS approved continued narrow engineering with a cumulative device-test backlog; deferred work
-> is never described as physically accepted.
+> The APOS-approved `v0.6.1` confirmed rapid-rise walk increment is in final engineering
+> verification with physical acceptance deferred. Deferred work is never described as physically
+> accepted.
 > It is a wellness tool, not a medical device, and must not replace the CGM vendor app, glucose
 > alarms, professional advice, or a personal care plan.
 
@@ -39,7 +40,7 @@ synchronization and coaching foundations remain frozen while the current milesto
 | `v0.5.0` | Phone-only local history foundation: explicit retention, source-scoped resumable backfill, export/reset safety | Accepted by user report 2026-08-04 |
 | `v0.5.1` | Phone-only local trend chart and selected-period GMI after history acceptance | Accepted by user report 2026-08-04 |
 | `v0.6.0` | One post-meal delayed walk prompt with exact-source safety, Start/Snooze, completion, and descriptive follow-up | Engineering PASS / Physical DEFERRED |
-| `v0.6.1` | Confirmed two-reading rapid-rise walk coaching through the existing canonical pipeline | Engineering in progress / Physical DEFERRED |
+| `v0.6.1` | Confirmed two-reading rapid-rise walk coaching through the existing canonical pipeline | Engineering verification / Physical DEFERRED |
 | `v0.6.2` | Prolonged-inactivity walk coaching only | Planned after v0.6.1 engineering gate |
 | `v0.7.0` | Integrated walk-coaching release candidate | Planned batched phone/Galaxy Watch8 physical gate |
 | `v0.5` | One-week personal beta with documented reliability, battery, and safety observations | Planned after feature gates |
@@ -66,7 +67,7 @@ and [the v0.3 acceptance record](docs/acceptance/V0_3_PHYSICAL_ACCEPTANCE.md).
 | Phone hub | Nightscout glucose retrieval with explicit multi-server selection, bounded retry/cache retention, source-scoped local history and resumable range backfill; a local-only exact-source trend explorer and selected-period GMI; Health Connect activity reads; Room schema v10 coaching provenance and saved planner milestones; configurable Glycemic Goal Planner metrics/scenarios; settings; coaching rules; notifications; daily summary; streaming JSON export; confirmation-gated local erase; and revisioned Wear Data Layer publishing |
 | Wear app | Three-page touch-only horizontal pager, glucose/activity display, walk and stair actions, home countdown with completion haptic, explicit queued/rejected action results, durable snooze outbox, pending-session reconciliation, direct watch notifications, and complication providers; no bezel dependency |
 | Watch face | Separate WFF v4 resource-only package with clock, glucose/trend/delta/age, steps/floors, battery, coach action, reduced ambient content, and selectable accent configuration |
-| Coaching | The `v0.6.0` production capability is one meal-scoped delayed walk recommendation with stable identity, immutable exact-source safety provenance, bounded snooze redelivery, and shared missing/future/stale/low/fast-fall safety policy. Rapid-rise and inactivity/stair rules remain non-production foundations for later review. |
+| Coaching | `v0.6.1` supports post-meal and confirmed rapid-rise walk recommendations. Rapid rise requires two consecutive same-exact-source readings whose effective rates meet the configured threshold, uses a versioned deterministic pair identity, and is revalidated at display/tap time. Post-meal wins on overlap. Inactivity/stair automation remains non-production. |
 | Intervention lifecycle | Idempotent start/complete commands, immutable phone-authored recommendation snapshots, deferred completion reconciliation, configurable start/snooze expiry, durable completion of an existing offline session, terminal expiry for orphan completions, and exact trigger, recommendation, activity-dose, baseline, source, and follow-up provenance |
 | Personal observations | Cautious effect summaries plus prospective-only timing observations. Generic/post-meal bucket widths, per-bucket sample floor, comparable-bucket count, follow-up matching width, and baseline glucose band are configurable (conservative defaults: 5/15 minutes, 8 samples, 2 buckets, 15 minutes, and 20 mg/dL); a unique lowest observed median must also have strict quartile separation. Results never change coaching automatically and remain experimental |
 | Synchronization | Versioned `DataMap` state with persistent phone instance/revision/reset metadata, stale pre-erase command rejection, terminal replay deduplication for every quick action, a bounded Wear outbox for non-session commands such as snooze, and a pending-mutation/tombstone session replica over Wear OS Data Layer (`play-services-wearable` 20.0.1) |
@@ -173,6 +174,7 @@ engineering artifacts, not production releases. A signed release requires enviro
 - [v0.3 Galaxy Watch8 physical acceptance checklist](docs/V0.3_WEAR_ACCEPTANCE.md)
 - [v0.3 privacy-sanitized physical acceptance record](docs/acceptance/V0_3_PHYSICAL_ACCEPTANCE.md)
 - [v0.4.1 current-glucose freshness hotfix report](docs/V0.4_1_FRESHNESS_HOTFIX.md)
+- [v0.6.1 confirmed rapid-rise engineering contract](docs/V0_6_1_RAPID_RISE_COACHING.md)
 - [v0.5.0 local history foundation and phone acceptance gate](docs/V0_5_0_HISTORY_FOUNDATION.md)
 - [v0.5.0 privacy-sanitized phone acceptance record](docs/acceptance/V0_5_0_PHYSICAL_ACCEPTANCE.md)
 - [v0.5.1 History Explorer architecture and phone acceptance checklist](docs/V0_5_1_HISTORY_EXPLORER.md)

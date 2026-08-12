@@ -1,6 +1,7 @@
 package com.young.metaboliccoach.core.domain
 
 import com.young.metaboliccoach.core.model.CoachRecommendation
+import com.young.metaboliccoach.core.model.CoachReason
 import com.young.metaboliccoach.core.model.CoachSettings
 import com.young.metaboliccoach.core.model.GlucoseReading
 import com.young.metaboliccoach.core.model.WatchState
@@ -67,6 +68,7 @@ fun WatchState.effectiveRecommendation(
     if (
         activeSession != null ||
         nowEpochMillis >= candidate.validUntilEpochMillis ||
+        !candidate.hasCurrentActionProvenance(glucose) ||
         !CoachedExerciseActionPolicy.canStart(
             glucose,
             settings,
@@ -77,6 +79,26 @@ fun WatchState.effectiveRecommendation(
         return null
     }
     return candidate
+}
+
+fun CoachRecommendation.Action.hasCurrentActionProvenance(
+    reading: GlucoseReading?,
+): Boolean {
+    val provenanceComplete = listOf(
+        triggerContextId,
+        triggerAtEpochMillis,
+        glucoseSourceId,
+        safetyReadingId,
+        safetyReadingAtEpochMillis,
+    ).all { it != null }
+    if (!provenanceComplete) return false
+    val currentReading = reading ?: return false
+    if (glucoseSourceId != currentReading.sourceId) return false
+    return reason != CoachReason.RAPID_GLUCOSE_RISE ||
+        (
+            safetyReadingId == currentReading.id &&
+                safetyReadingAtEpochMillis == currentReading.measuredAtEpochMillis
+            )
 }
 
 private fun minuteOfDay(epochMillis: Long): Int = Instant.ofEpochMilli(epochMillis)

@@ -50,6 +50,26 @@ handed off.
 These are debug-signed engineering artifacts, not production releases. Regenerate and rehash them
 after every source/build change.
 
+## v0.6.1 local engineering artifact
+
+The current engineering checkpoint is `v0.6.1` (versionCode `10`) across phone, Wear, and watch
+face. It adds confirmed exact-source rapid-rise walk coaching without changing the provider,
+polling/WorkManager cadence, Room schema, notification action plumbing, or Wear Data Layer schema.
+
+The authoritative local milestone pipeline produces:
+
+```text
+metabolic-coach-phone-debug.apk
+metabolic-coach-wear-debug.apk
+metabolic-coach-watchface-debug.apk
+MetabolicCoach-v0.6.1.zip
+```
+
+This package is an engineering artifact under the deferred-test process. It is not the promoted
+user install candidate and must not be described as physically accepted. Deferred phone and
+Galaxy Watch8 checks are tracked in `PHYSICAL_TEST_BACKLOG.md`; the intended promoted coaching
+bundle is the later `v0.7.0` integration RC.
+
 ## v0.4.2 GitHub Actions engineering artifact (historical)
 
 The v0.4.2 engineering artifact (versionCode `6`) was the phone-only saved

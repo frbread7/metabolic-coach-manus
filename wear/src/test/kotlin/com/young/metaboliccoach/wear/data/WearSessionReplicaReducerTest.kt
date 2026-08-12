@@ -1,5 +1,6 @@
 package com.young.metaboliccoach.wear.data
 
+import com.young.metaboliccoach.core.model.CoachReason
 import com.young.metaboliccoach.core.model.InterventionSession
 import com.young.metaboliccoach.core.model.InterventionStatus
 import com.young.metaboliccoach.core.model.InterventionType
@@ -25,6 +26,7 @@ class WearSessionReplicaReducerTest {
 
         assertEquals("session", reconciled.activeSession?.id)
         assertEquals("start-command", reconciled.pendingCommand?.id)
+        assertEquals(startCommand(), reconciled.pendingCommand)
     }
 
     @Test
@@ -190,6 +192,16 @@ class WearSessionReplicaReducerTest {
         type = QuickActionType.START_WALK,
         createdAtEpochMillis = 100,
         sessionId = "session",
+        recommendationId = "RAPID_GLUCOSE_RISE:v3:${"a".repeat(64)}",
+        recommendationValidUntilEpochMillis = 10_000,
+        recommendationReason = CoachReason.RAPID_GLUCOSE_RISE,
+        recommendationAlgorithmVersion = 3,
+        recommendationCreatedAtEpochMillis = 90,
+        triggerContextId = "rapid-pair:v3:${"a".repeat(64)}",
+        triggerAtEpochMillis = 80,
+        glucoseSourceId = "nightscout:server-a",
+        safetyReadingId = "latest-reading",
+        safetyReadingAtEpochMillis = 80,
     )
 
     private fun completionCommand() = QuickActionCommand(

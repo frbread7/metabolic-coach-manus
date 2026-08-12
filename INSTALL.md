@@ -72,6 +72,20 @@ data. This is not a production-signed release.
 After installation, use [the v0.6.0 physical acceptance document](docs/V0_6_0_POST_MEAL_COACHING.md).
 Stop after reporting the checklist; do not proceed to another feature milestone.
 
+## v0.6.1 local engineering artifact preflight
+
+The v0.6.1 package is a debug-signed engineering checkpoint for confirmed rapid-rise walk
+coaching. Verify the ZIP SHA-256, commit SHA, versionName `0.6.1`, versionCode `10`, and signing
+certificate before any intentional installation. Keep the matched phone, Wear, and watch-face APKs
+together and install them as an in-place update only when the signing certificate matches the
+accepted installation.
+
+Its status is `Engineering: PASS / Physical: DEFERRED` only after the recorded local automated and
+review gates pass. Installation is optional until the integrated coaching release candidate. If it
+is installed earlier, record only privacy-safe categorical results in
+[the cumulative physical-test backlog](PHYSICAL_TEST_BACKLOG.md); do not call the milestone
+physically accepted without a user-reported real-device pass.
+
 ## Historical v0.5.1 CI artifact preflight
 
 The v0.5.1 package is a debug-signed engineering candidate for the phone-only local History

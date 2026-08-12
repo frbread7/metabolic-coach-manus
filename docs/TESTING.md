@@ -18,8 +18,8 @@ The current source includes these JVM and Android local-test suites:
 | Suite | Coverage |
 | --- | --- |
 | `GlucoseReadingDisplayTest` | Unit-aware glucose rate display and threshold conversion round trips |
-| `CoachRuleEngineTest` | Recommendation IDs/validity, rapid rise, shared missing/future/stale/low/fast-fall safety, post-meal timing, inactivity stair/walk fallback, working/quiet hours, and cooldown |
-| `ExerciseSafetyPolicyTest` | Phone/Wear safety parity, exact action-expiry boundaries, quiet hours, active-session suppression, and falling-rate fallback |
+| `CoachRuleEngineTest` / `RapidRiseConfirmationPolicyTest` | Reason-specific IDs/validity; two-reading exact-source rapid confirmation; threshold, trend fallback, gap/timestamp/tie failure; post-meal precedence; shared missing/future/stale/low/fast-fall safety; inactivity foundation; quiet hours, snooze, cap, and cooldown |
+| `ExerciseSafetyPolicyTest` | Phone/Wear safety parity, complete source/trigger/safety provenance, rapid-pair supersession, exact action-expiry boundaries, quiet hours, active-session suppression, and falling-rate fallback |
 | `SettingsValidatorTest` | Defaults plus shared coaching bounds, retained legacy Health Connect-origin validation, falling-rate, follow-up, command-expiry, activity goals, and all personal-observation analysis controls |
 | `FollowUpReadingSelectorTest` | Exact-source filtering, at/after-due preference, pre-deadline waiting, deterministic deadline fallback, and missing finalization |
 | `ObservationAnalyzerTest` | Manual effects, legacy safety-provenance exclusion, below-threshold exclusion for effects/timing, configurable generic/post-meal/follow-up/baseline buckets, configurable sample and comparable-cohort gates, unique separated median, exact-source/follow-up eligibility, meal provenance, and cautious wording |
@@ -39,8 +39,8 @@ The current source includes these JVM and Android local-test suites:
 | `ExerciseSessionSummaryTest` | Daily valid-session count, total-duration aggregation, latest end time, and reversed-interval rejection |
 | `WatchStateCodecTest` | State/command round trips including backward-compatible legacy settings, configurable observation analysis, recommendation validity/provenance, phone revision, and session acknowledgement; Nightscout connection settings remain absent from Wear payloads |
 | `InterventionDaoLifecycleTest` | Idempotent start, one-active-session semantics, and Room follow-up lifecycle persistence |
-| `RecommendationSnapshotMapperTest` / `RecommendationSnapshotPersistenceTest` | Complete snapshot mapping plus immutable canonical retry behavior for a stable recommendation ID |
-| `QuickActionHandlerTest` | Selected-provider baseline provenance, required phone-authored snapshot lookup, echoed-provenance conflict rejection, snapshot-owned intervention dose, complete prospective recommendation/trigger/rate/threshold capture, no invented manual provenance, action-time recommendation/safety boundaries under delayed delivery, generic start expiry, idempotent start, deferred completion, delayed known-session completion, and terminal orphan expiry |
+| `RecommendationSnapshotMapperTest` / `RecommendationSnapshotPersistenceTest` | Complete snapshot mapping, immutable canonical retry, and rapid snapshot retention/invalidation across cooldown, new pairs, stable readings, and source changes |
+| `QuickActionHandlerTest` | Selected-provider baseline provenance, required phone-authored snapshot lookup, echoed-provenance conflict rejection, exact rapid-pair action-time revalidation, snapshot-owned intervention dose, complete prospective recommendation/trigger/rate/threshold capture, no invented manual provenance, delayed-delivery safety boundaries, generic start expiry, idempotent start, deferred completion, delayed known-session completion, and terminal orphan expiry |
 | `SyncSchedulerTest` | Nightscout connected-network scheduling, configured interval and 15-minute minimum, independence from Health Connect background permission, fallback behavior, and coroutine-cancellation propagation |
 | `DeferredCompletionPolicyTest` | Rejected-prerequisite propagation and session matching for completion-first delivery |
 | `PhoneCommandProcessorTest` | Exactly-once terminal replay: a persisted rejected command triggers watch-state republication without invoking mutation logic |
@@ -480,6 +480,8 @@ Test boundary values, not just typical values:
 - cooldown expiry;
 - daily maximum at zero, one below, and at limit;
 - simultaneous rapid-rise, post-meal, and inactivity eligibility;
+- absent prior local reading, cross-source pairs, duplicate/tied timestamps, out-of-order input, and
+  a newer stable or qualifying exact-source reading replacing a published rapid pair;
 - prolonged inactivity with stairs enabled, with stairs disabled/walking enabled, and with both
   reminder types disabled;
 - permission denied after recommendation generation;

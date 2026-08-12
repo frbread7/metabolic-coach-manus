@@ -77,6 +77,66 @@ class ExerciseSafetyPolicyTest {
     }
 
     @Test
+    fun `wear suppresses rapid action with incomplete provenance`() {
+        val state = watchState().copy(
+            recommendation = action(now + 60_000L),
+        )
+
+        assertNull(state.effectiveRecommendation(now, minuteOfDay = 12 * 60))
+    }
+
+    @Test
+    fun `wear accepts matching rapid action and hides it after a newer reading`() {
+        val current = glucose()
+        val recommendation = action(now + 60_000L).copy(
+            algorithmVersion = 3,
+            triggerContextId = "rapid-pair:v3:fingerprint",
+            triggerAtEpochMillis = current.measuredAtEpochMillis,
+            glucoseSourceId = current.sourceId,
+            safetyReadingId = current.id,
+            safetyReadingAtEpochMillis = current.measuredAtEpochMillis,
+        )
+        val state = watchState().copy(
+            glucose = current,
+            recommendation = recommendation,
+        )
+
+        assertEquals(
+            recommendation,
+            state.effectiveRecommendation(now, minuteOfDay = 12 * 60),
+        )
+        assertNull(
+            state.copy(
+                glucose = current.copy(
+                    id = "newer-reading",
+                    measuredAtEpochMillis = now + 1,
+                    receivedAtEpochMillis = now + 1,
+                ),
+            ).effectiveRecommendation(now, minuteOfDay = 12 * 60),
+        )
+    }
+
+    @Test
+    fun `wear suppresses action after glucose source changes`() {
+        val current = glucose()
+        val recommendation = action(now + 60_000L).copy(
+            algorithmVersion = 3,
+            triggerContextId = "rapid-pair:v3:fingerprint",
+            triggerAtEpochMillis = current.measuredAtEpochMillis,
+            glucoseSourceId = current.sourceId,
+            safetyReadingId = current.id,
+            safetyReadingAtEpochMillis = current.measuredAtEpochMillis,
+        )
+
+        assertNull(
+            watchState().copy(
+                glucose = current.copy(sourceId = "health-connect:source-b"),
+                recommendation = recommendation,
+            ).effectiveRecommendation(now, minuteOfDay = 12 * 60),
+        )
+    }
+
+    @Test
     fun `wear suppresses cached action after entering quiet hours`() {
         val state = watchState()
 
@@ -112,7 +172,7 @@ class ExerciseSafetyPolicyTest {
     private fun watchState() = WatchState(
         glucose = glucose(),
         activity = null,
-        recommendation = action(now + 60_000L),
+        recommendation = matchingAction(now + 60_000L),
         settings = settings,
         phoneBatteryPercent = null,
         generatedAtEpochMillis = now,
@@ -129,6 +189,18 @@ class ExerciseSafetyPolicyTest {
         durationMinutes = 10,
         targetFloors = null,
     )
+
+    private fun matchingAction(validUntilEpochMillis: Long): CoachRecommendation.Action {
+        val current = glucose()
+        return action(validUntilEpochMillis).copy(
+            algorithmVersion = 3,
+            triggerContextId = "rapid-pair:v3:fingerprint",
+            triggerAtEpochMillis = current.measuredAtEpochMillis,
+            glucoseSourceId = current.sourceId,
+            safetyReadingId = current.id,
+            safetyReadingAtEpochMillis = current.measuredAtEpochMillis,
+        )
+    }
 
     private fun glucose() = GlucoseReading(
         id = "reading",

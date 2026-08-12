@@ -4,9 +4,11 @@ import com.young.metaboliccoach.core.domain.CoachTimeSource
 import com.young.metaboliccoach.core.domain.CoachedExerciseActionPolicy
 import com.young.metaboliccoach.core.domain.CoachingRepository
 import com.young.metaboliccoach.core.domain.GlucoseRepository
+import com.young.metaboliccoach.core.domain.RapidRiseConfirmationPolicy
 import com.young.metaboliccoach.core.domain.SettingsRepository
-import com.young.metaboliccoach.core.model.CoachSettings
 import com.young.metaboliccoach.core.model.CoachRecommendation
+import com.young.metaboliccoach.core.model.CoachReason
+import com.young.metaboliccoach.core.model.CoachSettings
 import com.young.metaboliccoach.core.model.GlucoseReading
 import com.young.metaboliccoach.core.model.InterventionSession
 import com.young.metaboliccoach.core.model.InterventionStatus
@@ -70,6 +72,8 @@ class QuickActionHandler @Inject constructor(
         if (
             recommendation != null &&
             listOf(
+                recommendation.triggerContextId,
+                recommendation.triggerAtEpochMillis,
                 recommendation.glucoseSourceId,
                 recommendation.safetyReadingId,
                 recommendation.safetyReadingAtEpochMillis,
@@ -84,6 +88,17 @@ class QuickActionHandler @Inject constructor(
             return CommandHandlingResult.Rejected(SessionCommandOutcome.REJECTED_CONFLICT)
         }
         val eventAt = command.createdAtEpochMillis.coerceAtMost(now)
+        if (
+            recommendation?.reason == CoachReason.RAPID_GLUCOSE_RISE &&
+            interventionType != null &&
+            !rapidRisePairMatches(
+                recommendation = recommendation,
+                settings = settings,
+                eventAtEpochMillis = eventAt,
+            )
+        ) {
+            return CommandHandlingResult.Rejected(SessionCommandOutcome.REJECTED_CONFLICT)
+        }
         val baseline = interventionType?.let {
             glucoseNear(
                 eventAtEpochMillis = eventAt,
@@ -256,6 +271,31 @@ class QuickActionHandler @Inject constructor(
         return readings.maxWithOrNull(
             compareBy<GlucoseReading> { it.measuredAtEpochMillis }.thenBy { it.id },
         )
+    }
+
+    private suspend fun rapidRisePairMatches(
+        recommendation: CoachRecommendation.Action,
+        settings: CoachSettings,
+        eventAtEpochMillis: Long,
+    ): Boolean {
+        val sourceId = recommendation.glucoseSourceId ?: return false
+        val lookbackMillis =
+            settings.staleReadingMinutes * 2L * MILLIS_PER_MINUTE
+        val readings = glucoseRepository.readingsBetweenExactSource(
+            sourceId = sourceId,
+            startEpochMillis = (eventAtEpochMillis - lookbackMillis).coerceAtLeast(0L),
+            endEpochMillis = eventAtEpochMillis,
+        )
+        val confirmation = RapidRiseConfirmationPolicy.confirmLatest(readings, settings)
+            ?: return false
+        return recommendation.algorithmVersion == RapidRiseConfirmationPolicy.ALGORITHM_VERSION &&
+            recommendation.id == confirmation.recommendationId &&
+            recommendation.triggerContextId == confirmation.triggerIdentity &&
+            recommendation.triggerAtEpochMillis ==
+            confirmation.latestReading.measuredAtEpochMillis &&
+            recommendation.safetyReadingId == confirmation.latestReading.id &&
+            recommendation.safetyReadingAtEpochMillis ==
+            confirmation.latestReading.measuredAtEpochMillis
     }
 
     private fun QuickActionCommand.matches(

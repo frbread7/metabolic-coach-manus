@@ -234,6 +234,30 @@ class WatchStateCodecTest {
     }
 
     @Test
+    fun `rapid rise start command keeps complete pair provenance`() {
+        val fingerprint = "a".repeat(64)
+        val command = QuickActionCommand(
+            id = "rapid-command",
+            type = QuickActionType.START_WALK,
+            createdAtEpochMillis = 1_720_000_010_000,
+            sessionId = "rapid-session",
+            recommendationId = "RAPID_GLUCOSE_RISE:v3:$fingerprint",
+            recommendationValidUntilEpochMillis = 1_720_000_900_000,
+            recommendationReason = CoachReason.RAPID_GLUCOSE_RISE,
+            recommendationAlgorithmVersion = 3,
+            recommendationCreatedAtEpochMillis = 1_720_000_009_000,
+            triggerContextId = "rapid-pair:v3:$fingerprint",
+            triggerAtEpochMillis = 1_720_000_000_000,
+            glucoseSourceId = "nightscout:server-a",
+            safetyReadingId = "latest-reading",
+            safetyReadingAtEpochMillis = 1_720_000_000_000,
+            dataResetId = "data-reset-2",
+        )
+
+        assertEquals(command, codec.decodeCommand(codec.encode(command)))
+    }
+
+    @Test
     fun `unknown schema is rejected`() {
         val unsupportedState = DataMap().apply {
             putInt("schemaVersion", SyncSchema.VERSION + 1)

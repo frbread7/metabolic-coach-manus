@@ -37,8 +37,8 @@ android {
         applicationId = "com.young.metaboliccoach"
         minSdk = 30
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.6.0"
+        versionCode = 10
+        versionName = "0.6.1"
         vectorDrawables.useSupportLibrary = true
     }
 

@@ -9,11 +9,13 @@ import com.young.metaboliccoach.core.data.db.MealDao
 import com.young.metaboliccoach.core.data.db.RecommendationSnapshotDao
 import com.young.metaboliccoach.core.data.db.toEntity
 import com.young.metaboliccoach.core.data.db.toModel
+import com.young.metaboliccoach.core.domain.CoachActionSuppression
 import com.young.metaboliccoach.core.domain.CoachRuleEngine
 import com.young.metaboliccoach.core.domain.CoachTimeSource
 import com.young.metaboliccoach.core.domain.CoachingRepository
 import com.young.metaboliccoach.core.domain.GlucoseRepository
 import com.young.metaboliccoach.core.domain.ObservationAnalyzer
+import com.young.metaboliccoach.core.domain.RapidRiseConfirmationPolicy
 import com.young.metaboliccoach.core.domain.SettingsRepository
 import com.young.metaboliccoach.core.model.CoachContext
 import com.young.metaboliccoach.core.model.CoachReason
@@ -75,7 +77,25 @@ class CoachingRepositoryImpl @Inject constructor(
         timeSource.minuteTicks(),
     ) { (settings, glucose), activity, meal, state, now ->
         val currentState = state.forCurrentDay(now)
-        val generated = ruleEngine.recommend(
+        val recentExactSourceReadings = glucose
+            ?.takeIf { settings.walkingRemindersEnabled }
+            ?.let { current ->
+                glucoseRepository.readingsBetweenExactSource(
+                    sourceId = current.sourceId,
+                    startEpochMillis = (
+                        current.measuredAtEpochMillis -
+                            settings.staleReadingMinutes * MILLIS_PER_MINUTE
+                        ).coerceAtLeast(0L),
+                    endEpochMillis = current.measuredAtEpochMillis,
+                )
+            }.orEmpty()
+        val previousGlucose = glucose?.let { current ->
+            RapidRiseConfirmationPolicy.immediatePredecessor(
+                readings = recentExactSourceReadings,
+                latestReading = current,
+            )
+        }
+        val evaluation = ruleEngine.evaluate(
             context = CoachContext(
                 nowEpochMillis = now,
                 minuteOfDay = Instant.ofEpochMilli(now)
@@ -93,10 +113,15 @@ class CoachingRepositoryImpl @Inject constructor(
                 snoozedUntilEpochMillis = currentState.snoozedUntilEpochMillis,
                 notificationsSentToday = currentState.notificationsSentToday,
                 consumedRecommendationId = currentState.consumedRecommendationId,
+                previousGlucose = previousGlucose,
             ),
             settings = settings,
-            allowedActionReasons = setOf(CoachReason.POST_MEAL_WINDOW),
+            allowedActionReasons = setOf(
+                CoachReason.POST_MEAL_WINDOW,
+                CoachReason.RAPID_GLUCOSE_RISE,
+            ),
         )
+        val generated = evaluation.recommendation
         val lastSnapshot = currentState.lastRecommendationId?.let {
             recommendationSnapshotDao.getById(it)?.toModel()
         }
@@ -105,21 +130,28 @@ class CoachingRepositoryImpl @Inject constructor(
             generated is CoachRecommendation.Action &&
                 generated.id == currentState.consumedRecommendationId -> null
             generated is CoachRecommendation.Action &&
-                lastSnapshot?.triggerContextId == generated.triggerContextId &&
-                lastSnapshot?.glucoseSourceId != generated.glucoseSourceId -> null
+                lastSnapshot?.id == generated.id -> lastSnapshot.takeIf { snapshot ->
+                    snapshot.matchesCurrentCandidate(generated) &&
+                        snapshot.validUntilEpochMillis > now
+                }
             generated is CoachRecommendation.Action &&
                 lastSnapshot?.triggerContextId == generated.triggerContextId ->
-                lastSnapshot?.takeIf { it.validUntilEpochMillis > now }
+                null
             generated is CoachRecommendation.Action -> generated
             (currentState.snoozedUntilEpochMillis ?: Long.MIN_VALUE) > now -> null
             currentState.lastRecommendationId == null -> null
             currentState.lastRecommendationId == currentState.consumedRecommendationId -> null
-            else -> lastSnapshot
-                ?.takeIf { snapshot ->
+            evaluation.actionSuppression == CoachActionSuppression.DAILY_CAP &&
+                currentState.snoozedUntilEpochMillis != null -> null
+            evaluation.actionSuppression != CoachActionSuppression.COOLDOWN &&
+                evaluation.actionSuppression != CoachActionSuppression.DAILY_CAP -> null
+            else -> lastSnapshot?.takeIf { snapshot ->
+                val candidate = evaluation.actionCandidate
+                candidate != null &&
+                    snapshot.id == candidate.id &&
                     snapshot.validUntilEpochMillis > now &&
-                        snapshot.glucoseSourceId == glucose?.sourceId &&
-                        snapshot.triggerContextId == meal?.id
-                }
+                    snapshot.matchesCurrentCandidate(candidate)
+            }
         }
     }
 
@@ -379,6 +411,24 @@ class CoachingRepositoryImpl @Inject constructor(
             .atStartOfDay(ZoneId.systemDefault())
             .toInstant()
             .toEpochMilli()
+
+    private fun CoachRecommendation.Action.matchesCurrentCandidate(
+        candidate: CoachRecommendation.Action,
+    ): Boolean {
+        if (
+            reason != candidate.reason ||
+            triggerContextId != candidate.triggerContextId ||
+            glucoseSourceId != candidate.glucoseSourceId
+        ) {
+            return false
+        }
+        return reason != CoachReason.RAPID_GLUCOSE_RISE ||
+            (
+                safetyReadingId == candidate.safetyReadingId &&
+                    safetyReadingAtEpochMillis == candidate.safetyReadingAtEpochMillis &&
+                    algorithmVersion == candidate.algorithmVersion
+                )
+    }
 
     private fun observeDayStart(): Flow<Long> = flow {
         var emittedDayStart: Long? = null
