@@ -154,5 +154,11 @@ non-conflicting earlier constraints, and avoid inferring acceptance that the use
   [V0_6_2_INACTIVITY_WALK_COACHING.md](V0_6_2_INACTIVITY_WALK_COACHING.md). Status is `Engineering:
   PASS / Physical: DEFERRED`; no automated stair activation is permitted, and every device-only
   check remains `NOT RUN` in the `v0.7.0` integrated RC backlog.
+- `v0.7.0` integrated WALK RC: the user explicitly deferred the unavailable device/instrumentation
+  gate and requested continued engineering. The milestone is behavior-neutral: it aligns version
+  metadata, consolidates the physical checklist, reruns the full automated/review/package gate, and
+  preserves every `NOT RUN` row. It does not authorize automated stairs or any production behavior
+  change. The repository-scoped ChatGPT Pro continuation review was requested twice before work;
+  both calls failed closed with `response.possibly_stale` and captured no assistant verdict.
 
 The completed physical test was defined in [V0.3_WEAR_ACCEPTANCE.md](V0.3_WEAR_ACCEPTANCE.md).

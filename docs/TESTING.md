@@ -133,6 +133,12 @@ remain authoritative for their respective runs.
   phone/Wear display parity, processing-time Start revalidation, replay/idempotence, and explicit
   automated-stair exclusion. No provider request, scheduler/polling change, Room migration, Wear
   schema field, notification-action change, or session/replay semantic change is permitted.
+- `v0.7.0` gate: integrate the unchanged three WALK paths into one version-aligned RC, run the
+  complete forced regression/lint/APK/WFF/signature/privacy/package pipeline, and execute an
+  independent boundary review. No production source behavior is changed. The consolidated
+  [v0.7.0 physical checklist](V0_7_0_INTEGRATED_WALK_RC.md) remains `NOT RUN`/deferred until the
+  user tests the pinned artifact; Android migration instrumentation likewise remains `NOT RUN`
+  without an attached Android runtime.
 
 ## Current local verification
 

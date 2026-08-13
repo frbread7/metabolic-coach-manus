@@ -267,7 +267,7 @@ The coach evaluates in this order:
 7. notifications/quiet hours, snooze, cooldown, and the daily notification cap suppress the
    selected action when applicable.
 
-`v0.6.2` supports post-meal, confirmed rapid-rise, and prolonged-inactivity WALK actions. Post-meal
+`v0.7.0` integrates post-meal, confirmed rapid-rise, and prolonged-inactivity WALK actions. Post-meal
 wins an overlap, followed by rapid rise, then inactivity. Rapid rise requires two consecutive
 readings from the selected exact source, strictly increasing timestamps, a gap inside the
 configured stale-reading window, and both effective rates at or above the configured threshold.

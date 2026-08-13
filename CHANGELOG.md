@@ -2,6 +2,28 @@
 
 All notable Metabolic Coach package changes are recorded here.
 
+## v0.7.0 — 2026-08-13 — Integrated WALK coaching release candidate
+
+### Changed
+
+- Phone, Wear, and watch-face modules are aligned at versionName `0.7.0`, versionCode `12` for one
+  integrated engineering release candidate containing the previously completed post-meal,
+  confirmed rapid-rise, and prolonged-inactivity WALK paths.
+- The cumulative device backlog is consolidated into one privacy-safe phone/Galaxy Watch8
+  acceptance checklist.
+- GitHub Actions artifact metadata is aligned with `v0.7.0`; the authoritative artifact for this
+  milestone is still built locally to conserve the user's hosted Actions quota.
+
+### Safety, scope, and verification status
+
+- This integration milestone changes no production coaching, provider, current-glucose,
+  persistence, WorkManager, notification/action, session/replay, Wear protocol, History, Planner,
+  export/reset, or watch-face behavior. Automated stairs remain production-disabled.
+- Android instrumentation and every phone/Galaxy Watch8 row remain `NOT RUN`. The artifact must be
+  described as `Physical: DEFERRED`, never physically accepted, until the user tests the pinned RC.
+- Engineering verification is in progress. Exact automated results, review verdict, hashes, and
+  certificate identity will be recorded only after the fresh full gate completes.
+
 ## v0.6.2 — 2026-08-13 — Prolonged-inactivity WALK coaching
 
 ### Added

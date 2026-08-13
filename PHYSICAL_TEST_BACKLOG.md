@@ -50,5 +50,10 @@ contract is in
 [docs/V0_6_1_RAPID_RISE_COACHING.md](docs/V0_6_1_RAPID_RISE_COACHING.md). The `v0.6.2` engineering
 contract and its fail-closed activity boundaries are in
 [docs/V0_6_2_INACTIVITY_WALK_COACHING.md](docs/V0_6_2_INACTIVITY_WALK_COACHING.md). The rows are
-pinned to the final v0.6.2 feature commit and will be consolidated into the promoted `v0.7.0` integrated
+pinned to the final v0.6.2 feature commit and are consolidated into the `v0.7.0` integrated
 walk-coaching release-candidate checklist.
+
+The consolidated RC procedure now exists at
+[docs/V0_7_0_INTEGRATED_WALK_RC.md](docs/V0_7_0_INTEGRATED_WALK_RC.md). Every row above remains
+`NOT RUN`; the user's decision to defer this batch is recorded as `Physical: DEFERRED`, not as a
+waiver or acceptance. The RC introduces no automated stairs and no new device behavior.

@@ -59,7 +59,7 @@ in-place update only when its certificate matches the accepted v0.3 package. Wea
 APKs are rebuilt to keep the package metadata aligned; this milestone does not claim a new physical
 acceptance for those components.
 
-After installation, use [the v0.4.2 acceptance checklist](docs/V0.4_2_SAVED_MILESTONES.md) and
+After installation, use [the v0.4.2 acceptance checklist](docs/V0_4_2_SAVED_MILESTONES.md) and
 stop after recording the phone results.
 
 ## v0.6.0 local engineering artifact preflight
@@ -100,6 +100,20 @@ prompt. The artifact remains `Physical: DEFERRED` and is intended to be exercise
 integrated `v0.7.0` coaching release-candidate checklist. Record only privacy-safe categorical
 results in [the cumulative physical-test backlog](PHYSICAL_TEST_BACKLOG.md), and never call this
 milestone physically accepted without a user-reported real-device pass.
+
+## v0.7.0 integrated WALK release-candidate preflight
+
+The v0.7.0 package combines the unchanged post-meal, confirmed rapid-rise, and
+prolonged-inactivity WALK paths in one matched engineering RC. Verify the externally recorded ZIP
+SHA-256, pinned commit, versionName `0.7.0`, versionCode `12`, and signing certificate before any
+installation. Keep the phone, Wear, and watch-face APKs from the same ZIP together and install only
+as an in-place update when their certificate matches the accepted installation.
+
+This artifact is `Physical: DEFERRED`. Android instrumentation and all consolidated device rows
+remain `NOT RUN`; skipping them does not make them pass. Automated stairs remain disabled. If the
+user later tests this RC, use
+[the consolidated v0.7.0 checklist](docs/V0_7_0_INTEGRATED_WALK_RC.md), record categorical results
+only, and do not include health values, endpoints, credentials, or private screenshots.
 
 ## Historical v0.5.1 CI artifact preflight
 

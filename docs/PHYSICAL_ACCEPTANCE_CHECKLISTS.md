@@ -40,14 +40,14 @@ new pinned run.
 | `v0.3` | Galaxy Watch8 installation, Wear Data Layer, face, touch, AOD, reconnect, stability | Accepted by user report 2026-08-02 | [V0.3 Wear checklist](V0.3_WEAR_ACCEPTANCE.md) and [sanitized record](acceptance/V0_3_PHYSICAL_ACCEPTANCE.md) |
 | `v0.4.0` | Original phone planner/freshness artifact | Not accepted; stale-current defect evidence is preserved | [v0.4.1 hotfix report](V0.4_1_FRESHNESS_HOTFIX.md) |
 | `v0.4.1` | Phone current-glucose freshness regression gate | Accepted by user report | [v0.4.1 hotfix report](V0.4_1_FRESHNESS_HOTFIX.md) |
-| `v0.4.2` | Phone saved planning milestones and planner regressions | Accepted by user report | [v0.4.2 checklist](V0.4_2_SAVED_MILESTONES.md) |
+| `v0.4.2` | Phone saved planning milestones and planner regressions | Accepted by user report | [v0.4.2 checklist](V0_4_2_SAVED_MILESTONES.md) |
 | `v0.5.0` | Phone local history retention, backfill, export/reset | Accepted by user report 2026-08-04 | [v0.5.0 history checklist](V0_5_0_HISTORY_FOUNDATION.md) and [sanitized record](acceptance/V0_5_0_PHYSICAL_ACCEPTANCE.md) |
 | `v0.5.1` | Phone trend chart and selected-period GMI | Accepted by user report 2026-08-04 | [v0.5.1 phone checklist](V0_5_1_HISTORY_EXPLORER.md) |
 | `v0.6.0` | Post-meal walk coaching | Engineering PASS / Physical DEFERRED | [v0.6.0 checklist](V0_6_0_POST_MEAL_COACHING.md); cumulative backlog |
 | `v0.6.1` | Confirmed rapid-rise walk coaching | Engineering PASS / Physical DEFERRED | [v0.6.1 contract](V0_6_1_RAPID_RISE_COACHING.md); cumulative backlog |
 | `v0.6.2` | Fail-closed prolonged-inactivity WALK coaching only | Engineering PASS / Physical DEFERRED | [v0.6.2 contract](V0_6_2_INACTIVITY_WALK_COACHING.md); cumulative backlog |
-| `v0.7.0` | Integrated walk-coaching RC | Planned batched physical gate | Consolidated checklist pending |
-| `v0.5` beta | One-week daily-use reliability and safety observation | Planned after feature gates | This document, §one-week beta |
+| `v0.7.0` | Integrated walk-coaching RC | Engineering verification in progress / Physical DEFERRED | [Consolidated v0.7.0 checklist](V0_7_0_INTEGRATED_WALK_RC.md) |
+| `v0.9.0` beta | One-week daily-use reliability and safety observation | Planned after feature gates | This document, §one-week beta |
 | `v1.0` | Production daily-use release | Planned | This document, §v1.0 |
 
 The version labels follow the repository milestone table. `v0.4.0` remains a historical failed
@@ -129,7 +129,7 @@ not changed.
 
 ## v0.4.2 — Saved planning milestones
 
-The detailed phone gate is [V0.4_2_SAVED_MILESTONES.md](V0.4_2_SAVED_MILESTONES.md). It covers
+The detailed phone gate is [V0_4_2_SAVED_MILESTONES.md](V0_4_2_SAVED_MILESTONES.md). It covers
 multiple saved targets while keeping exactly one selected detail scenario.
 
 | ID | Expected physical result | Status | Evidence |
@@ -202,7 +202,15 @@ the pinned `v0.7.0` integrated release candidate. Record categorical results onl
 | V062-NF-01 | Working/quiet hours, snooze, cooldown, daily cap, reminder disablement, and active-session suppression remain coherent. | `NOT RUN` |
 | V062-ST-01 | Representative use shows no crash, ANR, excess heat, notification storm, unexpected polling/background wake, or obvious battery regression. | `NOT RUN` |
 
-## One-week personal beta (`v0.5` roadmap milestone)
+## v0.7.0 — Integrated WALK coaching release candidate
+
+The executable consolidated gate is maintained in
+[V0_7_0_INTEGRATED_WALK_RC.md](V0_7_0_INTEGRATED_WALK_RC.md). It combines every still-relevant
+post-meal, rapid-rise, inactivity, cross-reason, action/replay, synchronization, AOD, and stability
+check against one pinned matched artifact set. All rows remain `NOT RUN`; engineering verification
+and an installable ZIP do not imply physical acceptance.
+
+## One-week personal beta (`v0.9.0` roadmap milestone)
 
 Run only after the feature milestones above are individually accepted. Use a predeclared daily
 script and record categorical observations; do not export or paste personal health data into the

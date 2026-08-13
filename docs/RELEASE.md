@@ -50,9 +50,33 @@ handed off.
 These are debug-signed engineering artifacts, not production releases. Regenerate and rehash them
 after every source/build change.
 
-## v0.6.2 local engineering artifact
+## v0.7.0 integrated WALK engineering candidate
 
-The active engineering milestone is `v0.6.2` (versionCode `11`) across phone, Wear, and watch face.
+The active engineering milestone is `v0.7.0` (versionCode `12`) across phone, Wear, and watch face.
+It packages the unchanged `v0.6.0` post-meal, `v0.6.1` confirmed rapid-rise, and `v0.6.2`
+prolonged-inactivity WALK paths into one matched integration RC. Automated stairs remain disabled.
+No production source, provider/current-reading, Room, WorkManager, notification/action,
+session/replay, Wear protocol, History, Planner, export/reset, or watch-face behavior changes in
+this milestone.
+
+The expected local package names are:
+
+```text
+metabolic-coach-phone-debug.apk
+metabolic-coach-wear-debug.apk
+metabolic-coach-watchface-debug.apk
+MetabolicCoach-v0.7.0.zip
+```
+
+Engineering verification is in progress. Do not record hashes, suite counts, certificate identity,
+or a passing verdict until the fresh forced local pipeline, standalone verifier, and independent
+review complete. Android instrumentation and every row in the
+[consolidated RC checklist](V0_7_0_INTEGRATED_WALK_RC.md) remain `NOT RUN`; the release status is
+`Physical: DEFERRED`, not accepted.
+
+## v0.6.2 local engineering artifact (historical)
+
+The preceding engineering milestone is `v0.6.2` (versionCode `11`) across phone, Wear, and watch face.
 It adds fail-closed prolonged-inactivity WALK coaching through the existing canonical pipeline.
 Automated stairs remain disabled. The change adds no provider request, polling/WorkManager change,
 Room migration, notification-action contract, Wear Data Layer field/schema, or session/replay
@@ -129,7 +153,7 @@ All three APKs report versionName `0.6.1`, versionCode `10`, and certificate SHA
 The v0.4.2 engineering artifact (versionCode `6`) was the phone-only saved
 planning-milestones milestone layered on the accepted v0.4.1 freshness fix. The workflow keeps the
 same signed phone/Wear/watch-face package contract, but physical acceptance is limited to the phone
-Planner behavior described in [V0_4_2_SAVED_MILESTONES.md](V0.4_2_SAVED_MILESTONES.md).
+Planner behavior described in [V0_4_2_SAVED_MILESTONES.md](V0_4_2_SAVED_MILESTONES.md).
 
 The workflow requires the accepted v0.3 engineering keystore through the encrypted
 `MC_DEBUG_KEYSTORE_BASE64` repository secret and uploads:
@@ -146,9 +170,9 @@ The ZIP must contain exactly `CHANGELOG.md`, `INSTALL.md`, `phone.apk`, `watchfa
 certificate. The old v0.4.0 artifact is preserved and the v0.4.1 artifact/evidence remain separate;
 neither is overwritten or relabeled.
 
-## v0.5.1 GitHub Actions engineering artifact
+## v0.5.1 GitHub Actions engineering artifact (historical)
 
-The current engineering artifact is `v0.5.1` (versionCode `8`). It adds the phone-only local
+The historical `v0.5.1` engineering artifact (versionCode `8`) added the phone-only local
 History Explorer and selected-period GMI over the accepted v0.5.0 foundation. The workflow keeps
 the same signed phone/Wear/watch-face package contract; Wear and watch-face behavior remain
 unchanged.

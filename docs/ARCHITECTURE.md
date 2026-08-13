@@ -622,8 +622,10 @@ describe a timing bucket as medically recommended, causal, best, or ideal.
   and reboot validation.
 - Prospective timing excludes recorded intervening meals and overlapping intervention sessions,
   but medication, unrecorded behavior, adherence, and selection bias remain uncontrolled.
-- No cloud backup, account recovery, or configurable retention policy exists. The local JSON
-  export and confirmed erase flows still require device/document-provider lifecycle testing.
+- No cloud backup or account recovery exists. Glucose history has explicit 90-day, one-year, and
+  keep-all retention choices; equivalent user-configurable retention is not yet defined for every
+  non-glucose table. The local JSON export, pruning, and confirmed erase flows still require
+  device/document-provider lifecycle testing.
 - The user reported the `v0.3` Galaxy Watch8 physical acceptance complete on 2026-08-02; the
   repository retains only a privacy-sanitized record, so independent device logs, extended battery
   measurements, and lifecycle retests remain unverified.
