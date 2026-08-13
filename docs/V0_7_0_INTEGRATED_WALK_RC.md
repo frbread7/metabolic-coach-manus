@@ -84,8 +84,14 @@ afb5b0f45123a6ee84f87e4e937a99e4eea93b4c187115eae22bef1a41ca2573  metabolic-coac
 7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6667da26c5fad4  signing certificate
 ```
 
-The final archive hash is pinned after the approved documentation-only deterministic repack. This
-engineering evidence does not change any physical row below.
+The approved documentation-only deterministic repack preserved all three APK hashes, passed the
+standalone verifier again, and produced:
+
+```text
+e8165936f92bfe1b7c0d710d11dbc6c73cd366d8a375b962a5cf1729c8fd0af4  MetabolicCoach-v0.7.0.zip
+```
+
+This engineering evidence does not change any physical row below.
 
 ## Consolidated physical acceptance checklist
 

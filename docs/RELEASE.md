@@ -92,8 +92,15 @@ afb5b0f45123a6ee84f87e4e937a99e4eea93b4c187115eae22bef1a41ca2573  metabolic-coac
 Signing certificate SHA-256: 7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6667da26c5fad4
 ```
 
-The final ZIP hash is recorded after the approved documentation-only deterministic repack. Android
-instrumentation and every row in the
+The approved documentation-only deterministic repack used root handoff documentation from commit
+`2e8e9eb95933096e9d19b75a737337527248c2e1`, preserved all three APK hashes, passed the standalone
+verifier again, and produced:
+
+```text
+e8165936f92bfe1b7c0d710d11dbc6c73cd366d8a375b962a5cf1729c8fd0af4  MetabolicCoach-v0.7.0.zip
+```
+
+Android instrumentation and every row in the
 [consolidated RC checklist](V0_7_0_INTEGRATED_WALK_RC.md) remain `NOT RUN`. Status is
 `Engineering: PASS / Physical: DEFERRED`, not accepted.
 
