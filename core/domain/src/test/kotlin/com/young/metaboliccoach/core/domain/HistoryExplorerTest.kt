@@ -14,11 +14,69 @@ import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class HistoryExplorerTest {
+    @Test
+    fun `six and twelve hour ranges use exact elapsed durations across daylight saving`() {
+        val springForward = Instant.parse("2026-03-08T08:30:00Z").toEpochMilli()
+        val fallBack = Instant.parse("2026-11-01T07:30:00Z").toEpochMilli()
+
+        val sixHours = HistoryRangeResolver.resolveFixed(
+            preset = HistoryPeriodPreset.HOURS_6,
+            nowEpochMillis = springForward,
+            displayTimeZoneId = "America/New_York",
+        ) as HistoryRangeResolution.Resolved
+        val twelveHours = HistoryRangeResolver.resolveFixed(
+            preset = HistoryPeriodPreset.HOURS_12,
+            nowEpochMillis = fallBack,
+            displayTimeZoneId = "America/New_York",
+        ) as HistoryRangeResolution.Resolved
+        val sixHoursInUtc = HistoryRangeResolver.resolveFixed(
+            preset = HistoryPeriodPreset.HOURS_6,
+            nowEpochMillis = springForward,
+            displayTimeZoneId = "UTC",
+        ) as HistoryRangeResolution.Resolved
+
+        assertEquals(6L * HOUR_MILLIS, sixHours.range.durationMillis)
+        assertEquals(springForward, sixHours.range.endExclusiveEpochMillis)
+        assertEquals(springForward - 6L * HOUR_MILLIS, sixHours.range.startEpochMillis)
+        assertEquals(12L * HOUR_MILLIS, twelveHours.range.durationMillis)
+        assertEquals(fallBack, twelveHours.range.endExclusiveEpochMillis)
+        assertEquals(fallBack - 12L * HOUR_MILLIS, twelveHours.range.startEpochMillis)
+        assertEquals(1, sixHours.range.calendarDayCount)
+        assertEquals(1, twelveHours.range.calendarDayCount)
+        assertEquals(sixHours.range.startEpochMillis, sixHoursInUtc.range.startEpochMillis)
+        assertEquals(
+            sixHours.range.endExclusiveEpochMillis,
+            sixHoursInUtc.range.endExclusiveEpochMillis,
+        )
+    }
+
+    @Test
+    fun `six and twelve hour GMI remains unavailable regardless of local readings`() {
+        listOf(
+            HistoryPeriodPreset.HOURS_6 to 6L * HOUR_MILLIS,
+            HistoryPeriodPreset.HOURS_12 to 12L * HOUR_MILLIS,
+        ).forEach { (preset, duration) ->
+            val range = range(preset, 0L, duration)
+            val result = SelectedPeriodGmiCalculator.calculate(
+                readings = readingsEveryFiveMinutes(0L, duration) { 140 },
+                sourceId = SOURCE,
+                range = range,
+                plannerSettings = GlycemicPlannerSettings(),
+                targetLowerMgDl = 70,
+                targetUpperMgDl = 180,
+            )
+
+            assertEquals(SelectedPeriodGmiAvailability.INSUFFICIENT_DURATION, result.availability)
+            assertNull(result.gmiPercent)
+        }
+    }
+
     @Test
     fun `fixed ranges end at the current instant`() {
         val resolved = HistoryRangeResolver.resolveFixed(
@@ -380,6 +438,8 @@ class HistoryExplorerTest {
         endExclusiveEpochMillis = end,
         displayTimeZoneId = "UTC",
         calendarDayCount = when (preset) {
+            HistoryPeriodPreset.HOURS_6,
+            HistoryPeriodPreset.HOURS_12,
             HistoryPeriodPreset.HOURS_24 -> 1
             HistoryPeriodPreset.DAYS_7 -> 7
             HistoryPeriodPreset.DAYS_14 -> 14

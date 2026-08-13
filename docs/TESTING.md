@@ -30,8 +30,9 @@ The current source includes these JVM and Android local-test suites:
 | `GlucoseHistoryRetentionPolicyTest` | Deterministic 90-day/1-year cutoffs and no-cutoff keep-all behavior |
 | `NightscoutProviderTest` range case | Bounded older-range reads use the range endpoint without publishing an older current state |
 | `GlycemicGoalPlannerTest` | GMI conversion, time-weighted 14/30/60/90-day metrics, coverage and long-gap handling, source discontinuity, horizon equations, remaining-window milestones, temporal states, deterministic ordering, and low-glucose-risk suppression |
-| `HistoryExplorerTest` | Fixed/custom/DST range resolution, deterministic exact-source chart ordering, disconnected gaps, bounded aggregation with extrema preservation, duration/coverage gates, and neutral low-glucose GMI qualification |
-| `HistoryExplorerLoaderTest` | Exact-source local-only loading with no refresh/provider call plus stale-result rejection after newer periods, source changes, custom-draft invalidation, and navigation away |
+| `HistoryExplorerTest` | Exact elapsed 6h/12h plus existing fixed/custom/DST range resolution, deterministic exact-source chart ordering, disconnected gaps, bounded aggregation with extrema preservation, duration/coverage gates, and neutral low-glucose GMI qualification |
+| `HistoryExplorerLoaderTest` | Exact-source local-only 6h/12h loading with no refresh/provider call plus stale-result rejection after rapid period changes, source changes, custom-draft invalidation, and navigation away |
+| `HistoryFixedPresetParserTest` | Backward-compatible 6h/12h and existing fixed-preset restoration plus 24h fallback for custom, missing, blank, unknown, and malformed values |
 | `OkHttpNightscoutApiClientTest` | MockWebServer request path/query/headers, conditional responses, redirect refusal, bounded declared/streamed response size, and future-authenticator hook without a real server |
 | `NightscoutSettingsJsonCodecTest` | Stable multi-server DataStore encoding/decoding and malformed stored-value recovery |
 | `XdripGlucoseIngestorTest` | Retained inactive-adapter input validation; it does not prove or enable a Version 1 broadcast route |
@@ -139,6 +140,13 @@ remain authoritative for their respective runs.
   [v0.7.0 physical checklist](V0_7_0_INTEGRATED_WALK_RC.md) remains `NOT RUN`/deferred until the
   user tests the pinned artifact; Android migration instrumentation likewise remains `NOT RUN`
   without an attached Android runtime.
+- `v0.7.1` gate: APOS returned `GO` for phone-only 6h/12h local History windows. Prove exact
+  elapsed-time resolution, backward-compatible fixed-preset persistence, exact-source local-only
+  loading, rapid-selection/source stale-result rejection, and unchanged short-period GMI
+  ineligibility. Then run the complete forced regression/lint/APK/WFF/signature/privacy/package
+  pipeline and independent boundary review. Provider/current-reading, backfill/retention, Room,
+  GMI policy, coaching, notification, Wear, and watch-face behavior remain frozen. The
+  [v0.7.1 physical checklist](V0_7_1_SHORT_HISTORY_WINDOWS.md) may remain `NOT RUN`/deferred.
 
 ## Current local verification
 

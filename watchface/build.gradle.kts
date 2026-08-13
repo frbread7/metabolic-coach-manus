@@ -31,8 +31,8 @@ android {
         applicationId = "com.young.metaboliccoach.watchface"
         minSdk = 36
         targetSdk = 36
-        versionCode = 12
-        versionName = "0.7.0"
+        versionCode = 13
+        versionName = "0.7.1"
     }
 
     val releaseSigningConfig = if (releaseSigningConfigured) {

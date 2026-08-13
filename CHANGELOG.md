@@ -2,6 +2,29 @@
 
 All notable Metabolic Coach package changes are recorded here.
 
+## v0.7.1 — 2026-08-13 — Six- and twelve-hour local History windows
+
+### Added
+
+- The phone History screen adds fixed **6h** and **12h** selections before the existing 24h,
+  7d, 14d, 30d, 90d, and custom choices.
+- Both new choices resolve exact elapsed UTC half-open ranges and reuse the existing captured-source
+  local Room query, deterministic gap-aware chart path, and stale-result generation gate.
+- The last fixed-period preference restores the new choices while retaining a defensive 24h
+  fallback for custom, missing, blank, unknown, or malformed stored values.
+
+### Safety, scope, and verification status
+
+- The APOS architecture review returned `GO` with no blocker and required this milestone to remain
+  strictly local History/UI-state work.
+- Numeric selected-period GMI remains unavailable for 6h and 12h. No GMI formula, eligibility,
+  disclaimer, provider/current-reading, retention/backfill, Room schema, coaching, notification,
+  Wear, or watch-face behavior changed.
+- Phone, Wear, and watch-face metadata is aligned at versionName `0.7.1`, versionCode `13` for the
+  deterministic package contract; the feature itself is phone-only.
+- Engineering verification is in progress. Physical phone/Watch checks remain `NOT RUN` and are
+  recorded as `Physical: DEFERRED`, never accepted.
+
 ## v0.7.0 — 2026-08-13 — Integrated WALK coaching release candidate
 
 ### Changed

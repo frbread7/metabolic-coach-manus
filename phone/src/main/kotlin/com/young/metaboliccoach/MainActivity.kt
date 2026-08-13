@@ -392,6 +392,8 @@ private fun HistoryExplorerScreen(
                         label = {
                             Text(
                                 when (preset) {
+                                    HistoryPeriodPreset.HOURS_6 -> "6h"
+                                    HistoryPeriodPreset.HOURS_12 -> "12h"
                                     HistoryPeriodPreset.HOURS_24 -> "24h"
                                     HistoryPeriodPreset.DAYS_7 -> "7d"
                                     HistoryPeriodPreset.DAYS_14 -> "14d"
@@ -653,6 +655,8 @@ private fun SelectedPeriodGmiCard(
 }
 
 private fun historyRangeLabel(range: HistoryRange): String = when (range.preset) {
+    HistoryPeriodPreset.HOURS_6 -> "Last 6 hours"
+    HistoryPeriodPreset.HOURS_12 -> "Last 12 hours"
     HistoryPeriodPreset.HOURS_24 -> "Last 24 hours"
     HistoryPeriodPreset.DAYS_7 -> "Last 7 days"
     HistoryPeriodPreset.DAYS_14 -> "Last 14 days"

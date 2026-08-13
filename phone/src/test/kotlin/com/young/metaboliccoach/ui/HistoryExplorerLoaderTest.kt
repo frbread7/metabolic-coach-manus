@@ -13,6 +13,7 @@ import com.young.metaboliccoach.core.model.GlucoseTrend
 import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
 import com.young.metaboliccoach.core.model.HistoryPeriodPreset
 import com.young.metaboliccoach.core.model.HistoryRange
+import com.young.metaboliccoach.core.model.SelectedPeriodGmiAvailability
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -82,6 +83,81 @@ class HistoryExplorerLoaderTest {
 
         assertFalse(gate.canPublish(older))
         assertTrue(gate.canPublish(newer))
+    }
+
+    @Test
+    fun `rapid six twelve and twenty four hour selections publish only the final request`() {
+        val gate = HistoryExplorerRequestGate()
+        gate.updateVisibility(true, "source-a")
+
+        val sixHours = gate.begin("source-a")
+        val twelveHours = gate.begin("source-a")
+        val twentyFourHours = gate.begin("source-a")
+
+        assertFalse(gate.canPublish(sixHours))
+        assertFalse(gate.canPublish(twelveHours))
+        assertTrue(gate.canPublish(twentyFourHours))
+    }
+
+    @Test
+    fun `six and twelve hour loads remain exact source local only`() = runTest {
+        val glucoseRepository = Mockito.mock(GlucoseRepository::class.java)
+        val goalRepository = Mockito.mock(GlycemicGoalRepository::class.java)
+        val settingsRepository = Mockito.mock(SettingsRepository::class.java)
+        val exactSourceId = "nightscout:active"
+        Mockito.`when`(goalRepository.observeSettings()).thenReturn(
+            flowOf(GlycemicPlannerSettings()),
+        )
+        Mockito.`when`(settingsRepository.observe()).thenReturn(
+            flowOf(DefaultCoachSettings.create()),
+        )
+        val loader = HistoryExplorerLoader(
+            glucoseRepository = glucoseRepository,
+            glycemicGoalRepository = goalRepository,
+            settingsRepository = settingsRepository,
+            computationDispatcher = Dispatchers.Unconfined,
+        )
+
+        listOf(
+            HistoryPeriodPreset.HOURS_6 to 6L,
+            HistoryPeriodPreset.HOURS_12 to 12L,
+        ).forEach { (preset, hours) ->
+            val range = HistoryRange(
+                preset = preset,
+                startEpochMillis = 1_000_000_000L,
+                endExclusiveEpochMillis = 1_000_000_000L + hours * 60L * 60L * 1_000L,
+                displayTimeZoneId = "UTC",
+                calendarDayCount = 1,
+                includesPartialLatestDay = true,
+            )
+            val queryStart = range.startEpochMillis - 20L * 60L * 1_000L
+            Mockito.`when`(
+                glucoseRepository.readingsBetweenExactSource(
+                    exactSourceId,
+                    queryStart,
+                    range.endExclusiveEpochMillis,
+                ),
+            ).thenReturn(emptyList())
+
+            val result = loader.load(exactSourceId, range)
+
+            assertEquals(GlucoseChartStatus.NO_DATA, result.chart.status)
+            assertEquals(
+                SelectedPeriodGmiAvailability.INSUFFICIENT_DURATION,
+                result.selectedPeriodGmi.availability,
+            )
+            Mockito.verify(glucoseRepository).readingsBetweenExactSource(
+                exactSourceId,
+                queryStart,
+                range.endExclusiveEpochMillis,
+            )
+        }
+        Mockito.verify(glucoseRepository, Mockito.never()).readingsBetween(
+            Mockito.anyLong(),
+            Mockito.anyLong(),
+        )
+        Mockito.verify(glucoseRepository, Mockito.never()).refresh()
+        Mockito.verify(glucoseRepository, Mockito.never()).refreshExactSource(Mockito.anyString())
     }
 
     @Test

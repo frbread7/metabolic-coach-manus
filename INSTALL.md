@@ -116,6 +116,19 @@ remain disabled. If the user later tests this RC, use
 [the consolidated v0.7.0 checklist](docs/V0_7_0_INTEGRATED_WALK_RC.md), record categorical results
 only, and do not include health values, endpoints, credentials, or private screenshots.
 
+## v0.7.1 local History engineering-candidate preflight
+
+The v0.7.1 package adds phone-only 6h and 12h local History choices. Verify the externally
+recorded ZIP SHA-256, pinned commit, versionName `0.7.1`, versionCode `13`, and signing certificate
+before installation. Keep all three APKs from the same archive together; Wear and watch-face
+metadata is aligned for packaging, but their production behavior is unchanged.
+
+The new periods read only already-downloaded exact-source Room history. They do not initiate a
+Nightscout refresh or backfill, and they do not display numeric selected-period GMI. Physical
+testing is deferred, so every row remains `NOT RUN`. If installed later, use
+[the v0.7.1 checklist](docs/V0_7_1_SHORT_HISTORY_WINDOWS.md) and record only privacy-safe
+categorical results.
+
 ## Historical v0.5.1 CI artifact preflight
 
 The v0.5.1 package is a debug-signed engineering candidate for the phone-only local History

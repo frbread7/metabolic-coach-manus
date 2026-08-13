@@ -50,9 +50,33 @@ handed off.
 These are debug-signed engineering artifacts, not production releases. Regenerate and rehash them
 after every source/build change.
 
-## v0.7.0 integrated WALK engineering candidate
+## v0.7.1 short local History engineering candidate
 
-The active engineering milestone is `v0.7.0` (versionCode `12`) across phone, Wear, and watch face.
+The active engineering milestone is `v0.7.1` (versionCode `13`) across phone, Wear, and watch face.
+It adds fixed 6h and 12h choices to the phone's accepted exact-source local History path. The APOS
+architecture review returned `GO` with no blocker. No provider/current-reading, backfill/retention,
+Room schema, GMI policy/formula/wording, coaching, notification, Wear Data Layer, Wear UI, or
+watch-face production behavior changes in this milestone.
+
+The expected local package names are:
+
+```text
+metabolic-coach-phone-debug.apk
+metabolic-coach-wear-debug.apk
+metabolic-coach-watchface-debug.apk
+MetabolicCoach-v0.7.1.zip
+```
+
+Wear and watch-face metadata is aligned only to preserve the deterministic matched-package
+contract. Their production behavior is unchanged and is not newly physically validated. Record
+the pinned commit, full forced-pipeline evidence, APK/certificate/ZIP hashes, and independent
+review only after those checks actually pass. Until then, and after engineering completion unless
+the user runs the device checklist, status remains `Physical: DEFERRED` and every physical row is
+`NOT RUN`.
+
+## v0.7.0 integrated WALK engineering candidate (historical)
+
+The preceding engineering milestone is `v0.7.0` (versionCode `12`) across phone, Wear, and watch face.
 It packages the unchanged `v0.6.0` post-meal, `v0.6.1` confirmed rapid-rise, and `v0.6.2`
 prolonged-inactivity WALK paths into one matched integration RC. Automated stairs remain disabled.
 No production source, provider/current-reading, Room, WorkManager, notification/action,

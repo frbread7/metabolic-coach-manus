@@ -7,6 +7,8 @@ enum class HistoryPeriodPreset(
     val aggregationBucketMillis: Long?,
     val gmiEligible: Boolean,
 ) {
+    HOURS_6("6 hours", 6L * HOUR_MILLIS, null, false),
+    HOURS_12("12 hours", 12L * HOUR_MILLIS, null, false),
     HOURS_24("24 hours", 24L * HOUR_MILLIS, null, false),
     DAYS_7("7 days", 7L * DAY_MILLIS, 30L * MINUTE_MILLIS, false),
     DAYS_14("14 days", 14L * DAY_MILLIS, HOUR_MILLIS, true),

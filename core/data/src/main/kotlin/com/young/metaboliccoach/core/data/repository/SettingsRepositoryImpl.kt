@@ -367,10 +367,7 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override fun observeLastFixedPreset(): Flow<HistoryPeriodPreset> =
         context.settingsDataStore.data.map { values ->
-            values[Keys.historyLastFixedPreset]
-                .enumOrDefault(HistoryPeriodPreset.HOURS_24)
-                .takeUnless { it == HistoryPeriodPreset.CUSTOM }
-                ?: HistoryPeriodPreset.HOURS_24
+            parseFixedHistoryPreset(values[Keys.historyLastFixedPreset])
         }
 
     override suspend fun updateLastFixedPreset(preset: HistoryPeriodPreset) {
@@ -458,6 +455,12 @@ class SettingsRepositoryImpl @Inject constructor(
         val historyLastFixedPreset = stringPreferencesKey("history_last_fixed_preset")
     }
 }
+
+internal fun parseFixedHistoryPreset(value: String?): HistoryPeriodPreset =
+    value
+        ?.let { stored -> runCatching { HistoryPeriodPreset.valueOf(stored) }.getOrNull() }
+        ?.takeUnless { it == HistoryPeriodPreset.CUSTOM }
+        ?: HistoryPeriodPreset.HOURS_24
 
 private inline fun <reified T : Enum<T>> String?.enumOrNull(): T? =
     this?.let { value -> runCatching { enumValueOf<T>(value) }.getOrNull() }

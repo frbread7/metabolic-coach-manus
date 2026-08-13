@@ -106,6 +106,8 @@ object HistoryRangeResolver {
     }
 
     private fun HistoryPeriodPreset.calendarDayCount(): Int = when (this) {
+        HistoryPeriodPreset.HOURS_6,
+        HistoryPeriodPreset.HOURS_12,
         HistoryPeriodPreset.HOURS_24 -> 1
         HistoryPeriodPreset.DAYS_7 -> 7
         HistoryPeriodPreset.DAYS_14 -> 14

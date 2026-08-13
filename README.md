@@ -25,6 +25,8 @@ Samsung Galaxy Watch8.
 > review, final APOS gate, and artifact checks passed. Its real-device rows remain `NOT RUN`.
 > The behavior-neutral `v0.7.0` integrated WALK coaching RC is `Engineering: PASS / Physical:
 > DEFERRED`; its consolidated phone/Galaxy Watch8 gate remains explicitly `NOT RUN`.
+> The APOS-approved `v0.7.1` phone-only 6h/12h local History increment is under engineering
+> verification; physical testing remains deferred and every device row remains `NOT RUN`.
 > Deferred work is never described as physically accepted.
 > It is a wellness tool, not a medical device, and must not replace the CGM vendor app, glucose
 > alarms, professional advice, or a personal care plan.
@@ -47,6 +49,7 @@ synchronization and coaching foundations remain frozen while the current milesto
 | `v0.6.1` | Confirmed two-reading rapid-rise walk coaching through the existing canonical pipeline | Engineering PASS / Physical DEFERRED |
 | `v0.6.2` | Fail-closed prolonged-inactivity WALK coaching only | Engineering PASS / Physical DEFERRED |
 | `v0.7.0` | Behavior-neutral integrated walk-coaching release candidate | Engineering PASS / Physical DEFERRED |
+| `v0.7.1` | Phone-only 6h/12h exact-source local History windows | Engineering in progress / Physical DEFERRED |
 | `v0.9.0` | One-week personal beta with documented reliability, battery, and safety observations | Planned after feature gates |
 | `v1.0` | Stable daily-use release with production signing and all release gates complete | Planned |
 
@@ -58,6 +61,8 @@ not change Wear synchronization, the watch face, coaching rules, or notification
 saved phone-only milestones on top of that foundation and preserves the same boundary. `v0.5.0`
 adds the explicit local-history foundation. `v0.5.1` adds a read-only exact-source History Explorer
 and descriptive selected-period GMI without changing current glucose, Wear, or coaching paths.
+`v0.7.1` adds elapsed-time 6h/12h choices through that same local-only path; it does not change
+GMI eligibility, providers, backfill, retention, coaching, Wear, or watch-face behavior.
 See the
 [milestone process](docs/MILESTONE_PROCESS.md), [physical acceptance checklists by milestone](docs/PHYSICAL_ACCEPTANCE_CHECKLISTS.md),
 [cumulative physical-test backlog](PHYSICAL_TEST_BACKLOG.md),
@@ -68,7 +73,7 @@ and [the v0.3 acceptance record](docs/acceptance/V0_3_PHYSICAL_ACCEPTANCE.md).
 
 | Area | Current implementation |
 | --- | --- |
-| Phone hub | Nightscout glucose retrieval with explicit multi-server selection, bounded retry/cache retention, source-scoped local history and resumable range backfill; a local-only exact-source trend explorer and selected-period GMI; Health Connect activity reads; Room schema v10 coaching provenance and saved planner milestones; configurable Glycemic Goal Planner metrics/scenarios; settings; coaching rules; notifications; daily summary; streaming JSON export; confirmation-gated local erase; and revisioned Wear Data Layer publishing |
+| Phone hub | Nightscout glucose retrieval with explicit multi-server selection, bounded retry/cache retention, source-scoped local history and resumable range backfill; a local-only exact-source trend explorer with 6h/12h/24h/7d/14d/30d/90d/custom windows and selected-period GMI under the existing eligibility policy; Health Connect activity reads; Room schema v10 coaching provenance and saved planner milestones; configurable Glycemic Goal Planner metrics/scenarios; settings; coaching rules; notifications; daily summary; streaming JSON export; confirmation-gated local erase; and revisioned Wear Data Layer publishing |
 | Wear app | Three-page touch-only horizontal pager, glucose/activity display, walk and stair actions, home countdown with completion haptic, explicit queued/rejected action results, durable snooze outbox, pending-session reconciliation, direct watch notifications, and complication providers; no bezel dependency |
 | Watch face | Separate WFF v4 resource-only package with clock, glucose/trend/delta/age, steps/floors, battery, coach action, reduced ambient content, and selectable accent configuration |
 | Coaching | `v0.7.0` integrates the unchanged post-meal, confirmed rapid-rise, and fail-closed prolonged-inactivity WALK paths in one engineering RC. Inactivity requires current same-day Health Connect activity context, uses an algorithm-v4 stable episode identity, is revalidated for display and Start, and expires at the earlier glucose/activity freshness boundary. Automated stairs remain disabled. |
@@ -112,9 +117,10 @@ and [the v0.3 acceptance record](docs/acceptance/V0_3_PHYSICAL_ACCEPTANCE.md).
   evaluation. They are not laboratory HbA1c results, treatment instructions, insulin/dose
   guidance, or promises that a target will be achieved. Wear synchronization and coaching do not
   consume planner output.
-- **v0.5.1 reads downloaded history locally for a trend chart and selected-period GMI.** The normal
+- **v0.7.1 extends the accepted local History Explorer with 6h and 12h windows.** The normal
   refresh and explicit Settings backfill remain the only ways data is collected. Opening History
-  never performs network or backfill work, and 24-hour/7-day periods never show numeric GMI.
+  never performs network or backfill work, and 6-hour/12-hour/24-hour/7-day periods never show
+  numeric selected-period GMI.
 
 ## Project structure
 
@@ -181,6 +187,7 @@ engineering artifacts, not production releases. A signed release requires enviro
 - [v0.6.1 confirmed rapid-rise engineering contract](docs/V0_6_1_RAPID_RISE_COACHING.md)
 - [v0.6.2 prolonged-inactivity WALK engineering contract](docs/V0_6_2_INACTIVITY_WALK_COACHING.md)
 - [v0.7.0 integrated WALK coaching RC and consolidated physical checklist](docs/V0_7_0_INTEGRATED_WALK_RC.md)
+- [v0.7.1 six- and twelve-hour local History contract and deferred phone checklist](docs/V0_7_1_SHORT_HISTORY_WINDOWS.md)
 - [v0.5.0 local history foundation and phone acceptance gate](docs/V0_5_0_HISTORY_FOUNDATION.md)
 - [v0.5.0 privacy-sanitized phone acceptance record](docs/acceptance/V0_5_0_PHYSICAL_ACCEPTANCE.md)
 - [v0.5.1 History Explorer architecture and phone acceptance checklist](docs/V0_5_1_HISTORY_EXPLORER.md)

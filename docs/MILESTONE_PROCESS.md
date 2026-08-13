@@ -163,5 +163,11 @@ non-conflicting earlier constraints, and avoid inferring acceptance that the use
   The behavior-neutral RC subsequently passed the full forced automated pipeline, artifact checks,
   and independent final review. Status is `Engineering: PASS / Physical: DEFERRED`; every device
   row remains `NOT RUN` and automated stairs remain production-disabled.
+- `v0.7.1` short local History windows: the repository-scoped APOS review returned `GO` with no
+  blocker for fixed 6h/12h elapsed-time periods through the existing exact-source local-only
+  loader. The milestone must stop for another review if it needs a provider/current-reading,
+  backfill/retention, Room, chart-interaction/aggregation, GMI policy, coaching, notification,
+  Wear, or watch-face change. Phone checks may remain `Physical: DEFERRED`; they are accumulated in
+  the root backlog and are never inferred from automated evidence.
 
 The completed physical test was defined in [V0.3_WEAR_ACCEPTANCE.md](V0.3_WEAR_ACCEPTANCE.md).

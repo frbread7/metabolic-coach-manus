@@ -47,6 +47,7 @@ new pinned run.
 | `v0.6.1` | Confirmed rapid-rise walk coaching | Engineering PASS / Physical DEFERRED | [v0.6.1 contract](V0_6_1_RAPID_RISE_COACHING.md); cumulative backlog |
 | `v0.6.2` | Fail-closed prolonged-inactivity WALK coaching only | Engineering PASS / Physical DEFERRED | [v0.6.2 contract](V0_6_2_INACTIVITY_WALK_COACHING.md); cumulative backlog |
 | `v0.7.0` | Integrated walk-coaching RC | Engineering PASS / Physical DEFERRED | [Consolidated v0.7.0 checklist](V0_7_0_INTEGRATED_WALK_RC.md) |
+| `v0.7.1` | Phone-only 6h/12h local History windows | Engineering in progress / Physical DEFERRED | [v0.7.1 checklist](V0_7_1_SHORT_HISTORY_WINDOWS.md) |
 | `v0.9.0` beta | One-week daily-use reliability and safety observation | Planned after feature gates | This document, §one-week beta |
 | `v1.0` | Production daily-use release | Planned | This document, §v1.0 |
 
@@ -209,6 +210,14 @@ The executable consolidated gate is maintained in
 post-meal, rapid-rise, inactivity, cross-reason, action/replay, synchronization, AOD, and stability
 check against one pinned matched artifact set. All rows remain `NOT RUN`; engineering verification
 and an installable ZIP do not imply physical acceptance.
+
+## v0.7.1 — Six- and twelve-hour local History windows
+
+The executable phone gate is maintained in
+[V0_7_1_SHORT_HISTORY_WINDOWS.md](V0_7_1_SHORT_HISTORY_WINDOWS.md). It verifies the two new fixed
+choices, exact local-window presentation, rapid-selection stale-result protection, fixed-preset
+restoration, unchanged short-period GMI ineligibility, and frozen current-glucose/backfill/Wear/
+coaching behavior. All rows remain `NOT RUN`; physical testing is deferred rather than passed.
 
 ## One-week personal beta (`v0.9.0` roadmap milestone)
 

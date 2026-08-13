@@ -301,6 +301,14 @@ weighted values. `SelectedPeriodGmiCalculator` reuses the accepted planner metri
 the last fixed presentation preset is stored in DataStore; there is no Room schema migration and
 no Wear, coaching, notification, or current-reading consumer.
 
+`v0.7.1` adds 6h and 12h fixed presets to this same path. Each captures one instant and resolves an
+exact elapsed UTC interval `[T-duration, T)`, independent of daylight-saving or local-calendar
+boundaries. Both use the raw-point chart path unless the existing defensive render cap is needed,
+and both remain ineligible for numeric selected-period GMI. Defensive DataStore parsing accepts
+their stable enum names and retains the established 24h fallback for custom or malformed values.
+No provider/backfill dependency, Room schema, chart interaction architecture, or downstream
+consumer is added.
+
 ### Refresh and coaching
 
 1. After the user configures and selects a Nightscout server, the phone schedules unique periodic
