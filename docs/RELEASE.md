@@ -93,7 +93,7 @@ Signing certificate SHA-256: 7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6
 ```
 
 The approved documentation-only deterministic repack used root handoff documentation from commit
-`2e8e9eb95933096e9d19b75a737337527248c2e1`, preserved all three APK hashes, passed the standalone
+`2e8e9eb2806499b32d2bcfa75fa93b47aac82f2c`, preserved all three APK hashes, passed the standalone
 verifier again, and produced:
 
 ```text
