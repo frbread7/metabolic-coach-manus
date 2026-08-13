@@ -347,7 +347,7 @@ Recheck current policies at release time; store policy is time-sensitive.
 - [ ] Version names/codes updated intentionally.
 - [ ] Dependency and license inventory reviewed.
 - [ ] No credentials, private health data, or vendor-restricted binaries committed.
-- [ ] Room v8, exported schemas 1–8, migrations 1→8, and migration-test execution reviewed.
+- [ ] Room v10, exported schemas 1–10, migrations 1→10, and migration-test execution reviewed.
 - [ ] R8 rules and release warnings reviewed.
 - [ ] Exported components and PendingIntents security-reviewed.
 

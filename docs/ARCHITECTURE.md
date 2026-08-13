@@ -182,7 +182,7 @@ The current authenticator is deliberately a no-op for public Nightscout servers.
 Credentials are invalid inside a URL and must eventually use a phone-only secure credential store;
 they must never enter ordinary DataStore settings, logs, exports, or Wear synchronization.
 
-Room is currently at schema version 9. Exported schemas 1–9 are committed under
+Room is currently at schema version 10. Exported schemas 1–10 are committed under
 `core/data/schemas/`; migrations 1→2 add follow-up lifecycle fields, 2→3 add query indices, 3→4 add
 exact baseline/follow-up reading provenance plus the last presented recommendation ID, and 4→5 add
 daily exercise-session count/duration with safe zero defaults. Migration 5→6 adds nullable
@@ -190,9 +190,10 @@ recommendation, trigger, baseline-rate, and low-threshold-at-start provenance so
 retrospectively classified as prospective timing samples. Migration 6→7 adds immutable,
 phone-authored recommendation snapshots used to validate delayed watch commands. Migration 7→8
 adds the phone-only `glycemic_planning_milestones` table and lifecycle/date indexes. Migration 8→9
-adds the history-management tables described below. The `DatabaseMigrationTest` instrumentation
-source covers 1→9 plus every supported starting version 2–8, and the build pipeline compiles that
-source. The suite has not executed; doing so still
+adds the history-management tables described below. Migration 9→10 adds recommendation delivery/
+consumption state plus nullable glucose-safety provenance on immutable recommendation snapshots.
+The `DatabaseMigrationTest` instrumentation source covers 1→10 plus every supported starting
+version 2–9, and the build pipeline compiles that source. The suite has not executed; doing so still
 requires an Android device or emulator. Every future version must add both a migration and its
 exported schema.
 

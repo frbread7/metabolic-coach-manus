@@ -59,11 +59,12 @@ The current source includes these JVM and Android local-test suites:
 | `RemoteDataResetPolicyTest` | First-seen reset handling, same-token idempotence, legacy-state compatibility, and missing-cache recovery |
 | `TimeSettingValueTest` | Exact minute/hour preservation and valid minute-of-day clamping |
 
-Exported Room schemas 1–9 are committed. `DatabaseMigrationTest` is an Android instrumentation
-suite for schema 1→9 and every supported starting version 2–8→9, including safe defaults, preserved
-legacy rows, nullable prospective timing-provenance columns, and an initially empty recommendation
-snapshot table plus the phone-only milestone table. Its source has compiled locally, but the suite has not executed because it requires
-an Android device or emulator.
+Exported Room schemas 1–10 are committed. `DatabaseMigrationTest` is an Android instrumentation
+suite for schema 1→10 and every supported starting version 2–9→10, including safe defaults,
+preserved legacy rows, nullable prospective timing-provenance columns, initially empty history/
+recommendation/milestone tables where applicable, and the schema-10 recommendation delivery,
+consumption, and glucose-safety provenance defaults. Its source has compiled locally, but the suite
+has not executed because it requires an Android device or emulator.
 
 Run them with:
 
