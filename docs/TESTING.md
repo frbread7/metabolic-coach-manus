@@ -394,6 +394,36 @@ aad8dbafbf0a66ddcd8202a51be0b6b4c18fde8ea030b9adc1bb7097ef755e01  MetabolicCoach
 Status is `Engineering: PASS / Physical: DEFERRED`. Every real-device row remains `NOT RUN` in the
 cumulative backlog.
 
+### v0.7.0 integrated WALK engineering RC gate
+
+Behavior-neutral transition commit `9f891832f5435ecc1ecee81e8b444ab5483e9466` passed the forced
+authoritative local pipeline:
+
+```text
+./scripts/build-apks.sh
+BUILD SUCCESSFUL in 8m 25s
+333 actionable tasks: 333 executed
+```
+
+Fresh JUnit XML reports contain 62 suites and 432 executions with 0 failures, 0 errors, and 0
+skipped. Phone, Wear, and watch-face lint passed. Android migration-test sources compiled, but no
+Android runtime was available, so instrumentation remains `NOT RUN`. WFF v4 source and APK memory
+validation, all APK signatures, accepted certificate continuity, the five-file ZIP contract, and
+the standalone metadata/signature/ZIP/privacy verifier passed. Independent final review returned
+`SHIP` with no blockers.
+
+The pinned APK identities are:
+
+```text
+d067383f4e91824911593540acfe0edc6e700682bdacb8dd17cc2d6acded9bbe  metabolic-coach-phone-debug.apk
+0a2cf5f77bf85919a1d74a46b5ac2f0f82140e1c92218ea6c300c3ea3358f32e  metabolic-coach-wear-debug.apk
+afb5b0f45123a6ee84f87e4e937a99e4eea93b4c187115eae22bef1a41ca2573  metabolic-coach-watchface-debug.apk
+```
+
+The final ZIP identity is recorded after the approved documentation-only deterministic repack.
+Status is `Engineering: PASS / Physical: DEFERRED`; every consolidated device row remains
+`NOT RUN`.
+
 Historical v0.2 debug artifact SHA-256 values:
 
 ```text

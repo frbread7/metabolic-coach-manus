@@ -21,8 +21,13 @@ All notable Metabolic Coach package changes are recorded here.
   export/reset, or watch-face behavior. Automated stairs remain production-disabled.
 - Android instrumentation and every phone/Galaxy Watch8 row remain `NOT RUN`. The artifact must be
   described as `Physical: DEFERRED`, never physically accepted, until the user tests the pinned RC.
-- Engineering verification is in progress. Exact automated results, review verdict, hashes, and
-  certificate identity will be recorded only after the fresh full gate completes.
+- The forced local pipeline passed all 333 tasks, with 62 JUnit suites/432 executions and zero
+  failures, errors, or skips. Phone, Wear, and watch-face lint, WFF v4 source/APK memory checks,
+  APK signature/certificate continuity, and the standalone metadata/ZIP/privacy verifier passed.
+- Independent preflight review returned `GO WITH CONDITIONS`; the checklist conditions were
+  resolved before the pinned commit. Fresh final review returned `SHIP` with no blockers.
+- Current status is `Engineering: PASS / Physical: DEFERRED`. Android instrumentation and every
+  phone/Galaxy Watch8 row remain `NOT RUN`.
 
 ## v0.6.2 — 2026-08-13 — Prolonged-inactivity WALK coaching
 

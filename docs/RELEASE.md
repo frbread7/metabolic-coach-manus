@@ -68,11 +68,34 @@ metabolic-coach-watchface-debug.apk
 MetabolicCoach-v0.7.0.zip
 ```
 
-Engineering verification is in progress. Do not record hashes, suite counts, certificate identity,
-or a passing verdict until the fresh forced local pipeline, standalone verifier, and independent
-review complete. Android instrumentation and every row in the
-[consolidated RC checklist](V0_7_0_INTEGRATED_WALK_RC.md) remain `NOT RUN`; the release status is
-`Physical: DEFERRED`, not accepted.
+Transition commit `9f891832f5435ecc1ecee81e8b444ab5483e9466` passed the forced local pipeline:
+
+```text
+./scripts/build-apks.sh
+BUILD SUCCESSFUL in 8m 25s
+333 actionable tasks: 333 executed
+62 JUnit suites / 432 executions / 0 failures / 0 errors / 0 skipped
+```
+
+Phone, Wear, and watch-face lint passed. Android migration-test sources compiled, but Android
+instrumentation was not run. WFF v4 source and APK memory validation, all APK signature checks,
+accepted engineering-certificate continuity, the exact five-file package contract, and the
+standalone metadata/signature/ZIP/privacy verifier passed. Independent final review returned
+`SHIP` with no blockers.
+
+Pinned APK and certificate identities are:
+
+```text
+d067383f4e91824911593540acfe0edc6e700682bdacb8dd17cc2d6acded9bbe  metabolic-coach-phone-debug.apk
+0a2cf5f77bf85919a1d74a46b5ac2f0f82140e1c92218ea6c300c3ea3358f32e  metabolic-coach-wear-debug.apk
+afb5b0f45123a6ee84f87e4e937a99e4eea93b4c187115eae22bef1a41ca2573  metabolic-coach-watchface-debug.apk
+Signing certificate SHA-256: 7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6667da26c5fad4
+```
+
+The final ZIP hash is recorded after the approved documentation-only deterministic repack. Android
+instrumentation and every row in the
+[consolidated RC checklist](V0_7_0_INTEGRATED_WALK_RC.md) remain `NOT RUN`. Status is
+`Engineering: PASS / Physical: DEFERRED`, not accepted.
 
 ## v0.6.2 local engineering artifact (historical)
 

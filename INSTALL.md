@@ -109,9 +109,10 @@ SHA-256, pinned commit, versionName `0.7.0`, versionCode `12`, and signing certi
 installation. Keep the phone, Wear, and watch-face APKs from the same ZIP together and install only
 as an in-place update when their certificate matches the accepted installation.
 
-This artifact is `Physical: DEFERRED`. Android instrumentation and all consolidated device rows
-remain `NOT RUN`; skipping them does not make them pass. Automated stairs remain disabled. If the
-user later tests this RC, use
+The automated engineering, lint, WFF, signature, package/privacy, and independent-review gates
+passed. This artifact is `Engineering: PASS / Physical: DEFERRED`. Android instrumentation and all
+consolidated device rows remain `NOT RUN`; skipping them does not make them pass. Automated stairs
+remain disabled. If the user later tests this RC, use
 [the consolidated v0.7.0 checklist](docs/V0_7_0_INTEGRATED_WALK_RC.md), record categorical results
 only, and do not include health values, endpoints, credentials, or private screenshots.
 

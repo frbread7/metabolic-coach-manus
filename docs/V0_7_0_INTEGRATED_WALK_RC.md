@@ -1,6 +1,6 @@
 # v0.7.0 Integrated WALK coaching release candidate
 
-Status: `Engineering: IN PROGRESS / Physical: DEFERRED`.
+Status: `Engineering: PASS / Physical: DEFERRED`.
 
 `v0.7.0` is the behavior-neutral integration release candidate for the three independently
 engineered WALK paths:
@@ -63,6 +63,29 @@ pinned commit:
 8. independent code/boundary review finds no new production behavior and no severity-high defect.
 
 Android instrumentation remains `NOT RUN` unless a compatible Android runtime is actually attached.
+
+### Recorded engineering evidence
+
+- Transition commit: `9f891832f5435ecc1ecee81e8b444ab5483e9466`.
+- Forced pipeline: `BUILD SUCCESSFUL in 8m 25s`; 333/333 actionable tasks executed.
+- JUnit: 62 suites/432 executions; zero failures, errors, or skips.
+- Phone, Wear, and watch-face lint: passed.
+- Android migration-test source: compiled; instrumentation execution: `NOT RUN`.
+- WFF v4 source and APK memory-footprint validation: passed.
+- APK signatures and accepted engineering certificate continuity: passed.
+- Standalone version/signature/five-file-ZIP/privacy verifier: passed.
+- Independent preflight: `GO WITH CONDITIONS`; every checklist condition resolved before commit.
+- Independent final review: `SHIP`; no blockers.
+
+```text
+d067383f4e91824911593540acfe0edc6e700682bdacb8dd17cc2d6acded9bbe  metabolic-coach-phone-debug.apk
+0a2cf5f77bf85919a1d74a46b5ac2f0f82140e1c92218ea6c300c3ea3358f32e  metabolic-coach-wear-debug.apk
+afb5b0f45123a6ee84f87e4e937a99e4eea93b4c187115eae22bef1a41ca2573  metabolic-coach-watchface-debug.apk
+7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6667da26c5fad4  signing certificate
+```
+
+The final archive hash is pinned after the approved documentation-only deterministic repack. This
+engineering evidence does not change any physical row below.
 
 ## Consolidated physical acceptance checklist
 

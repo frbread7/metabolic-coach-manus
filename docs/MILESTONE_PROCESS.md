@@ -160,5 +160,8 @@ non-conflicting earlier constraints, and avoid inferring acceptance that the use
   preserves every `NOT RUN` row. It does not authorize automated stairs or any production behavior
   change. The repository-scoped ChatGPT Pro continuation review was requested twice before work;
   both calls failed closed with `response.possibly_stale` and captured no assistant verdict.
+  The behavior-neutral RC subsequently passed the full forced automated pipeline, artifact checks,
+  and independent final review. Status is `Engineering: PASS / Physical: DEFERRED`; every device
+  row remains `NOT RUN` and automated stairs remain production-disabled.
 
 The completed physical test was defined in [V0.3_WEAR_ACCEPTANCE.md](V0.3_WEAR_ACCEPTANCE.md).
