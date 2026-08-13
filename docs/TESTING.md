@@ -465,9 +465,16 @@ f1eb8539cd0fbe3316ca3b088155fe8a4f8cd9b77936ab711213e7ad3b91fbf9  metabolic-coac
 e61511087c304f844fbfaf8af74d84cbe374b8ed5db01cb0f59f052ef488087b  metabolic-coach-watchface-debug.apk
 ```
 
-The final ZIP hash is recorded after the evidence-only deterministic repack. Status is
-`Engineering: PASS / Physical: DEFERRED`; every new phone row and every previously deferred device
-row remains `NOT RUN`.
+Independent final review returned `SHIP`. The approved evidence-only deterministic repack
+preserved all three APK hashes, passed the standalone verifier again, and produced:
+
+```text
+482914936d44f7d4cb11544d2d5159aa1bee03e61e6d6c1fa3bb6d792ae893a1  MetabolicCoach-v0.7.1.zip
+```
+
+Status is `Engineering: PASS / Physical: DEFERRED`; every new phone row and every previously
+deferred device row remains `NOT RUN`. The v0.7.0 archive remains preserved at SHA-256
+`e8165936f92bfe1b7c0d710d11dbc6c73cd366d8a375b962a5cf1729c8fd0af4`.
 
 Historical v0.2 debug artifact SHA-256 values:
 
