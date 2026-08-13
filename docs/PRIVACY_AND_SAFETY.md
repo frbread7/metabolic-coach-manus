@@ -171,10 +171,17 @@ health-related breadcrumbs or user identifiers.
 
 ## Retention and deletion
 
-Most current retention is local and indefinite until Android clears application data or the app is
-uninstalled. Expired recommendation snapshots are opportunistically pruned when a later
-recommendation is authored once their validity ended more than seven days earlier. There is no
-configurable retention period for glucose, activity, meal, or intervention history.
+Glucose readings are stored locally under an explicit phone-side retention choice: 90 days (the
+default), 1 year, or Keep all downloaded. Changing the choice stages it without deleting data; no
+retention pruning occurs until the user confirms the selected policy. A confirmed bounded policy
+prunes by measurement time and source while preserving each source's newest reading. Keep all
+downloaded disables retention pruning, but it neither downloads older data automatically nor
+guarantees that the upstream Nightscout server retains unlimited history.
+
+Activity snapshots, meal markers, and intervention sessions do not currently have separate
+configurable retention periods. They remain local until confirmed in-app erase, Android clears app
+data, or the app is uninstalled. Expired recommendation snapshots are opportunistically pruned when
+a later recommendation is authored once their validity ended more than seven days earlier.
 
 The phone Settings screen can export coaching settings and every application Room row through the
 Android document picker. Nightscout server configuration and future credentials are excluded. The
@@ -209,8 +216,8 @@ Uninstalling:
 - the watch-face package removes face resources;
 - source data in Nightscout, Health Connect, Samsung Health, CareSens, or xDrip is not deleted.
 
-A production release still needs configurable retention policy, target-device lifecycle testing of
-export/erase, and legal review of the export/deletion disclosures.
+A production release still needs target-device lifecycle testing of retention/backfill,
+export/erase, and legal review of the retention/export/deletion disclosures.
 
 ## Minimum public privacy policy content
 
