@@ -1,6 +1,6 @@
 # v0.6.2 Prolonged-inactivity walk coaching
 
-Status during implementation: `Engineering: IN PROGRESS / Physical: DEFERRED`.
+Status: `Engineering: PASS / Physical: DEFERRED`.
 
 ## APOS architecture decision
 
@@ -66,22 +66,37 @@ idempotent session creation. All frozen regression suites, lint, APK/WFF/signatu
 and independent code/architecture review must pass.
 
 The targeted domain/data/phone/Wear gate reported `BUILD SUCCESSFUL` with 154 actionable tasks on
-2026-08-12. It covers the new policy, arbitration, immutable snapshot, display-context, and Start
-revalidation paths. This is intermediate evidence, not the full milestone gate. Full regression,
-lint, APK/WFF/signature/package validation and independent final review remain pending.
+2026-08-12. The forced authoritative pipeline then reported `BUILD SUCCESSFUL in 8m 11s` with all
+333 tasks executed on 2026-08-13. Fresh reports contain 61 JUnit suites/420 executions with zero
+failures, errors, or skips. Lint, APK assembly/signatures, certificate continuity, WFF source/APK
+validation, five-file packaging, and the standalone metadata/privacy verifier passed.
+
+Independent review found and resolved replay-idempotency, episode-consumption/resurrection,
+immutable-snapshot supersession, display-deadline, publication-parity, and phone-card publication
+defects before the feature commit. Final APOS review returned `FINAL GO` with no blockers. It
+records one non-blocking reliability characteristic: Watch publication precedes phone publication
+bookkeeping, so process failure in that narrow interval fails closed toward a missed prompt rather
+than a duplicate or resurrected prompt. Reconnect/replay for that interval remains in the physical
+backlog.
 
 All modules use versionName `0.6.2` and versionCode `11` for the engineering artifact. Device checks
 remain in the cumulative physical-test backlog for the later `v0.7.0` integrated walk-coaching RC.
 This milestone must never be described as physically accepted without a pinned real-device result.
 
-Pending completion evidence (fill only from the authoritative successful run):
+Completion evidence:
 
 ```text
-Feature commit: PENDING
-Full pipeline result/task count: PENDING
-Independent final review: PENDING
-Final APOS decision: PENDING
-Phone/Wear/watch-face/ZIP SHA-256: PENDING
+Architecture gate commit: 9659927694532c3d4960bebc970337017174ddce
+Feature commit: 09c977a734af51f88709bd3f88b3ccbc2b01fbb1
+Full pipeline: BUILD SUCCESSFUL in 8m 11s; 333/333 tasks executed
+JUnit XML: 61 suites; 420 executions; 0 failures/errors/skips
+Independent review: PASS after all blocker/high findings were resolved
+Final APOS decision: FINAL GO; no blockers
+Phone SHA-256: 67449bb4a7a1b80fba86127a8c768167afc28714102eab0e08f09f1391be53b8
+Wear SHA-256: f8f75c528dcceec34aef0b0dc86b5e6716ba30a3c92c802696dbe876d89db364
+Watch-face SHA-256: 4d84ff84dc0fa6128a761e4687ad6b8ba9360328984273acbbd7b0bc25e9b753
+ZIP SHA-256: aad8dbafbf0a66ddcd8202a51be0b6b4c18fde8ea030b9adc1bb7097ef755e01
+Signing certificate SHA-256: 7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6667da26c5fad4
 ```
 
 ## Stop conditions

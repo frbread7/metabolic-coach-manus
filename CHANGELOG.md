@@ -2,7 +2,7 @@
 
 All notable Metabolic Coach package changes are recorded here.
 
-## v0.6.2 — 2026-08-12 — Prolonged-inactivity WALK coaching
+## v0.6.2 — 2026-08-13 — Prolonged-inactivity WALK coaching
 
 ### Added
 
@@ -33,11 +33,15 @@ All notable Metabolic Coach package changes are recorded here.
   recommendation; manual stair actions remain unchanged.
 - The increment adds no provider request, polling or WorkManager change, Room migration, Wear Data
   Layer field/schema change, notification-action contract, or session/replay semantic change.
-- The targeted v0.6.2 test gate passed with exit code 0 across 154 actionable tasks. The full
-  milestone pipeline, independent final review, APK/WFF/signature/package evidence, hashes, commit
-  identity, and final APOS decision remain pending.
-- Current status is `Engineering: IN PROGRESS / Physical: DEFERRED`. All device-only checks are
-  backlogged for the `v0.7.0` integrated walk-coaching release candidate.
+- The targeted v0.6.2 test gate passed with exit code 0 across 154 actionable tasks. The forced
+  authoritative pipeline then passed all 333 tasks, 61 JUnit suites/420 executions with zero
+  failures, errors, or skips, lint, WFF validation, APK signature/certificate continuity, and the
+  five-file package/privacy verifier.
+- Independent review found and resolved the recommendation replay, episode-resurrection,
+  publication, and display-deadline defects before the feature commit. The final APOS review
+  returned `FINAL GO` with no blockers.
+- Current status is `Engineering: PASS / Physical: DEFERRED`. All device-only checks remain
+  `NOT RUN` and are backlogged for the `v0.7.0` integrated walk-coaching release candidate.
 
 ## v0.6.1 — 2026-08-12 — Confirmed rapid-rise walk coaching
 

@@ -89,7 +89,8 @@ physically accepted without a user-reported real-device pass.
 ## v0.6.2 local engineering artifact preflight
 
 The v0.6.2 package is a debug-signed engineering checkpoint for fail-closed prolonged-inactivity
-WALK coaching. Verify the ZIP SHA-256, commit SHA, versionName `0.6.2`, versionCode `11`, and
+WALK coaching with status `Engineering: PASS / Physical: DEFERRED`. Verify the ZIP SHA-256,
+feature commit SHA, versionName `0.6.2`, versionCode `11`, and
 signing certificate before any intentional installation. Keep the matched phone, Wear, and
 watch-face APKs together and install them as an in-place update only when the signing certificate
 matches the accepted installation.

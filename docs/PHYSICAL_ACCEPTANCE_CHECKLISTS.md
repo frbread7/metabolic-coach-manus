@@ -45,7 +45,7 @@ new pinned run.
 | `v0.5.1` | Phone trend chart and selected-period GMI | Accepted by user report 2026-08-04 | [v0.5.1 phone checklist](V0_5_1_HISTORY_EXPLORER.md) |
 | `v0.6.0` | Post-meal walk coaching | Engineering PASS / Physical DEFERRED | [v0.6.0 checklist](V0_6_0_POST_MEAL_COACHING.md); cumulative backlog |
 | `v0.6.1` | Confirmed rapid-rise walk coaching | Engineering PASS / Physical DEFERRED | [v0.6.1 contract](V0_6_1_RAPID_RISE_COACHING.md); cumulative backlog |
-| `v0.6.2` | Fail-closed prolonged-inactivity WALK coaching only | Engineering IN PROGRESS / Physical DEFERRED | [v0.6.2 contract](V0_6_2_INACTIVITY_WALK_COACHING.md); cumulative backlog |
+| `v0.6.2` | Fail-closed prolonged-inactivity WALK coaching only | Engineering PASS / Physical DEFERRED | [v0.6.2 contract](V0_6_2_INACTIVITY_WALK_COACHING.md); cumulative backlog |
 | `v0.7.0` | Integrated walk-coaching RC | Planned batched physical gate | Consolidated checklist pending |
 | `v0.5` beta | One-week daily-use reliability and safety observation | Planned after feature gates | This document, §one-week beta |
 | `v1.0` | Production daily-use release | Planned | This document, §v1.0 |

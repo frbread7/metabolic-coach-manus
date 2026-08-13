@@ -21,9 +21,9 @@ Samsung Galaxy Watch8.
 > The bounded `v0.6.0` post-meal walk increment is `Engineering: PASS / Physical: DEFERRED`.
 > The APOS-approved `v0.6.1` confirmed rapid-rise walk increment is
 > `Engineering: PASS / Physical: DEFERRED`. The APOS-approved `v0.6.2` prolonged-inactivity WALK
-> increment is `Engineering: IN PROGRESS / Physical: DEFERRED`; its targeted test gate is green,
-> while the full milestone pipeline, final review, and artifact evidence remain pending. Deferred
-> work is never described as physically accepted.
+> increment is `Engineering: PASS / Physical: DEFERRED`; its full local pipeline, independent
+> review, final APOS gate, and artifact checks passed. Its real-device rows remain `NOT RUN`.
+> Deferred work is never described as physically accepted.
 > It is a wellness tool, not a medical device, and must not replace the CGM vendor app, glucose
 > alarms, professional advice, or a personal care plan.
 
@@ -43,7 +43,7 @@ synchronization and coaching foundations remain frozen while the current milesto
 | `v0.5.1` | Phone-only local trend chart and selected-period GMI after history acceptance | Accepted by user report 2026-08-04 |
 | `v0.6.0` | One post-meal delayed walk prompt with exact-source safety, Start/Snooze, completion, and descriptive follow-up | Engineering PASS / Physical DEFERRED |
 | `v0.6.1` | Confirmed two-reading rapid-rise walk coaching through the existing canonical pipeline | Engineering PASS / Physical DEFERRED |
-| `v0.6.2` | Fail-closed prolonged-inactivity WALK coaching only | Engineering IN PROGRESS / Physical DEFERRED; targeted tests passed |
+| `v0.6.2` | Fail-closed prolonged-inactivity WALK coaching only | Engineering PASS / Physical DEFERRED |
 | `v0.7.0` | Integrated walk-coaching release candidate | Planned batched phone/Galaxy Watch8 physical gate |
 | `v0.5` | One-week personal beta with documented reliability, battery, and safety observations | Planned after feature gates |
 | `v1.0` | Stable daily-use release with production signing and all release gates complete | Planned |

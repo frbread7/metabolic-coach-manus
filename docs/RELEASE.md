@@ -50,7 +50,7 @@ handed off.
 These are debug-signed engineering artifacts, not production releases. Regenerate and rehash them
 after every source/build change.
 
-## v0.6.2 engineering artifact (pending full gate)
+## v0.6.2 local engineering artifact
 
 The active engineering milestone is `v0.6.2` (versionCode `11`) across phone, Wear, and watch face.
 It adds fail-closed prolonged-inactivity WALK coaching through the existing canonical pipeline.
@@ -58,11 +58,12 @@ Automated stairs remain disabled. The change adds no provider request, polling/W
 Room migration, notification-action contract, Wear Data Layer field/schema, or session/replay
 semantic change.
 
-The targeted test gate reported `BUILD SUCCESSFUL` with 154 actionable tasks. Engineering remains
-`IN PROGRESS` and physical testing remains `DEFERRED`: the authoritative full local pipeline,
-independent final review, final APOS decision, feature commit, artifact metadata, certificate
-verification, and SHA-256 values are still pending. Do not install or describe an unpinned package
-as the promoted `v0.7.0` integrated coaching release candidate.
+The targeted gate passed 154 actionable tasks. The forced authoritative pipeline then passed all
+333 tasks, 61 JUnit suites/420 executions with zero failures/errors/skips, lint, WFF validation,
+APK signature/certificate continuity, packaging, and the standalone metadata/privacy verifier.
+Independent review completed without a remaining blocker, and final APOS review returned
+`FINAL GO`. Status is `Engineering: PASS / Physical: DEFERRED`; this is not the promoted `v0.7.0`
+integrated coaching release candidate.
 
 After the full gate passes, the expected package names are:
 
@@ -73,16 +74,17 @@ metabolic-coach-watchface-debug.apk
 MetabolicCoach-v0.6.2.zip
 ```
 
-Pending identities to be filled only from the successful authoritative run:
+Pinned identities from the successful authoritative run:
 
 ```text
-Feature commit: PENDING
-Phone APK SHA-256: PENDING
-Wear APK SHA-256: PENDING
-Watch-face APK SHA-256: PENDING
-ZIP SHA-256: PENDING
-Signing certificate SHA-256: PENDING VERIFICATION
-Final APOS decision: PENDING
+Architecture gate commit: 9659927694532c3d4960bebc970337017174ddce
+Feature commit: 09c977a734af51f88709bd3f88b3ccbc2b01fbb1
+Phone APK SHA-256: 67449bb4a7a1b80fba86127a8c768167afc28714102eab0e08f09f1391be53b8
+Wear APK SHA-256: f8f75c528dcceec34aef0b0dc86b5e6716ba30a3c92c802696dbe876d89db364
+Watch-face APK SHA-256: 4d84ff84dc0fa6128a761e4687ad6b8ba9360328984273acbbd7b0bc25e9b753
+ZIP SHA-256: aad8dbafbf0a66ddcd8202a51be0b6b4c18fde8ea030b9adc1bb7097ef755e01
+Signing certificate SHA-256: 7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6667da26c5fad4
+Final APOS decision: FINAL GO; no blockers
 ```
 
 Device-only inactivity, reconnect/replay, AOD, notification, and battery checks remain in

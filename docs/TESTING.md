@@ -341,7 +341,7 @@ Status is `Engineering: PASS / Physical: DEFERRED`. The ZIP is a local engineeri
 the promoted integrated coaching release candidate; all device-only rows remain in the cumulative
 physical-test backlog.
 
-### v0.6.2 targeted engineering gate
+### v0.6.2 local engineering artifact gate
 
 On 2026-08-12, the targeted domain/data/phone/Wear verification for prolonged-inactivity WALK
 coaching reported:
@@ -352,10 +352,40 @@ BUILD SUCCESSFUL
 ```
 
 The targeted gate covers policy boundaries, WALK-only arbitration, immutable recommendation
-snapshot behavior, phone Start revalidation, and phone/Wear action-context regressions. This is
-intermediate evidence only. Engineering remains `IN PROGRESS`, physical testing remains
-`DEFERRED`, and the full regression/lint/APK/WFF/signature/package pipeline, independent final
-review, final APOS decision, artifact metadata, hashes, and commit identity are pending.
+snapshot behavior, phone Start revalidation, and phone/Wear action-context regressions.
+
+Feature revision `09c977a734af51f88709bd3f88b3ccbc2b01fbb1` then passed the forced authoritative
+local pipeline:
+
+```text
+./scripts/build-apks.sh
+BUILD SUCCESSFUL in 8m 11s
+333 actionable tasks: 333 executed
+```
+
+Fresh JUnit XML reports contain 61 suites and 420 executions with 0 failures, 0 errors, and 0
+skipped. Phone, Wear, and watch-face lint passed; Android migration-test sources compiled; WFF v4
+source and APK memory checks passed; all APK signatures and the accepted engineering certificate
+matched; and the five-file ZIP/credential verifier passed. Android instrumentation and physical
+device testing were not run.
+
+Independent review found and resolved four high-severity lifecycle defects plus two publication
+parity defects before the feature commit. Final APOS review returned `FINAL GO` with no blockers.
+The narrow Watch-publication-before-phone-record interval intentionally fails closed toward a
+missed prompt after process failure; reconnect/replay behavior for that interval remains a
+device-only backlog item.
+
+The final artifact identities are:
+
+```text
+67449bb4a7a1b80fba86127a8c768167afc28714102eab0e08f09f1391be53b8  metabolic-coach-phone-debug.apk
+f8f75c528dcceec34aef0b0dc86b5e6716ba30a3c92c802696dbe876d89db364  metabolic-coach-wear-debug.apk
+4d84ff84dc0fa6128a761e4687ad6b8ba9360328984273acbbd7b0bc25e9b753  metabolic-coach-watchface-debug.apk
+aad8dbafbf0a66ddcd8202a51be0b6b4c18fde8ea030b9adc1bb7097ef755e01  MetabolicCoach-v0.6.2.zip
+```
+
+Status is `Engineering: PASS / Physical: DEFERRED`. Every real-device row remains `NOT RUN` in the
+cumulative backlog.
 
 Historical v0.2 debug artifact SHA-256 values:
 
