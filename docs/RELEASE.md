@@ -68,10 +68,36 @@ MetabolicCoach-v0.7.1.zip
 ```
 
 Wear and watch-face metadata is aligned only to preserve the deterministic matched-package
-contract. Their production behavior is unchanged and is not newly physically validated. Record
-the pinned commit, full forced-pipeline evidence, APK/certificate/ZIP hashes, and independent
-review only after those checks actually pass. Until then, and after engineering completion unless
-the user runs the device checklist, status remains `Physical: DEFERRED` and every physical row is
+contract. Their production behavior is unchanged and is not newly physically validated.
+
+Pinned feature/build commit `bfe1f3c4d002edd641ff895933b43d8032080b3d` passed the forced local
+pipeline:
+
+```text
+./scripts/build-apks.sh
+BUILD SUCCESSFUL in 9m 3s
+333 actionable tasks: 333 executed
+64 JUnit suites / 442 executions / 0 failures / 0 errors / 0 skipped
+```
+
+Phone, Wear, and watch-face lint passed. Android migration-test sources compiled, but Android
+instrumentation was not run. WFF v4 source and APK memory validation, all APK signature checks,
+accepted engineering-certificate continuity, the exact five-file package contract, and the
+standalone metadata/signature/ZIP/privacy verifier passed. Independent preflight found no
+blocker/high issue and returned `GO WITH CONDITIONS`; the forced pipeline satisfied its remaining
+engineering condition.
+
+Pinned APK and certificate identities are:
+
+```text
+f1eb8539cd0fbe3316ca3b088155fe8a4f8cd9b77936ab711213e7ad3b91fbf9  metabolic-coach-phone-debug.apk
+351d1f956a0466d3937b83ee80a5d1ba69b1fbec9d3e602a40929300ceffad7f  metabolic-coach-wear-debug.apk
+e61511087c304f844fbfaf8af74d84cbe374b8ed5db01cb0f59f052ef488087b  metabolic-coach-watchface-debug.apk
+Signing certificate SHA-256: 7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6667da26c5fad4
+```
+
+The final ZIP hash is recorded after the documentation-only deterministic repack. Status is
+`Engineering: PASS / Physical: DEFERRED`; every physical and instrumentation row remains
 `NOT RUN`.
 
 ## v0.7.0 integrated WALK engineering candidate (historical)

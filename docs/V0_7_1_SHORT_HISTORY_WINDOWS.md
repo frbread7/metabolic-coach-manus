@@ -1,6 +1,6 @@
 # v0.7.1 Six- and twelve-hour local History windows
 
-Status: `Engineering: IN PROGRESS / Physical: DEFERRED`.
+Status: `Engineering: PASS / Physical: DEFERRED`.
 
 `v0.7.1` is a phone-only History usability increment. It adds fixed **6h** and **12h**
 selections to the accepted local History Explorer and routes them through the same exact-source,
@@ -53,7 +53,28 @@ runtime. Automated evidence cannot promote physical status.
 
 ### Recorded engineering evidence
 
-Pending the authoritative milestone run.
+- Pinned feature/build commit: `bfe1f3c4d002edd641ff895933b43d8032080b3d`.
+- Focused gate: 148 tasks; affected domain/data/phone tests and data/phone lint passed.
+- Independent preflight: no blocker/high issue; `GO WITH CONDITIONS` limited the remaining work to
+  the forced milestone pipeline and evidence completion.
+- Forced pipeline: `BUILD SUCCESSFUL in 9m 3s`; all 333 actionable tasks executed.
+- JUnit: 64 suites/442 executions; zero failures, errors, or skips.
+- Phone, Wear, and watch-face lint: passed.
+- Android migration-test source: compiled; instrumentation execution: `NOT RUN`.
+- WFF v4 source and watch-face APK memory-footprint validation: passed.
+- All three APK signatures: v2 verified, one signer; accepted engineering-certificate continuity
+  and phone/Wear identity equality passed.
+- Standalone version/signature/five-file-ZIP/privacy/credential verifier: passed for `0.7.1`/`13`.
+
+```text
+f1eb8539cd0fbe3316ca3b088155fe8a4f8cd9b77936ab711213e7ad3b91fbf9  metabolic-coach-phone-debug.apk
+351d1f956a0466d3937b83ee80a5d1ba69b1fbec9d3e602a40929300ceffad7f  metabolic-coach-wear-debug.apk
+e61511087c304f844fbfaf8af74d84cbe374b8ed5db01cb0f59f052ef488087b  metabolic-coach-watchface-debug.apk
+7978094b10c81a65669d7cc077d15f350b37312d2c04abd73c6667da26c5fad4  signing certificate
+```
+
+The deterministic final ZIP hash is recorded after the evidence-only changelog repack. This does
+not alter any APK byte or physical-test status.
 
 ## Deferred phone acceptance checklist
 

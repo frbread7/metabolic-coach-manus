@@ -25,8 +25,8 @@ Samsung Galaxy Watch8.
 > review, final APOS gate, and artifact checks passed. Its real-device rows remain `NOT RUN`.
 > The behavior-neutral `v0.7.0` integrated WALK coaching RC is `Engineering: PASS / Physical:
 > DEFERRED`; its consolidated phone/Galaxy Watch8 gate remains explicitly `NOT RUN`.
-> The APOS-approved `v0.7.1` phone-only 6h/12h local History increment is under engineering
-> verification; physical testing remains deferred and every device row remains `NOT RUN`.
+> The APOS-approved `v0.7.1` phone-only 6h/12h local History increment is `Engineering: PASS /
+> Physical: DEFERRED`; physical testing remains deferred and every device row remains `NOT RUN`.
 > Deferred work is never described as physically accepted.
 > It is a wellness tool, not a medical device, and must not replace the CGM vendor app, glucose
 > alarms, professional advice, or a personal care plan.
@@ -49,7 +49,7 @@ synchronization and coaching foundations remain frozen while the current milesto
 | `v0.6.1` | Confirmed two-reading rapid-rise walk coaching through the existing canonical pipeline | Engineering PASS / Physical DEFERRED |
 | `v0.6.2` | Fail-closed prolonged-inactivity WALK coaching only | Engineering PASS / Physical DEFERRED |
 | `v0.7.0` | Behavior-neutral integrated walk-coaching release candidate | Engineering PASS / Physical DEFERRED |
-| `v0.7.1` | Phone-only 6h/12h exact-source local History windows | Engineering in progress / Physical DEFERRED |
+| `v0.7.1` | Phone-only 6h/12h exact-source local History windows | Engineering PASS / Physical DEFERRED |
 | `v0.9.0` | One-week personal beta with documented reliability, battery, and safety observations | Planned after feature gates |
 | `v1.0` | Stable daily-use release with production signing and all release gates complete | Planned |
 

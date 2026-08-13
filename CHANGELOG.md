@@ -22,8 +22,13 @@ All notable Metabolic Coach package changes are recorded here.
   Wear, or watch-face behavior changed.
 - Phone, Wear, and watch-face metadata is aligned at versionName `0.7.1`, versionCode `13` for the
   deterministic package contract; the feature itself is phone-only.
-- Engineering verification is in progress. Physical phone/Watch checks remain `NOT RUN` and are
-  recorded as `Physical: DEFERRED`, never accepted.
+- The forced local pipeline passed all 333 tasks with 64 JUnit suites/442 executions and zero
+  failures, errors, or skips. Lint, WFF v4 source/APK memory validation, signatures/certificate
+  continuity, deterministic packaging, and the standalone metadata/ZIP/privacy verifier passed.
+- Independent preflight found no blocker/high defect and returned `GO WITH CONDITIONS`; the full
+  forced pipeline satisfied its remaining engineering condition.
+- Status is `Engineering: PASS / Physical: DEFERRED`. Android instrumentation and every phone/
+  Watch row remain `NOT RUN`, never accepted.
 
 ## v0.7.0 — 2026-08-13 — Integrated WALK coaching release candidate
 
