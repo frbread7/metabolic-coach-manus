@@ -3,7 +3,9 @@ package com.young.metaboliccoach.background
 import android.content.Context
 import android.os.BatteryManager
 import com.young.metaboliccoach.core.domain.ActivityRepository
+import com.young.metaboliccoach.core.domain.ActionDisplayDeadlinePolicy
 import com.young.metaboliccoach.core.domain.CoachingRepository
+import com.young.metaboliccoach.core.domain.effectiveRecommendation
 import com.young.metaboliccoach.core.domain.GlucoseRepository
 import com.young.metaboliccoach.core.domain.PersonalDataRepository
 import com.young.metaboliccoach.core.domain.SettingsRepository
@@ -68,32 +70,47 @@ class PhoneRefreshCoordinator @Inject constructor(
             } else {
                 generatedRecommendation
             }
+            val publicationNow = System.currentTimeMillis()
+            val glucose = glucoseRepository.observeLatest().first()
+            val activity = activityRepository.observeToday().first()
+            val settings = settingsRepository.observe().first()
             val syncMetadata = syncMetadataStore.nextPublication()
+            val capturedState = WatchState(
+                glucose = glucose,
+                activity = activity,
+                recommendation = recommendation,
+                settings = settings,
+                phoneBatteryPercent = phoneBatteryPercent(),
+                generatedAtEpochMillis = publicationNow,
+                activeSession = activeSession,
+                phoneInstanceId = syncMetadata.phoneInstanceId,
+                stateRevision = syncMetadata.stateRevision,
+                lastSessionCommandAck = syncMetadata.lastSessionCommandAck,
+                dataResetId = syncMetadata.dataResetId,
+            )
+            val effectiveRecommendation = capturedState.effectiveRecommendation(publicationNow)
             watchSyncRepository.publish(
-                WatchState(
-                    glucose = glucoseRepository.observeLatest().first(),
-                    activity = activityRepository.observeToday().first(),
-                    recommendation = recommendation,
-                    settings = settingsRepository.observe().first(),
-                    phoneBatteryPercent = phoneBatteryPercent(),
-                    generatedAtEpochMillis = System.currentTimeMillis(),
-                    activeSession = activeSession,
-                    phoneInstanceId = syncMetadata.phoneInstanceId,
-                    stateRevision = syncMetadata.stateRevision,
-                    lastSessionCommandAck = syncMetadata.lastSessionCommandAck,
-                    dataResetId = syncMetadata.dataResetId,
-                ),
+                capturedState.copy(recommendation = effectiveRecommendation),
             )
 
-            if (recommendation is CoachRecommendation.Action) {
+            if (effectiveRecommendation is CoachRecommendation.Action) {
                 // The successful persistent watch-state publication is the canonical prompt
                 // delivery. The phone notification below is an optional local mirror.
                 val newlyPublished = coachingRepository.recordRecommendationPublished(
-                    recommendationId = recommendation.id,
-                    nowEpochMillis = System.currentTimeMillis(),
+                    recommendationId = effectiveRecommendation.id,
+                    nowEpochMillis = publicationNow,
                 )
                 if (newlyPublished) {
-                    notificationManager.showCoachPrompt(recommendation)
+                    notificationManager.showCoachPrompt(
+                        recommendation = effectiveRecommendation,
+                        nowEpochMillis = publicationNow,
+                        displayUntilEpochMillis =
+                            ActionDisplayDeadlinePolicy.displayUntilEpochMillis(
+                                recommendation = effectiveRecommendation,
+                                settings = settings,
+                                nowEpochMillis = publicationNow,
+                            ),
+                    )
                 }
             } else {
                 notificationManager.clearCoachPrompt()

@@ -23,9 +23,9 @@ the shared limit must not be loosened as a workaround.
 - Automated inactivity coaching always produces `WALK` when walking reminders are enabled.
   `stairRemindersEnabled` has no effect on this branch; manual stair actions remain unchanged.
 - Production priority is post-meal, then confirmed rapid rise, then prolonged inactivity.
-- Algorithm-v4 episode identity is derived from the activity source, last movement, threshold
-  crossing, and algorithm version. Glucose refreshes, activity refresh time, step/floor totals, and
-  notification time must not change the identity.
+- Algorithm-v4 episode identity is derived from the reason, activity source, last movement,
+  threshold crossing, and algorithm version. Glucose refreshes, activity refresh time, step/floor
+  totals, and notification time must not change the identity.
 - Candidate validity is bounded by the earlier of glucose freshness and activity-snapshot
   freshness. A persisted snapshot remains immutable and must not gain a later expiry.
 - New movement, activity-source change, activity invalidation, settings mismatch, working-hours
@@ -35,6 +35,12 @@ the shared limit must not be loosened as a workaround.
   phone Start. Delayed commands may fail closed.
 - Phone remains the only recommendation publisher. Wear verifies current display/action context but
   never generates a replacement recommendation.
+- The phone card, notification, and Wear state must resolve from the same coordinator-published
+  immutable snapshot. Merely synthesizing or storing an inactivity candidate is not sufficient to
+  expose it on the phone card.
+- Notification and complication visibility ends at the earliest immutable validity, quiet-hours
+  start, or inactivity working-hours end. A not-yet-applied delayed Start fails closed after
+  invalidation; an identical replay of an already applied Start remains idempotently applied.
 
 ## Frozen boundaries
 
@@ -42,7 +48,7 @@ This milestone must not change:
 
 - Nightscout or activity provider retrieval behavior;
 - polling cadence, WorkManager jobs, or background wake behavior;
-- `ExerciseSafetyPolicy`, safety thresholds, or freshness-setting bounds;
+- glucose safety classification/outcomes, safety thresholds, or freshness-setting bounds;
 - Room entities, schema, migrations, export, or reset guarantees;
 - Wear Data Layer fields or schema;
 - notification PendingIntent/action contracts;
@@ -59,9 +65,24 @@ immutable snapshot retention, phone Start revalidation, phone/Wear parity, recon
 idempotent session creation. All frozen regression suites, lint, APK/WFF/signature/package checks,
 and independent code/architecture review must pass.
 
+The targeted domain/data/phone/Wear gate reported `BUILD SUCCESSFUL` with 154 actionable tasks on
+2026-08-12. It covers the new policy, arbitration, immutable snapshot, display-context, and Start
+revalidation paths. This is intermediate evidence, not the full milestone gate. Full regression,
+lint, APK/WFF/signature/package validation and independent final review remain pending.
+
 All modules use versionName `0.6.2` and versionCode `11` for the engineering artifact. Device checks
 remain in the cumulative physical-test backlog for the later `v0.7.0` integrated walk-coaching RC.
 This milestone must never be described as physically accepted without a pinned real-device result.
+
+Pending completion evidence (fill only from the authoritative successful run):
+
+```text
+Feature commit: PENDING
+Full pipeline result/task count: PENDING
+Independent final review: PENDING
+Final APOS decision: PENDING
+Phone/Wear/watch-face/ZIP SHA-256: PENDING
+```
 
 ## Stop conditions
 

@@ -234,6 +234,30 @@ class WatchStateCodecTest {
     }
 
     @Test
+    fun `inactivity walk command survives encode and decode with v4 provenance`() {
+        val fingerprint = "b".repeat(64)
+        val command = QuickActionCommand(
+            id = "inactivity-command",
+            type = QuickActionType.START_WALK,
+            createdAtEpochMillis = 1_720_000_000_000,
+            sessionId = "walk-123",
+            recommendationId = "PROLONGED_INACTIVITY:v4:$fingerprint",
+            recommendationValidUntilEpochMillis = 1_720_000_900_000,
+            recommendationReason = CoachReason.PROLONGED_INACTIVITY,
+            recommendationAlgorithmVersion = 4,
+            recommendationCreatedAtEpochMillis = 1_720_000_000_000,
+            triggerContextId = "inactivity:v4:$fingerprint",
+            triggerAtEpochMillis = 1_719_990_000_000,
+            glucoseSourceId = "health-connect",
+            safetyReadingId = "reading-1",
+            safetyReadingAtEpochMillis = 1_720_000_000_000,
+            dataResetId = "data-reset-2",
+        )
+
+        assertEquals(command, codec.decodeCommand(codec.encode(command)))
+    }
+
+    @Test
     fun `rapid rise start command keeps complete pair provenance`() {
         val fingerprint = "a".repeat(64)
         val command = QuickActionCommand(

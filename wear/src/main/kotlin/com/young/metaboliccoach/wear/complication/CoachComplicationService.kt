@@ -7,6 +7,7 @@ import androidx.wear.watchface.complications.data.ComplicationType
 import androidx.wear.watchface.complications.data.NoDataComplicationData
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
+import com.young.metaboliccoach.core.domain.ActionDisplayDeadlinePolicy
 import com.young.metaboliccoach.core.model.CoachRecommendation
 import com.young.metaboliccoach.core.domain.effectiveRecommendation
 import com.young.metaboliccoach.core.model.InterventionType
@@ -53,8 +54,9 @@ class CoachComplicationService : SuspendingComplicationDataSourceService() {
                 ),
             )
         }
+        val now = System.currentTimeMillis()
         val recommendation =
-            state.effectiveRecommendation(System.currentTimeMillis())
+            state.effectiveRecommendation(now)
                 ?: return NoDataComplicationData()
         val action = recommendation as? CoachRecommendation.Action
         val pendingIntent = if (action != null) {
@@ -94,7 +96,13 @@ class CoachComplicationService : SuspendingComplicationDataSourceService() {
                 is CoachRecommendation.Information -> recommendation.title
             },
             tapAction = pendingIntent,
-            validUntilEpochMillis = action?.validUntilEpochMillis,
+            validUntilEpochMillis = action?.let {
+                ActionDisplayDeadlinePolicy.displayUntilEpochMillis(
+                    recommendation = it,
+                    settings = state.settings,
+                    nowEpochMillis = now,
+                )
+            },
         )
     }
 

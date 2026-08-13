@@ -138,6 +138,10 @@ interface CoachingRepository {
     suspend fun recommendationSnapshot(
         recommendationId: String,
     ): CoachRecommendation.Action?
+    suspend fun publishedRecommendationSnapshot(
+        recommendationId: String,
+        nowEpochMillis: Long,
+    ): CoachRecommendation.Action?
     suspend fun recordRecommendationPublished(
         recommendationId: String,
         nowEpochMillis: Long,

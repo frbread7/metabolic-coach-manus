@@ -1,5 +1,6 @@
 package com.young.metaboliccoach.core.domain
 
+import com.young.metaboliccoach.core.model.ActivitySnapshot
 import com.young.metaboliccoach.core.model.CoachRecommendation
 import com.young.metaboliccoach.core.model.CoachReason
 import com.young.metaboliccoach.core.model.CoachSettings
@@ -68,7 +69,13 @@ fun WatchState.effectiveRecommendation(
     if (
         activeSession != null ||
         nowEpochMillis >= candidate.validUntilEpochMillis ||
-        !candidate.hasCurrentActionProvenance(glucose) ||
+        !candidate.hasCurrentActionContext(
+            reading = glucose,
+            activity = activity,
+            settings = settings,
+            nowEpochMillis = nowEpochMillis,
+            minuteOfDay = minuteOfDay,
+        ) ||
         !CoachedExerciseActionPolicy.canStart(
             glucose,
             settings,
@@ -80,6 +87,26 @@ fun WatchState.effectiveRecommendation(
     }
     return candidate
 }
+
+fun CoachRecommendation.Action.hasCurrentActionContext(
+    reading: GlucoseReading?,
+    activity: ActivitySnapshot?,
+    settings: CoachSettings,
+    nowEpochMillis: Long,
+    minuteOfDay: Int,
+    zoneId: ZoneId = ZoneId.systemDefault(),
+): Boolean = hasCurrentActionProvenance(reading) &&
+    (
+        reason != CoachReason.PROLONGED_INACTIVITY ||
+            InactivityConfirmationPolicy.matches(
+                recommendation = this,
+                activity = activity,
+                settings = settings,
+                nowEpochMillis = nowEpochMillis,
+                minuteOfDay = minuteOfDay,
+                zoneId = zoneId,
+            )
+        )
 
 fun CoachRecommendation.Action.hasCurrentActionProvenance(
     reading: GlucoseReading?,

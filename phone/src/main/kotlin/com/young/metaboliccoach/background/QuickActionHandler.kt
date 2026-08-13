@@ -1,9 +1,11 @@
 package com.young.metaboliccoach.background
 
+import com.young.metaboliccoach.core.domain.ActivityRepository
 import com.young.metaboliccoach.core.domain.CoachTimeSource
 import com.young.metaboliccoach.core.domain.CoachedExerciseActionPolicy
 import com.young.metaboliccoach.core.domain.CoachingRepository
 import com.young.metaboliccoach.core.domain.GlucoseRepository
+import com.young.metaboliccoach.core.domain.InactivityConfirmationPolicy
 import com.young.metaboliccoach.core.domain.RapidRiseConfirmationPolicy
 import com.young.metaboliccoach.core.domain.SettingsRepository
 import com.young.metaboliccoach.core.model.CoachRecommendation
@@ -16,6 +18,8 @@ import com.young.metaboliccoach.core.model.InterventionType
 import com.young.metaboliccoach.core.model.QuickActionCommand
 import com.young.metaboliccoach.core.model.QuickActionType
 import com.young.metaboliccoach.core.model.SessionCommandOutcome
+import java.time.Instant
+import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
@@ -24,6 +28,7 @@ import kotlinx.coroutines.flow.first
 class QuickActionHandler @Inject constructor(
     private val coachingRepository: CoachingRepository,
     private val glucoseRepository: GlucoseRepository,
+    private val activityRepository: ActivityRepository,
     private val settingsRepository: SettingsRepository,
     private val followUpScheduler: InterventionFollowUpScheduler,
     private val timeSource: CoachTimeSource,
@@ -82,10 +87,59 @@ class QuickActionHandler @Inject constructor(
             return CommandHandlingResult.Rejected(SessionCommandOutcome.REJECTED_CONFLICT)
         }
         if (
-            recommendation?.glucoseSourceId != null &&
-            glucoseRepository.observeLatest().first()?.sourceId != recommendation.glucoseSourceId
+            recommendation != null &&
+            interventionType != null &&
+            recommendation.reason == CoachReason.PROLONGED_INACTIVITY &&
+            coachingRepository.sessionForRecommendation(recommendation.id) != null
+        ) {
+            return CommandHandlingResult.Applied
+        }
+        val isInactivityStart =
+            recommendation?.reason == CoachReason.PROLONGED_INACTIVITY &&
+                interventionType != null
+        if (isInactivityStart) {
+            if (now >= recommendation.validUntilEpochMillis) {
+                return CommandHandlingResult.Rejected(SessionCommandOutcome.REJECTED_CONFLICT)
+            }
+            val zoneId = ZoneId.systemDefault()
+            val minuteOfDay = Instant.ofEpochMilli(now)
+                .atZone(zoneId)
+                .toLocalTime()
+                .toSecondOfDay() / 60
+            if (
+                !InactivityConfirmationPolicy.matches(
+                    recommendation = recommendation,
+                    activity = activityRepository.observeToday().first(),
+                    settings = settings,
+                    nowEpochMillis = now,
+                    minuteOfDay = minuteOfDay,
+                    zoneId = zoneId,
+                )
+            ) {
+                return CommandHandlingResult.Rejected(SessionCommandOutcome.REJECTED_CONFLICT)
+            }
+        }
+        val recommendationSourceId = recommendation?.glucoseSourceId
+        val currentGlucose = if (recommendationSourceId != null) {
+            glucoseRepository.observeLatest().first()
+        } else {
+            null
+        }
+        if (
+            recommendationSourceId != null &&
+            currentGlucose?.sourceId != recommendationSourceId
         ) {
             return CommandHandlingResult.Rejected(SessionCommandOutcome.REJECTED_CONFLICT)
+        }
+        if (
+            isInactivityStart &&
+            !CoachedExerciseActionPolicy.canStart(
+                reading = currentGlucose,
+                settings = settings,
+                nowEpochMillis = now,
+            )
+        ) {
+            return CommandHandlingResult.Rejected(SessionCommandOutcome.REJECTED_UNSAFE)
         }
         val eventAt = command.createdAtEpochMillis.coerceAtMost(now)
         if (

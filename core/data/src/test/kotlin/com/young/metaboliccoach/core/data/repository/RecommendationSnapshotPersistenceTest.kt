@@ -10,6 +10,7 @@ import com.young.metaboliccoach.core.data.db.MealDao
 import com.young.metaboliccoach.core.data.db.RecommendationSnapshotDao
 import com.young.metaboliccoach.core.data.db.RecommendationSnapshotEntity
 import com.young.metaboliccoach.core.domain.CoachRuleEngine
+import com.young.metaboliccoach.core.data.db.toEntity
 import com.young.metaboliccoach.core.domain.CoachTimeSource
 import com.young.metaboliccoach.core.domain.GlucoseRepository
 import com.young.metaboliccoach.core.domain.ObservationAnalyzer
@@ -23,6 +24,8 @@ import com.young.metaboliccoach.core.model.ProviderAvailability
 import com.young.metaboliccoach.core.model.ProviderStatus
 import com.young.metaboliccoach.core.model.CoachReason
 import com.young.metaboliccoach.core.model.CoachRecommendation
+import com.young.metaboliccoach.core.model.InterventionSession
+import com.young.metaboliccoach.core.model.InterventionStatus
 import com.young.metaboliccoach.core.model.InterventionType
 import java.time.Instant
 import java.time.ZoneId
@@ -255,40 +258,324 @@ class RecommendationSnapshotPersistenceTest {
     }
 
     @Test
-    fun `production repository does not emit inactivity or stair actions`() = runTest {
-        val older = risingReading("older", NOW - 5 * 60_000L).copy(
-            rateMgDlPerMinute = 0.0,
-            trend = GlucoseTrend.STABLE,
-        )
-        val latest = risingReading("latest", NOW).copy(
-            rateMgDlPerMinute = 0.0,
-            trend = GlucoseTrend.STABLE,
-        )
-        val dayStart = Instant.ofEpochMilli(NOW)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDate()
-            .atStartOfDay(ZoneId.systemDefault())
-            .toInstant()
-            .toEpochMilli()
-        val activity = ActivitySnapshotEntity(
-            dayStartEpochMillis = dayStart,
-            stepsToday = 0,
-            floorsToday = 0.0,
-            latestHeartRateBpm = null,
-            activeCaloriesToday = null,
-            lastMovementAtEpochMillis = NOW - 4 * 60 * 60_000L,
-            measuredAtEpochMillis = NOW,
-            sourceId = "health-connect",
-            exerciseSessionCountToday = 0,
-            exerciseDurationMinutesToday = 0,
-        )
+    fun `production repository emits inactivity walk even when stairs are enabled`() = runTest {
         val fixture = coachingFixture(
-            readings = listOf(older, latest),
-            activity = activity,
+            readings = stableReadings(),
+            activity = inactiveActivity(),
+        )
+
+        val recommendation = fixture.repository.observeCurrentRecommendation().first()
+            as CoachRecommendation.Action
+
+        assertEquals(CoachReason.PROLONGED_INACTIVITY, recommendation.reason)
+        assertEquals(InterventionType.WALK, recommendation.interventionType)
+        assertNull(recommendation.targetFloors)
+        assertEquals(4, recommendation.algorithmVersion)
+    }
+
+    @Test
+    fun `production repository does not emit inactivity when walking is disabled`() = runTest {
+        val fixture = coachingFixture(
+            readings = stableReadings(),
+            settings = DefaultCoachSettings.create().copy(
+                walkingRemindersEnabled = false,
+                stairRemindersEnabled = true,
+            ),
+            activity = inactiveActivity(),
         )
 
         assertNull(fixture.repository.observeCurrentRecommendation().first())
     }
+
+    @Test
+    fun `production repository does not emit inactivity from stale activity`() = runTest {
+        val settings = DefaultCoachSettings.create()
+        val fixture = coachingFixture(
+            readings = stableReadings(),
+            settings = settings,
+            activity = inactiveActivity().copy(
+                measuredAtEpochMillis = NOW - settings.staleReadingMinutes * 60_000L,
+            ),
+        )
+
+        assertNull(fixture.repository.observeCurrentRecommendation().first())
+    }
+
+    @Test
+    fun `safe glucose refresh retains immutable inactivity snapshot and id`() = runTest {
+        val fixture = coachingFixture(
+            readings = stableReadings(),
+            activity = inactiveActivity(),
+        )
+        val original = fixture.repository.observeCurrentRecommendation().first()
+            as CoachRecommendation.Action
+        fixture.repository.rememberRecommendation(original)
+        fixture.repository.recordRecommendationPublished(original.id, NOW)
+
+        fixture.glucose.setReadings(
+            stableReadings() + stableReading("safe-refresh", NOW + 60_000L),
+        )
+        fixture.activity.value = inactiveActivity().copy(
+            stepsToday = inactiveActivity().stepsToday + 100,
+            measuredAtEpochMillis = NOW + 60_000L,
+        )
+        fixture.time.now = NOW + 60_000L
+
+        val retained = fixture.repository.observeCurrentRecommendation().first()
+        assertEquals(original.id, (retained as CoachRecommendation.Action).id)
+        assertEquals(original, retained)
+        assertEquals(original.validUntilEpochMillis, retained.validUntilEpochMillis)
+    }
+
+    @Test
+    fun `inactivity snapshot is not UI-authoritative until publication is recorded`() = runTest {
+        val fixture = coachingFixture(
+            readings = stableReadings(),
+            activity = inactiveActivity(),
+        )
+        val recommendation = fixture.repository.observeCurrentRecommendation().first()
+            as CoachRecommendation.Action
+
+        fixture.repository.rememberRecommendation(recommendation)
+        assertNull(
+            fixture.repository.publishedRecommendationSnapshot(
+                recommendationId = recommendation.id,
+                nowEpochMillis = NOW,
+            ),
+        )
+
+        assertEquals(
+            true,
+            fixture.repository.recordRecommendationPublished(recommendation.id, NOW),
+        )
+        assertEquals(
+            recommendation,
+            fixture.repository.publishedRecommendationSnapshot(
+                recommendationId = recommendation.id,
+                nowEpochMillis = NOW,
+            ),
+        )
+    }
+
+    @Test
+    fun `legacy v2 stair snapshot cannot survive a current v4 candidate`() = runTest {
+        val fixture = coachingFixture(
+            readings = stableReadings(),
+            activity = inactiveActivity(),
+        )
+        val current = fixture.repository.observeCurrentRecommendation().first()
+            as CoachRecommendation.Action
+        val legacy = current.copy(
+            validUntilEpochMillis = current.validUntilEpochMillis + 60_000L,
+            interventionType = InterventionType.STAIRS,
+            durationMinutes = null,
+            targetFloors = DefaultCoachSettings.create().stairTargetFloors,
+            algorithmVersion = 2,
+        )
+        fixture.repository.rememberRecommendation(legacy)
+        fixture.repository.recordRecommendationPublished(legacy.id, NOW)
+
+        assertNull(fixture.repository.observeCurrentRecommendation().first())
+    }
+
+    @Test
+    fun `movement source and threshold changes supersede inactivity identity`() = runTest {
+        suspend fun replacement(
+            activityChange: (ActivitySnapshotEntity) -> ActivitySnapshotEntity = { it },
+            settingsChange: (CoachSettings) -> CoachSettings = { it },
+        ): Pair<CoachRecommendation.Action, CoachRecommendation.Action> {
+            val initialSettings = DefaultCoachSettings.create()
+            val initialActivity = inactiveActivity()
+            val fixture = coachingFixture(
+                readings = stableReadings(),
+                settings = initialSettings,
+                activity = initialActivity,
+            )
+            val original = fixture.repository.observeCurrentRecommendation().first()
+                as CoachRecommendation.Action
+            fixture.repository.rememberRecommendation(original)
+            fixture.repository.recordRecommendationPublished(original.id, NOW)
+
+            val replacementAt =
+                NOW + initialSettings.reminderCooldownMinutes * 60_000L
+            fixture.glucose.setReadings(
+                stableReadings() + stableReading("safe-refresh", replacementAt),
+            )
+            fixture.activity.value = activityChange(initialActivity).copy(
+                measuredAtEpochMillis = replacementAt,
+            )
+            fixture.settings.set(settingsChange(initialSettings))
+            fixture.time.now = replacementAt
+
+            val next = fixture.repository.observeCurrentRecommendation().first()
+                as CoachRecommendation.Action
+            return original to next
+        }
+
+        val moved = replacement(
+            activityChange = { activity ->
+                activity.copy(
+                    lastMovementAtEpochMillis =
+                        requireNotNull(activity.lastMovementAtEpochMillis) + 60_000L,
+                )
+            },
+        )
+        val otherSource = replacement(
+            activityChange = { activity ->
+                activity.copy(sourceId = "health-connect:other")
+            },
+        )
+        val otherThreshold = replacement(
+            settingsChange = { settings ->
+                settings.copy(prolongedInactivityMinutes = 61)
+            },
+        )
+
+        assertEquals(false, moved.first.id == moved.second.id)
+        assertEquals(false, otherSource.first.id == otherSource.second.id)
+        assertEquals(false, otherThreshold.first.id == otherThreshold.second.id)
+    }
+
+    @Test
+    fun `expired inactivity snapshot cannot be renewed by same episode`() = runTest {
+        val settings = DefaultCoachSettings.create().copy(staleReadingMinutes = 2)
+        val fixture = coachingFixture(
+            readings = stableReadings(),
+            settings = settings,
+            activity = inactiveActivity(),
+        )
+        val original = fixture.repository.observeCurrentRecommendation().first()
+            as CoachRecommendation.Action
+        fixture.repository.rememberRecommendation(original)
+        fixture.repository.recordRecommendationPublished(original.id, NOW)
+
+        fixture.glucose.setReadings(
+            stableReadings() + stableReading("safe-refresh", NOW + 2 * 60_000L),
+        )
+        fixture.activity.value = inactiveActivity().copy(
+            measuredAtEpochMillis = NOW + 2 * 60_000L,
+        )
+        fixture.time.now = NOW + 2 * 60_000L
+
+        assertEquals(original.id, fixture.repository.recommendationSnapshot(original.id)?.id)
+        assertNull(fixture.repository.observeCurrentRecommendation().first())
+    }
+
+    @Test
+    fun `consumed inactivity episode stays suppressed after coach state tracks another action`() =
+        runTest {
+            val fixture = coachingFixture(
+                readings = stableReadings(),
+                activity = inactiveActivity(),
+            )
+            val inactivity = fixture.repository.observeCurrentRecommendation().first()
+                as CoachRecommendation.Action
+            fixture.repository.rememberRecommendation(inactivity)
+            fixture.repository.recordRecommendationPublished(inactivity.id, NOW)
+            val consumedSession = InterventionSession(
+                id = "consumed-inactivity-session",
+                type = InterventionType.WALK,
+                status = InterventionStatus.COMPLETED,
+                startedAtEpochMillis = NOW,
+                endedAtEpochMillis = NOW + 60_000L,
+                targetDurationMinutes = inactivity.durationMinutes,
+                targetFloors = null,
+                baselineGlucoseMgDl = 140,
+                glucoseAfterMgDl = null,
+                recommendationId = inactivity.id,
+                recommendationReason = inactivity.reason,
+            ).toEntity()
+            `when`(fixture.interventions.getByRecommendationId(inactivity.id))
+                .thenReturn(consumedSession)
+
+            val nextEvaluationAt = NOW + 60_000L
+            fixture.glucose.setReadings(
+                stableReadings() + stableReading("later-safe", nextEvaluationAt),
+            )
+            fixture.activity.value = inactiveActivity().copy(
+                measuredAtEpochMillis = nextEvaluationAt,
+            )
+            fixture.time.now = nextEvaluationAt
+            fixture.states.upsert(
+                requireNotNull(fixture.states.get()).copy(
+                    lastRecommendationAtEpochMillis =
+                        nextEvaluationAt -
+                            DefaultCoachSettings.create().reminderCooldownMinutes * 60_000L - 1L,
+                    lastRecommendationId = "intervening-recommendation",
+                    consumedRecommendationId = "intervening-recommendation",
+                ),
+            )
+
+            assertNull(fixture.repository.observeCurrentRecommendation().first())
+            assertEquals(inactivity.id, fixture.repository.recommendationSnapshot(inactivity.id)?.id)
+        }
+
+    @Test
+    fun `expired inactivity episode stays suppressed after another prompt becomes last`() =
+        runTest {
+            val fixture = coachingFixture(
+                readings = stableReadings(),
+                activity = inactiveActivity(),
+            )
+            val inactivity = fixture.repository.observeCurrentRecommendation().first()
+                as CoachRecommendation.Action
+            fixture.repository.rememberRecommendation(inactivity)
+            fixture.repository.recordRecommendationPublished(inactivity.id, NOW)
+
+            val afterOriginalExpiry = inactivity.validUntilEpochMillis + 1L
+            fixture.glucose.setReadings(
+                stableReadings() + stableReading("fresh-after-expiry", afterOriginalExpiry),
+            )
+            fixture.activity.value = inactiveActivity().copy(
+                measuredAtEpochMillis = afterOriginalExpiry,
+            )
+            fixture.time.now = afterOriginalExpiry
+            fixture.states.upsert(
+                requireNotNull(fixture.states.get()).copy(
+                    lastRecommendationAtEpochMillis =
+                        afterOriginalExpiry -
+                            DefaultCoachSettings.create().reminderCooldownMinutes * 60_000L - 1L,
+                    lastRecommendationId = "intervening-recommendation",
+                    consumedRecommendationId = null,
+                ),
+            )
+
+            assertNull(fixture.repository.observeCurrentRecommendation().first())
+            assertEquals(inactivity.id, fixture.repository.recommendationSnapshot(inactivity.id)?.id)
+        }
+
+    @Test
+    fun `unexpired inactivity episode cannot republish after another prompt becomes last`() =
+        runTest {
+            val settings = DefaultCoachSettings.create().copy(staleReadingMinutes = 120)
+            val fixture = coachingFixture(
+                readings = stableReadings(),
+                settings = settings,
+                activity = inactiveActivity(),
+            )
+            val inactivity = fixture.repository.observeCurrentRecommendation().first()
+                as CoachRecommendation.Action
+            fixture.repository.rememberRecommendation(inactivity)
+            fixture.repository.recordRecommendationPublished(inactivity.id, NOW)
+
+            val later = NOW + settings.reminderCooldownMinutes * 60_000L + 1L
+            fixture.glucose.setReadings(
+                stableReadings() + stableReading("fresh-later", later),
+            )
+            fixture.activity.value = inactiveActivity().copy(measuredAtEpochMillis = later)
+            fixture.time.now = later
+            fixture.states.upsert(
+                requireNotNull(fixture.states.get()).copy(
+                    lastRecommendationAtEpochMillis =
+                        later - settings.reminderCooldownMinutes * 60_000L - 1L,
+                    lastRecommendationId = "intervening-recommendation",
+                    consumedRecommendationId = null,
+                ),
+            )
+
+            assertEquals(true, inactivity.validUntilEpochMillis > later)
+            assertNull(fixture.repository.observeCurrentRecommendation().first())
+        }
 
     private fun coachingFixture(
         readings: List<GlucoseReading>,
@@ -298,11 +585,13 @@ class RecommendationSnapshotPersistenceTest {
         val activityDao = mock(ActivityDao::class.java)
         val interventionDao = mock(InterventionDao::class.java)
         val mealDao = mock(MealDao::class.java)
-        `when`(activityDao.observeLatest()).thenReturn(flowOf(activity))
+        val activities = MutableStateFlow(activity)
+        `when`(activityDao.observeLatest()).thenReturn(activities)
         `when`(mealDao.observeLatest()).thenReturn(flowOf(null))
         val states = InMemoryCoachStateDao(null)
         val snapshots = InMemoryRecommendationSnapshotDao()
         val glucose = FakeGlucoseRepository(readings)
+        val mutableSettings = FakeSettingsRepository(settings)
         val time = FakeTimeSource(NOW)
         return CoachingFixture(
             repository = CoachingRepositoryImpl(
@@ -312,14 +601,18 @@ class RecommendationSnapshotPersistenceTest {
                 mealDao = mealDao,
                 coachStateDao = states,
                 recommendationSnapshotDao = snapshots,
-                settingsRepository = FakeSettingsRepository(settings),
+                settingsRepository = mutableSettings,
                 glucoseRepository = glucose,
                 ruleEngine = CoachRuleEngine(),
                 observationAnalyzer = ObservationAnalyzer(),
                 timeSource = time,
             ),
             glucose = glucose,
+            activity = activities,
+            settings = mutableSettings,
             time = time,
+            interventions = interventionDao,
+            states = states,
         )
     }
 
@@ -336,6 +629,37 @@ class RecommendationSnapshotPersistenceTest {
         measuredAtEpochMillis = measuredAtEpochMillis,
         receivedAtEpochMillis = measuredAtEpochMillis,
         sourceId = sourceId,
+    )
+
+    private fun stableReadings() = listOf(
+        stableReading("older", NOW - 5 * 60_000L),
+        stableReading("latest", NOW),
+    )
+
+    private fun stableReading(
+        id: String,
+        measuredAtEpochMillis: Long,
+    ) = risingReading(id, measuredAtEpochMillis).copy(
+        rateMgDlPerMinute = 0.0,
+        trend = GlucoseTrend.STABLE,
+    )
+
+    private fun inactiveActivity() = ActivitySnapshotEntity(
+        dayStartEpochMillis = Instant.ofEpochMilli(NOW)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli(),
+        stepsToday = 0,
+        floorsToday = 0.0,
+        latestHeartRateBpm = null,
+        activeCaloriesToday = null,
+        lastMovementAtEpochMillis = NOW - 2 * 60 * 60_000L,
+        measuredAtEpochMillis = NOW,
+        sourceId = "health-connect",
+        exerciseSessionCountToday = 0,
+        exerciseDurationMinutesToday = 0,
     )
 
     private fun recommendation(createdAtEpochMillis: Long) = CoachRecommendation.Action(
@@ -389,11 +713,21 @@ class RecommendationSnapshotPersistenceTest {
     }
 
     private class FakeSettingsRepository(
-        private val settings: CoachSettings = DefaultCoachSettings.create(),
+        initial: CoachSettings = DefaultCoachSettings.create(),
     ) : SettingsRepository {
-        override fun observe(): Flow<CoachSettings> = flowOf(settings)
-        override suspend fun update(settings: CoachSettings) = Unit
-        override suspend fun reset() = Unit
+        private val state = MutableStateFlow(initial)
+
+        fun set(settings: CoachSettings) {
+            state.value = settings
+        }
+
+        override fun observe(): Flow<CoachSettings> = state
+        override suspend fun update(settings: CoachSettings) {
+            set(settings)
+        }
+        override suspend fun reset() {
+            state.value = DefaultCoachSettings.create()
+        }
     }
 
     private class FakeGlucoseRepository(
@@ -446,7 +780,11 @@ class RecommendationSnapshotPersistenceTest {
     private data class CoachingFixture(
         val repository: CoachingRepositoryImpl,
         val glucose: FakeGlucoseRepository,
+        val activity: MutableStateFlow<ActivitySnapshotEntity?>,
+        val settings: FakeSettingsRepository,
         val time: FakeTimeSource,
+        val interventions: InterventionDao,
+        val states: InMemoryCoachStateDao,
     )
 
     private companion object {

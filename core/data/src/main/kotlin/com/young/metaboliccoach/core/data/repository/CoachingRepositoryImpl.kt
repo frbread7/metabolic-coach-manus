@@ -119,14 +119,32 @@ class CoachingRepositoryImpl @Inject constructor(
             allowedActionReasons = setOf(
                 CoachReason.POST_MEAL_WINDOW,
                 CoachReason.RAPID_GLUCOSE_RISE,
+                CoachReason.PROLONGED_INACTIVITY,
             ),
         )
         val generated = evaluation.recommendation
+        val inactivityAlreadyConsumed =
+            generated is CoachRecommendation.Action &&
+                generated.reason == CoachReason.PROLONGED_INACTIVITY &&
+                interventionDao.getByRecommendationId(generated.id) != null
+        val authoritativeInactivitySnapshot =
+            (generated as? CoachRecommendation.Action)
+                ?.takeIf { it.reason == CoachReason.PROLONGED_INACTIVITY }
+                ?.let { recommendationSnapshotDao.getById(it.id)?.toModel() }
         val lastSnapshot = currentState.lastRecommendationId?.let {
             recommendationSnapshotDao.getById(it)?.toModel()
         }
         when {
             generated is CoachRecommendation.Information -> generated
+            inactivityAlreadyConsumed -> null
+            generated is CoachRecommendation.Action &&
+                generated.reason == CoachReason.PROLONGED_INACTIVITY &&
+                authoritativeInactivitySnapshot != null ->
+                authoritativeInactivitySnapshot.takeIf { snapshot ->
+                    currentState.lastRecommendationId == snapshot.id &&
+                    snapshot.matchesCurrentCandidate(generated) &&
+                        snapshot.validUntilEpochMillis > now
+                }
             generated is CoachRecommendation.Action &&
                 generated.id == currentState.consumedRecommendationId -> null
             generated is CoachRecommendation.Action &&
@@ -345,6 +363,22 @@ class CoachingRepositoryImpl @Inject constructor(
     ): CoachRecommendation.Action? =
         recommendationSnapshotDao.getById(recommendationId)?.toModel()
 
+    override suspend fun publishedRecommendationSnapshot(
+        recommendationId: String,
+        nowEpochMillis: Long,
+    ): CoachRecommendation.Action? {
+        val current = coachStateDao.get().forCurrentDay(nowEpochMillis)
+        if (
+            current.lastRecommendationId != recommendationId ||
+            current.consumedRecommendationId == recommendationId
+        ) {
+            return null
+        }
+        return recommendationSnapshotDao.getById(recommendationId)
+            ?.toModel()
+            ?.takeIf { it.validUntilEpochMillis > nowEpochMillis }
+    }
+
     override suspend fun recordRecommendationPublished(
         recommendationId: String,
         nowEpochMillis: Long,
@@ -415,19 +449,22 @@ class CoachingRepositoryImpl @Inject constructor(
     private fun CoachRecommendation.Action.matchesCurrentCandidate(
         candidate: CoachRecommendation.Action,
     ): Boolean {
-        if (
-            reason != candidate.reason ||
-            triggerContextId != candidate.triggerContextId ||
-            glucoseSourceId != candidate.glucoseSourceId
-        ) {
+        if (reason != candidate.reason || glucoseSourceId != candidate.glucoseSourceId) {
             return false
         }
-        return reason != CoachReason.RAPID_GLUCOSE_RISE ||
-            (
+        return when (reason) {
+            CoachReason.RAPID_GLUCOSE_RISE ->
+                triggerContextId == candidate.triggerContextId &&
                 safetyReadingId == candidate.safetyReadingId &&
-                    safetyReadingAtEpochMillis == candidate.safetyReadingAtEpochMillis &&
-                    algorithmVersion == candidate.algorithmVersion
-                )
+                safetyReadingAtEpochMillis == candidate.safetyReadingAtEpochMillis &&
+                algorithmVersion == candidate.algorithmVersion
+            CoachReason.PROLONGED_INACTIVITY ->
+                id == candidate.id &&
+                algorithmVersion == candidate.algorithmVersion &&
+                triggerContextId == candidate.triggerContextId &&
+                triggerAtEpochMillis == candidate.triggerAtEpochMillis
+            else -> triggerContextId == candidate.triggerContextId
+        }
     }
 
     private fun observeDayStart(): Flow<Long> = flow {

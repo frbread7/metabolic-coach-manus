@@ -1679,7 +1679,7 @@ private fun SettingsScreen(
         }
         item {
             SliderSetting(
-                "Stale reading",
+                "Glucose/activity freshness",
                 draft.staleReadingMinutes,
                 CoachSettingsBounds.STALE_READING_MINUTES,
                 "min",

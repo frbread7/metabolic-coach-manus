@@ -45,7 +45,7 @@ new pinned run.
 | `v0.5.1` | Phone trend chart and selected-period GMI | Accepted by user report 2026-08-04 | [v0.5.1 phone checklist](V0_5_1_HISTORY_EXPLORER.md) |
 | `v0.6.0` | Post-meal walk coaching | Engineering PASS / Physical DEFERRED | [v0.6.0 checklist](V0_6_0_POST_MEAL_COACHING.md); cumulative backlog |
 | `v0.6.1` | Confirmed rapid-rise walk coaching | Engineering PASS / Physical DEFERRED | [v0.6.1 contract](V0_6_1_RAPID_RISE_COACHING.md); cumulative backlog |
-| `v0.6.2` | Prolonged-inactivity walk coaching only | Planned / Physical DEFERRED | Checklist pending architecture gate |
+| `v0.6.2` | Fail-closed prolonged-inactivity WALK coaching only | Engineering IN PROGRESS / Physical DEFERRED | [v0.6.2 contract](V0_6_2_INACTIVITY_WALK_COACHING.md); cumulative backlog |
 | `v0.7.0` | Integrated walk-coaching RC | Planned batched physical gate | Consolidated checklist pending |
 | `v0.5` beta | One-week daily-use reliability and safety observation | Planned after feature gates | This document, §one-week beta |
 | `v1.0` | Production daily-use release | Planned | This document, §v1.0 |
@@ -184,6 +184,23 @@ meal-scoped delayed walk recommendation and its Start/Snooze/completion lifecycl
 | V060-SY-01 | If Wear is in scope for the approved increment, phone-authored state and action results converge without duplicate or stale actions. | `NOT RUN` |
 | V060-PR-01 | User-visible wording remains observational wellness guidance and makes no medical or treatment claim. | `NOT RUN` |
 | V060-ST-01 | Reboot, disconnect, process death, and repeated notifications do not crash, duplicate, or create a battery/network loop. | `NOT RUN` |
+
+## v0.6.2 — Prolonged-inactivity WALK coaching
+
+The APOS-reviewed engineering contract is maintained in
+[V0_6_2_INACTIVITY_WALK_COACHING.md](V0_6_2_INACTIVITY_WALK_COACHING.md). Physical testing is
+deliberately deferred and these rows will be consolidated with the `v0.6.0`/`v0.6.1` backlog for
+the pinned `v0.7.0` integrated release candidate. Record categorical results only.
+
+| ID | Expected physical result | Status |
+| --- | --- | --- |
+| V062-TR-01 | One naturally eligible prolonged-inactivity episode can produce at most one WALK prompt after post-meal and rapid-rise priority; no automated stair prompt appears regardless of stair setting. | `NOT RUN` |
+| V062-AF-01 | Missing, future, inconsistent, previous-day/cross-midnight, stale, or changed activity context removes or suppresses the inactivity action. | `NOT RUN` |
+| V062-ID-01 | Routine refresh does not duplicate or extend one episode, while real new movement/context creates the correct invalidation or later new episode without resurrecting the old action. | `NOT RUN` |
+| V062-AC-01 | A not-yet-applied delayed phone or Watch Start fails closed after movement, expiry, or context change; an identical replay of an already applied Start remains idempotently applied and the devices converge to exactly one WALK session. | `NOT RUN` |
+| V062-SY-01 | Phone card, notification, Wear app, and watch face converge on the same phone-authored prompt/expiry/result through disconnect and reconnect without a Wear protocol change. | `NOT RUN` |
+| V062-NF-01 | Working/quiet hours, snooze, cooldown, daily cap, reminder disablement, and active-session suppression remain coherent. | `NOT RUN` |
+| V062-ST-01 | Representative use shows no crash, ANR, excess heat, notification storm, unexpected polling/background wake, or obvious battery regression. | `NOT RUN` |
 
 ## One-week personal beta (`v0.5` roadmap milestone)
 

@@ -36,7 +36,11 @@ class CoachNotificationManager @Inject constructor(
         )
     }
 
-    fun showCoachPrompt(recommendation: CoachRecommendation.Action) {
+    fun showCoachPrompt(
+        recommendation: CoachRecommendation.Action,
+        nowEpochMillis: Long,
+        displayUntilEpochMillis: Long,
+    ) {
         if (
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
             PackageManager.PERMISSION_GRANTED
@@ -55,8 +59,7 @@ class CoachNotificationManager @Inject constructor(
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
             .setTimeoutAfter(
-                (recommendation.validUntilEpochMillis - System.currentTimeMillis())
-                    .coerceAtLeast(1L),
+                (displayUntilEpochMillis - nowEpochMillis).coerceAtLeast(1L),
             )
             .addAction(
                 0,

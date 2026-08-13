@@ -2,6 +2,43 @@
 
 All notable Metabolic Coach package changes are recorded here.
 
+## v0.6.2 — 2026-08-12 — Prolonged-inactivity WALK coaching
+
+### Added
+
+- One fail-closed prolonged-inactivity `WALK` opportunity can enter the existing canonical
+  recommendation pipeline when walking reminders are enabled and current same-day activity context
+  confirms that the configured inactivity threshold has been reached.
+- Algorithm-v4 stable episode identity uses reason, activity source, last movement, threshold
+  crossing, and algorithm version. Routine glucose or activity refreshes cannot create a new
+  episode ID.
+- Phone, Wear display, and phone Start revalidate activity identity, working hours, expiry, and the
+  existing glucose safety/provenance rules. A delayed Start uses the latest persisted activity
+  snapshot and fails closed if movement or activity context changed.
+- The phone card remains hidden until the coordinator has both persisted and recorded publication
+  of the same authoritative inactivity snapshot. Phone, Wear notification, and complication
+  visibility are bounded by the earliest action-validity, quiet-hours, or inactivity working-hours
+  deadline.
+
+### Changed
+
+- Candidate priority is post-meal, then confirmed rapid rise, then prolonged inactivity.
+- Inactivity validity ends at the earlier of glucose freshness and activity freshness. A persisted
+  recommendation snapshot remains immutable and cannot gain a later expiry after refresh.
+- Phone, Wear, and watch-face modules are aligned at versionName `0.6.2`, versionCode `11`.
+
+### Safety, scope, and verification status
+
+- Automated inactivity coaching is WALK-only. Stair settings do not select an automated stair
+  recommendation; manual stair actions remain unchanged.
+- The increment adds no provider request, polling or WorkManager change, Room migration, Wear Data
+  Layer field/schema change, notification-action contract, or session/replay semantic change.
+- The targeted v0.6.2 test gate passed with exit code 0 across 154 actionable tasks. The full
+  milestone pipeline, independent final review, APK/WFF/signature/package evidence, hashes, commit
+  identity, and final APOS decision remain pending.
+- Current status is `Engineering: IN PROGRESS / Physical: DEFERRED`. All device-only checks are
+  backlogged for the `v0.7.0` integrated walk-coaching release candidate.
+
 ## v0.6.1 — 2026-08-12 — Confirmed rapid-rise walk coaching
 
 ### Added

@@ -128,9 +128,10 @@ non-conflicting earlier constraints, and avoid inferring acceptance that the use
   CONDITIONS` for the staged history/chart/GMI/coaching roadmap. v0.5.0 is limited to the local
   history foundation; the handoff is recorded in `docs/V0_5_0_HISTORY_FOUNDATION.md`.
 - Automated preflight: the historical v0.3 sync/phone/Wear pre-install suite passed with all 200
-  selected Gradle tasks executed. The current v0.6.1 authoritative local package run passed all 333
+  selected Gradle tasks executed. The v0.6.1 authoritative local package run passed all 333
   selected tasks, 58 local test suites/365 executions, lint, APK/WFF validation, signature/privacy
-  verification, and packaging.
+  verification, and packaging. The active v0.6.2 targeted gate reported `BUILD SUCCESSFUL` with
+  154 actionable tasks; its full milestone pipeline and final review remain pending.
 - `v0.5.0` physical acceptance: the user reported the phone-only history checklist passed on
   2026-08-04. The privacy-sanitized record is
   [V0_5_0_PHYSICAL_ACCEPTANCE.md](acceptance/V0_5_0_PHYSICAL_ACCEPTANCE.md).
@@ -151,6 +152,9 @@ non-conflicting earlier constraints, and avoid inferring acceptance that the use
 - `v0.6.2` architecture gate: APOS returned `GO WITH CONDITIONS` for fail-closed prolonged-
   inactivity WALK only. The approved contract is recorded in
   [V0_6_2_INACTIVITY_WALK_COACHING.md](V0_6_2_INACTIVITY_WALK_COACHING.md); no one-line allowlist or
-  automated stair activation is permitted.
+  automated stair activation is permitted. Current status is `Engineering: IN PROGRESS / Physical:
+  DEFERRED`; targeted tests passed, while the full pipeline, independent final review, artifact
+  hashes, commit identity, and final APOS decision remain pending. Device-only checks are assigned
+  to the `v0.7.0` integrated RC backlog.
 
 The completed physical test was defined in [V0.3_WEAR_ACCEPTANCE.md](V0.3_WEAR_ACCEPTANCE.md).

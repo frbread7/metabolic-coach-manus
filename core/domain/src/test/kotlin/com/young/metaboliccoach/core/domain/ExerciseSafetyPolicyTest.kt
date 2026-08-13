@@ -1,5 +1,6 @@
 package com.young.metaboliccoach.core.domain
 
+import com.young.metaboliccoach.core.model.ActivitySnapshot
 import com.young.metaboliccoach.core.model.CoachReason
 import com.young.metaboliccoach.core.model.CoachRecommendation
 import com.young.metaboliccoach.core.model.DefaultCoachSettings
@@ -149,6 +150,74 @@ class ExerciseSafetyPolicyTest {
     }
 
     @Test
+    fun `wear accepts policy-matching inactivity and tolerates a safe snapshot refresh`() {
+        val activity = inactiveActivity()
+        val recommendation = inactivityAction(activity)
+        val state = watchState().copy(
+            activity = activity,
+            recommendation = recommendation,
+        )
+
+        assertEquals(
+            recommendation,
+            state.effectiveRecommendation(now, minuteOfDay = 12 * 60),
+        )
+        assertEquals(
+            recommendation,
+            state.copy(
+                activity = activity.copy(
+                    stepsToday = activity.stepsToday + 100,
+                    measuredAtEpochMillis = now + 1_000L,
+                ),
+            ).effectiveRecommendation(now + 1_000L, minuteOfDay = 12 * 60),
+        )
+    }
+
+    @Test
+    fun `wear suppresses inactivity when current activity no longer confirms its episode`() {
+        val activity = inactiveActivity()
+        val recommendation = inactivityAction(activity)
+        val state = watchState().copy(
+            activity = activity,
+            recommendation = recommendation,
+        )
+
+        assertNull(
+            state.copy(
+                activity = activity.copy(sourceId = "other-source"),
+            ).effectiveRecommendation(now, minuteOfDay = 12 * 60),
+        )
+        assertNull(
+            state.copy(
+                activity = activity.copy(
+                    measuredAtEpochMillis =
+                        now - settings.staleReadingMinutes * 60_000L,
+                ),
+            ).effectiveRecommendation(now, minuteOfDay = 12 * 60),
+        )
+        assertNull(
+            state.copy(
+                settings = settings.copy(prolongedInactivityMinutes = 61),
+            ).effectiveRecommendation(now, minuteOfDay = 12 * 60),
+        )
+        assertNull(
+            state.copy(
+                settings = settings.copy(walkingRemindersEnabled = false),
+            ).effectiveRecommendation(now, minuteOfDay = 12 * 60),
+        )
+        assertNull(
+            state.copy(
+                recommendation = recommendation.copy(
+                    interventionType = InterventionType.STAIRS,
+                    durationMinutes = null,
+                    targetFloors = settings.stairTargetFloors,
+                    algorithmVersion = 2,
+                ),
+            ).effectiveRecommendation(now, minuteOfDay = 12 * 60),
+        )
+    }
+
+    @Test
     fun `coached action gate rechecks current reading at tap time`() {
         assertTrue(CoachedExerciseActionPolicy.canStart(glucose(), settings, now, 12 * 60))
         assertFalse(
@@ -201,6 +270,45 @@ class ExerciseSafetyPolicyTest {
             safetyReadingAtEpochMillis = current.measuredAtEpochMillis,
         )
     }
+
+    private fun inactivityAction(activity: ActivitySnapshot): CoachRecommendation.Action {
+        val confirmation = requireNotNull(
+            InactivityConfirmationPolicy.confirm(
+                activity = activity,
+                settings = settings,
+                nowEpochMillis = now,
+                minuteOfDay = 12 * 60,
+            ),
+        )
+        val current = glucose()
+        return CoachRecommendation.Action(
+            reason = CoachReason.PROLONGED_INACTIVITY,
+            id = confirmation.recommendationId,
+            createdAtEpochMillis = now,
+            validUntilEpochMillis = confirmation.activityFreshUntilEpochMillis,
+            interventionType = InterventionType.WALK,
+            title = "Walk now?",
+            actionLabel = "START WALK",
+            durationMinutes = settings.walkingDurationMinutes,
+            targetFloors = null,
+            algorithmVersion = InactivityConfirmationPolicy.ALGORITHM_VERSION,
+            triggerContextId = confirmation.triggerIdentity,
+            triggerAtEpochMillis = confirmation.thresholdCrossingAtEpochMillis,
+            glucoseSourceId = current.sourceId,
+            safetyReadingId = current.id,
+            safetyReadingAtEpochMillis = current.measuredAtEpochMillis,
+        )
+    }
+
+    private fun inactiveActivity() = ActivitySnapshot(
+        stepsToday = 2_000,
+        floorsToday = 1.0,
+        latestHeartRateBpm = 70,
+        activeCaloriesToday = 100.0,
+        lastMovementAtEpochMillis = now - settings.prolongedInactivityMinutes * 60_000L,
+        measuredAtEpochMillis = now,
+        sourceId = "health-connect",
+    )
 
     private fun glucose() = GlucoseReading(
         id = "reading",

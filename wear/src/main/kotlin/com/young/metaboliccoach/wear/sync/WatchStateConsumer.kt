@@ -3,8 +3,10 @@ package com.young.metaboliccoach.wear.sync
 import android.content.ComponentName
 import android.content.Context
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
+import com.young.metaboliccoach.core.domain.ActionDisplayDeadlinePolicy
 import com.young.metaboliccoach.core.model.WatchState
 import com.young.metaboliccoach.core.domain.effectiveRecommendation
+import com.young.metaboliccoach.core.model.CoachRecommendation
 import com.young.metaboliccoach.wear.complication.ActivityComplicationService
 import com.young.metaboliccoach.wear.complication.CoachComplicationService
 import com.young.metaboliccoach.wear.complication.GlucoseComplicationService
@@ -50,12 +52,23 @@ class WatchStateConsumer @Inject constructor(
         }
         val replica = sessionStore.replica.first()
         store.save(state)
+        val now = System.currentTimeMillis()
+        val effectiveRecommendation = if (replica.blocksNewSession) {
+            null
+        } else {
+            state.effectiveRecommendation(now)
+        }
         notifications.showRecommendation(
-            if (replica.blocksNewSession) {
-                null
-            } else {
-                state.effectiveRecommendation(System.currentTimeMillis())
-            },
+            recommendation = effectiveRecommendation,
+            nowEpochMillis = now,
+            displayUntilEpochMillis =
+                (effectiveRecommendation as? CoachRecommendation.Action)?.let { action ->
+                    ActionDisplayDeadlinePolicy.displayUntilEpochMillis(
+                        recommendation = action,
+                        settings = state.settings,
+                        nowEpochMillis = now,
+                    )
+                },
         )
         requestComplicationUpdates()
     }

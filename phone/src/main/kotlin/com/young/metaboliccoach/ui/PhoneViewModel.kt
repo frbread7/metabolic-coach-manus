@@ -16,7 +16,7 @@ import com.young.metaboliccoach.core.domain.CoachedExerciseActionPolicy
 import com.young.metaboliccoach.core.domain.CoachingRepository
 import com.young.metaboliccoach.core.domain.GlucoseRepository
 import com.young.metaboliccoach.core.domain.GlucoseHistoryRepository
-import com.young.metaboliccoach.core.domain.hasCurrentActionProvenance
+import com.young.metaboliccoach.core.domain.hasCurrentActionContext
 import com.young.metaboliccoach.core.domain.GlycemicGoalPlanner
 import com.young.metaboliccoach.core.domain.GlycemicGoalRepository
 import com.young.metaboliccoach.core.domain.GlycemicPlanningMilestoneRepository
@@ -29,6 +29,7 @@ import com.young.metaboliccoach.core.domain.NightscoutSettingsValidator
 import com.young.metaboliccoach.core.domain.SettingsRepository
 import com.young.metaboliccoach.core.domain.SettingsValidator
 import com.young.metaboliccoach.core.model.ActivitySnapshot
+import com.young.metaboliccoach.core.model.CoachReason
 import com.young.metaboliccoach.core.model.CoachRecommendation
 import com.young.metaboliccoach.core.model.CoachSettings
 import com.young.metaboliccoach.core.model.DailySummary
@@ -343,12 +344,36 @@ class PhoneViewModel @Inject constructor(
         operationInProgress,
         uiClock,
     ) { state, planner, message, isWorking, now ->
-        val recommendation = state.recommendation
+        val recommendation = when (val candidate = state.recommendation) {
+            is CoachRecommendation.Action -> if (
+                candidate.reason == CoachReason.PROLONGED_INACTIVITY
+            ) {
+                coachingRepository.publishedRecommendationSnapshot(
+                    recommendationId = candidate.id,
+                    nowEpochMillis = now,
+                )
+            } else {
+                candidate
+            }
+            else -> candidate
+        }
+        val zoneId = ZoneId.systemDefault()
+        val minuteOfDay = Instant.ofEpochMilli(now)
+            .atZone(zoneId)
+            .toLocalTime()
+            .toSecondOfDay() / 60
         val effectiveRecommendation = if (
             recommendation is CoachRecommendation.Action &&
             (
                 now >= recommendation.validUntilEpochMillis ||
-                    !recommendation.hasCurrentActionProvenance(state.glucose) ||
+                    !recommendation.hasCurrentActionContext(
+                        reading = state.glucose,
+                        activity = state.activity,
+                        settings = state.settings,
+                        nowEpochMillis = now,
+                        minuteOfDay = minuteOfDay,
+                        zoneId = zoneId,
+                    ) ||
                     !CoachedExerciseActionPolicy.canStart(
                         reading = state.glucose,
                         settings = state.settings,

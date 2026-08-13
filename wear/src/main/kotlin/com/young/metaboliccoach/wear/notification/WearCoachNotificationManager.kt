@@ -33,7 +33,11 @@ class WearCoachNotificationManager @Inject constructor(
         )
     }
 
-    fun showRecommendation(recommendation: CoachRecommendation?) {
+    fun showRecommendation(
+        recommendation: CoachRecommendation?,
+        nowEpochMillis: Long,
+        displayUntilEpochMillis: Long?,
+    ) {
         val action = recommendation as? CoachRecommendation.Action
         if (action == null) {
             NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)
@@ -74,7 +78,8 @@ class WearCoachNotificationManager @Inject constructor(
             .setAutoCancel(true)
             .setLocalOnly(true)
             .setTimeoutAfter(
-                (action.validUntilEpochMillis - System.currentTimeMillis()).coerceAtLeast(1L),
+                ((displayUntilEpochMillis ?: action.validUntilEpochMillis) - nowEpochMillis)
+                    .coerceAtLeast(1L),
             )
             .addAction(0, action.actionLabel, startIntent)
             .addAction(0, "Snooze", snoozeIntent)

@@ -197,11 +197,12 @@ class CoachRuleEngineTest {
         )
 
         val recommendation = engine.recommend(
-            context(glucose = glucose(146, 3.0), meal = meal),
+            context(glucose = glucose(146, 3.0), meal = meal, activity = inactiveActivity()),
             settings,
             allowedActionReasons = setOf(
                 CoachReason.POST_MEAL_WINDOW,
                 CoachReason.RAPID_GLUCOSE_RISE,
+                CoachReason.PROLONGED_INACTIVITY,
             ),
         )
 
@@ -300,22 +301,24 @@ class CoachRuleEngineTest {
     }
 
     @Test
-    fun `prolonged inactivity recommends configured stairs`() {
+    fun `prolonged inactivity recommends a v4 walk even when stairs are enabled`() {
         val recommendation = engine.recommend(
             context(glucose = glucose(value = 120, rate = 0.0), activity = inactiveActivity()),
             settings,
         ) as CoachRecommendation.Action
 
-        assertEquals(InterventionType.STAIRS, recommendation.interventionType)
-        assertEquals(settings.stairTargetFloors, recommendation.targetFloors)
-        assertEquals(
-            now,
-            recommendation.triggerAtEpochMillis,
-        )
+        assertEquals(CoachReason.PROLONGED_INACTIVITY, recommendation.reason)
+        assertEquals(InterventionType.WALK, recommendation.interventionType)
+        assertEquals(settings.walkingDurationMinutes, recommendation.durationMinutes)
+        assertNull(recommendation.targetFloors)
+        assertEquals(now, recommendation.triggerAtEpochMillis)
+        assertEquals(4, recommendation.algorithmVersion)
+        assertTrue(recommendation.id.startsWith("PROLONGED_INACTIVITY:v4:"))
+        assertTrue(recommendation.triggerContextId?.startsWith("inactivity:v4:") == true)
     }
 
     @Test
-    fun `prolonged inactivity falls back to walking when stair reminders are disabled`() {
+    fun `stair reminder setting does not alter inactivity walk`() {
         val recommendation = engine.recommend(
             context(glucose = glucose(value = 120, rate = 0.0), activity = inactiveActivity()),
             settings.copy(stairRemindersEnabled = false),
@@ -327,7 +330,7 @@ class CoachRuleEngineTest {
     }
 
     @Test
-    fun `prolonged inactivity is silent when both activity reminders are disabled`() {
+    fun `prolonged inactivity is silent when walking is disabled even if stairs are enabled`() {
         assertNull(
             engine.recommend(
                 context(
@@ -335,11 +338,66 @@ class CoachRuleEngineTest {
                     activity = inactiveActivity(),
                 ),
                 settings.copy(
-                    stairRemindersEnabled = false,
+                    stairRemindersEnabled = true,
                     walkingRemindersEnabled = false,
                 ),
             ),
         )
+    }
+
+    @Test
+    fun `rapid rise wins over confirmed inactivity`() {
+        val recommendation = engine.recommend(
+            context(
+                glucose = glucose(value = 146, rate = 3.0),
+                activity = inactiveActivity(),
+            ),
+            settings,
+            allowedActionReasons = setOf(
+                CoachReason.RAPID_GLUCOSE_RISE,
+                CoachReason.PROLONGED_INACTIVITY,
+            ),
+        )
+
+        assertEquals(CoachReason.RAPID_GLUCOSE_RISE, recommendation?.reason)
+    }
+
+    @Test
+    fun `stale activity cannot trigger inactivity`() {
+        val staleActivity = inactiveActivity().copy(
+            measuredAtEpochMillis =
+                now - settings.staleReadingMinutes * 60_000L,
+        )
+
+        assertNull(
+            engine.recommend(
+                context(
+                    glucose = glucose(value = 120, rate = 0.0),
+                    activity = staleActivity,
+                ),
+                settings,
+                allowedActionReasons = setOf(CoachReason.PROLONGED_INACTIVITY),
+            ),
+        )
+    }
+
+    @Test
+    fun `inactivity validity is bounded by activity freshness`() {
+        val almostStaleActivity = inactiveActivity().copy(
+            measuredAtEpochMillis =
+                now - (settings.staleReadingMinutes - 1) * 60_000L,
+        )
+
+        val recommendation = engine.recommend(
+            context(
+                glucose = glucose(value = 120, rate = 0.0),
+                activity = almostStaleActivity,
+            ),
+            settings,
+            allowedActionReasons = setOf(CoachReason.PROLONGED_INACTIVITY),
+        ) as CoachRecommendation.Action
+
+        assertEquals(now + 60_000L, recommendation.validUntilEpochMillis)
     }
 
     @Test

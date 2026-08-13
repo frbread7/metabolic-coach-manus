@@ -18,8 +18,9 @@ The current source includes these JVM and Android local-test suites:
 | Suite | Coverage |
 | --- | --- |
 | `GlucoseReadingDisplayTest` | Unit-aware glucose rate display and threshold conversion round trips |
-| `CoachRuleEngineTest` / `RapidRiseConfirmationPolicyTest` | Reason-specific IDs/validity; two-reading exact-source rapid confirmation; threshold, trend fallback, gap/timestamp/tie failure; post-meal precedence; shared missing/future/stale/low/fast-fall safety; inactivity foundation; quiet hours, snooze, cap, and cooldown |
-| `ExerciseSafetyPolicyTest` | Phone/Wear safety parity, complete source/trigger/safety provenance, rapid-pair supersession, exact action-expiry boundaries, quiet hours, active-session suppression, and falling-rate fallback |
+| `CoachRuleEngineTest` / `RapidRiseConfirmationPolicyTest` / `InactivityConfirmationPolicyTest` | Reason-specific IDs/validity; two-reading exact-source rapid confirmation; threshold, trend fallback, gap/timestamp/tie failure; post-meal/rapid/inactivity priority; WALK-only inactivity; activity missing/source/timestamp/day/freshness/threshold boundaries; stable algorithm-v4 episode identity; shared missing/future/stale/low/fast-fall safety; quiet/working hours, snooze, cap, and cooldown |
+| `ExerciseSafetyPolicyTest` | Phone/Wear safety parity, complete source/trigger/safety provenance, rapid-pair and inactivity-episode supersession, exact action-expiry boundaries, activity/working-hour revalidation, quiet hours, active-session suppression, and falling-rate fallback |
+| `ActionDisplayDeadlinePolicyTest` | Exact ordinary/overnight quiet and working-hour display deadlines, earlier immutable validity, equal-boundary semantics, non-inactivity isolation, and fail-closed ambiguous/nonexistent DST boundaries |
 | `SettingsValidatorTest` | Defaults plus shared coaching bounds, retained legacy Health Connect-origin validation, falling-rate, follow-up, command-expiry, activity goals, and all personal-observation analysis controls |
 | `FollowUpReadingSelectorTest` | Exact-source filtering, at/after-due preference, pre-deadline waiting, deterministic deadline fallback, and missing finalization |
 | `ObservationAnalyzerTest` | Manual effects, legacy safety-provenance exclusion, below-threshold exclusion for effects/timing, configurable generic/post-meal/follow-up/baseline buckets, configurable sample and comparable-cohort gates, unique separated median, exact-source/follow-up eligibility, meal provenance, and cautious wording |
@@ -39,8 +40,9 @@ The current source includes these JVM and Android local-test suites:
 | `ExerciseSessionSummaryTest` | Daily valid-session count, total-duration aggregation, latest end time, and reversed-interval rejection |
 | `WatchStateCodecTest` | State/command round trips including backward-compatible legacy settings, configurable observation analysis, recommendation validity/provenance, phone revision, and session acknowledgement; Nightscout connection settings remain absent from Wear payloads |
 | `InterventionDaoLifecycleTest` | Idempotent start, one-active-session semantics, and Room follow-up lifecycle persistence |
-| `RecommendationSnapshotMapperTest` / `RecommendationSnapshotPersistenceTest` | Complete snapshot mapping, immutable canonical retry, and rapid snapshot retention/invalidation across cooldown, new pairs, stable readings, and source changes |
-| `QuickActionHandlerTest` | Selected-provider baseline provenance, required phone-authored snapshot lookup, echoed-provenance conflict rejection, exact rapid-pair action-time revalidation, snapshot-owned intervention dose, complete prospective recommendation/trigger/rate/threshold capture, no invented manual provenance, delayed-delivery safety boundaries, generic start expiry, idempotent start, deferred completion, delayed known-session completion, and terminal orphan expiry |
+| `RecommendationSnapshotMapperTest` / `RecommendationSnapshotPersistenceTest` | Complete snapshot mapping, immutable canonical retry, publication-authority gating, and rapid/inactivity snapshot retention/invalidation across cooldown, new pairs or movement episodes, stable refreshes, expiry, and source changes |
+| `QuickActionHandlerTest` | Selected-provider baseline provenance, required phone-authored snapshot lookup, echoed-provenance conflict rejection, exact rapid-pair and latest-activity inactivity action-time revalidation, WALK-only inactivity enforcement, snapshot-owned intervention dose, complete prospective recommendation/trigger/rate/threshold capture, no invented manual provenance, delayed-delivery safety boundaries, generic start expiry, idempotent start, deferred completion, delayed known-session completion, and terminal orphan expiry |
+| `PhoneRefreshCoordinatorTest` | Canonical capture/revalidation before publication, invalid inactivity omission, phone/Watch effective-action parity, and policy-bounded phone-notification lifetime |
 | `SyncSchedulerTest` | Nightscout connected-network scheduling, configured interval and 15-minute minimum, independence from Health Connect background permission, fallback behavior, and coroutine-cancellation propagation |
 | `DeferredCompletionPolicyTest` | Rejected-prerequisite propagation and session matching for completion-first delivery |
 | `PhoneCommandProcessorTest` | Exactly-once terminal replay: a persisted rejected command triggers watch-state republication without invoking mutation logic |
@@ -123,6 +125,13 @@ remain authoritative for their respective runs.
   walk increment. Post-meal must win overlap; production inactivity/stairs remain disabled; action
   display and Start must fail closed on incomplete, changed-source, or superseded provenance. Run
   the full local milestone pipeline and retain all device-only checks as physically deferred.
+- `v0.6.2` gate: APOS returned `GO WITH CONDITIONS` for fail-closed prolonged-inactivity WALK
+  coaching. Post-meal and then confirmed rapid rise retain priority. Test exact inactivity and
+  activity-freshness boundaries, malformed/future/previous-day/cross-midnight activity, stable
+  algorithm-v4 identity, immutable snapshot expiry, movement/source/settings supersession,
+  phone/Wear display parity, processing-time Start revalidation, replay/idempotence, and explicit
+  automated-stair exclusion. No provider request, scheduler/polling change, Room migration, Wear
+  schema field, notification-action change, or session/replay semantic change is permitted.
 
 ## Current local verification
 
@@ -332,6 +341,22 @@ Status is `Engineering: PASS / Physical: DEFERRED`. The ZIP is a local engineeri
 the promoted integrated coaching release candidate; all device-only rows remain in the cumulative
 physical-test backlog.
 
+### v0.6.2 targeted engineering gate
+
+On 2026-08-12, the targeted domain/data/phone/Wear verification for prolonged-inactivity WALK
+coaching reported:
+
+```text
+BUILD SUCCESSFUL
+154 actionable tasks
+```
+
+The targeted gate covers policy boundaries, WALK-only arbitration, immutable recommendation
+snapshot behavior, phone Start revalidation, and phone/Wear action-context regressions. This is
+intermediate evidence only. Engineering remains `IN PROGRESS`, physical testing remains
+`DEFERRED`, and the full regression/lint/APK/WFF/signature/package pipeline, independent final
+review, final APOS decision, artifact metadata, hashes, and commit identity are pending.
+
 Historical v0.2 debug artifact SHA-256 values:
 
 ```text
@@ -524,8 +549,11 @@ Test boundary values, not just typical values:
 - simultaneous rapid-rise, post-meal, and inactivity eligibility;
 - absent prior local reading, cross-source pairs, duplicate/tied timestamps, out-of-order input, and
   a newer stable or qualifying exact-source reading replacing a published rapid pair;
-- prolonged inactivity with stairs enabled, with stairs disabled/walking enabled, and with both
-  reminder types disabled;
+- prolonged inactivity with stairs enabled or disabled, proving the automated candidate remains
+  WALK-only whenever walking reminders are enabled and is suppressed when walking is disabled;
+- missing/blank activity source, future or inconsistent activity timestamps, previous-day and
+  cross-midnight context, exact inactivity threshold, exact activity-stale boundary, new movement,
+  activity-source change, working-hours exit, and processing-time Start revalidation;
 - permission denied after recommendation generation;
 - duplicate start/complete deliveries;
 - completion arriving before start and later deferred reconciliation;

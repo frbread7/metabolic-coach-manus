@@ -86,6 +86,20 @@ is installed earlier, record only privacy-safe categorical results in
 [the cumulative physical-test backlog](PHYSICAL_TEST_BACKLOG.md); do not call the milestone
 physically accepted without a user-reported real-device pass.
 
+## v0.6.2 local engineering artifact preflight
+
+The v0.6.2 package is a debug-signed engineering checkpoint for fail-closed prolonged-inactivity
+WALK coaching. Verify the ZIP SHA-256, commit SHA, versionName `0.6.2`, versionCode `11`, and
+signing certificate before any intentional installation. Keep the matched phone, Wear, and
+watch-face APKs together and install them as an in-place update only when the signing certificate
+matches the accepted installation.
+
+Automated inactivity coaching is WALK-only; stair settings do not create an automated stair
+prompt. The artifact remains `Physical: DEFERRED` and is intended to be exercised with the
+integrated `v0.7.0` coaching release-candidate checklist. Record only privacy-safe categorical
+results in [the cumulative physical-test backlog](PHYSICAL_TEST_BACKLOG.md), and never call this
+milestone physically accepted without a user-reported real-device pass.
+
 ## Historical v0.5.1 CI artifact preflight
 
 The v0.5.1 package is a debug-signed engineering candidate for the phone-only local History

@@ -50,9 +50,47 @@ handed off.
 These are debug-signed engineering artifacts, not production releases. Regenerate and rehash them
 after every source/build change.
 
-## v0.6.1 local engineering artifact
+## v0.6.2 engineering artifact (pending full gate)
 
-The current engineering checkpoint is `v0.6.1` (versionCode `10`) across phone, Wear, and watch
+The active engineering milestone is `v0.6.2` (versionCode `11`) across phone, Wear, and watch face.
+It adds fail-closed prolonged-inactivity WALK coaching through the existing canonical pipeline.
+Automated stairs remain disabled. The change adds no provider request, polling/WorkManager change,
+Room migration, notification-action contract, Wear Data Layer field/schema, or session/replay
+semantic change.
+
+The targeted test gate reported `BUILD SUCCESSFUL` with 154 actionable tasks. Engineering remains
+`IN PROGRESS` and physical testing remains `DEFERRED`: the authoritative full local pipeline,
+independent final review, final APOS decision, feature commit, artifact metadata, certificate
+verification, and SHA-256 values are still pending. Do not install or describe an unpinned package
+as the promoted `v0.7.0` integrated coaching release candidate.
+
+After the full gate passes, the expected package names are:
+
+```text
+metabolic-coach-phone-debug.apk
+metabolic-coach-wear-debug.apk
+metabolic-coach-watchface-debug.apk
+MetabolicCoach-v0.6.2.zip
+```
+
+Pending identities to be filled only from the successful authoritative run:
+
+```text
+Feature commit: PENDING
+Phone APK SHA-256: PENDING
+Wear APK SHA-256: PENDING
+Watch-face APK SHA-256: PENDING
+ZIP SHA-256: PENDING
+Signing certificate SHA-256: PENDING VERIFICATION
+Final APOS decision: PENDING
+```
+
+Device-only inactivity, reconnect/replay, AOD, notification, and battery checks remain in
+`PHYSICAL_TEST_BACKLOG.md` for the `v0.7.0` batched phone/Galaxy Watch8 gate.
+
+## v0.6.1 local engineering artifact (historical)
+
+The preceding engineering checkpoint is `v0.6.1` (versionCode `10`) across phone, Wear, and watch
 face. It adds confirmed exact-source rapid-rise walk coaching without changing the provider,
 polling/WorkManager cadence, Room schema, notification action plumbing, or Wear Data Layer schema.
 Its recorded status is `Engineering: PASS / Physical: DEFERRED`.

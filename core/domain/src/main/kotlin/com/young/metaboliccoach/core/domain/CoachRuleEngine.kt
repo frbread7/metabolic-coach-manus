@@ -144,61 +144,27 @@ class CoachRuleEngine {
             )
         }
 
-        val inactiveMinutes = context.activity?.lastMovementAtEpochMillis?.let { lastMovement ->
-            (context.nowEpochMillis - lastMovement).coerceAtLeast(0) / MILLIS_PER_MINUTE
-        }
-        if (
-            isInWorkingHours(context.minuteOfDay, settings) &&
-            inactiveMinutes != null &&
-            inactiveMinutes >= settings.prolongedInactivityMinutes &&
-            CoachReason.PROLONGED_INACTIVITY in allowedActionReasons &&
-            (settings.stairRemindersEnabled || settings.walkingRemindersEnabled)
-        ) {
-            val inactivityActivity = requireNotNull(context.activity)
-            val lastMovementAtEpochMillis =
-                requireNotNull(inactivityActivity.lastMovementAtEpochMillis)
-            val triggerAtEpochMillis =
-                lastMovementAtEpochMillis +
-                    settings.prolongedInactivityMinutes * MILLIS_PER_MINUTE
-            val triggerContextId =
-                "${inactivityActivity.sourceId}:$lastMovementAtEpochMillis"
-            return if (settings.stairRemindersEnabled) {
-                CoachRecommendation.Action(
-                    reason = CoachReason.PROLONGED_INACTIVITY,
-                    id = actionId(
-                        CoachReason.PROLONGED_INACTIVITY,
-                        glucose.id,
-                        context.activity?.measuredAtEpochMillis?.toString(),
-                    ),
-                    createdAtEpochMillis = context.nowEpochMillis,
-                    validUntilEpochMillis = freshUntilEpochMillis,
-                    interventionType = InterventionType.STAIRS,
-                    title = "Climb ${settings.stairTargetFloors} floors?",
-                    actionLabel = "START",
-                    durationMinutes = null,
-                    targetFloors = settings.stairTargetFloors,
-                    algorithmVersion = INACTIVITY_ALGORITHM_VERSION,
-                    triggerContextId = triggerContextId,
-                    triggerAtEpochMillis = triggerAtEpochMillis,
-                    glucoseSourceId = glucose.sourceId,
-                    safetyReadingId = glucose.id,
-                    safetyReadingAtEpochMillis = glucose.measuredAtEpochMillis,
-                )
-            } else {
-                walkRecommendation(
+        if (CoachReason.PROLONGED_INACTIVITY in allowedActionReasons) {
+            val inactivity = InactivityConfirmationPolicy.confirm(
+                activity = context.activity,
+                settings = settings,
+                nowEpochMillis = context.nowEpochMillis,
+                minuteOfDay = context.minuteOfDay,
+            )
+            if (inactivity != null) {
+                return walkRecommendation(
                     reason = CoachReason.PROLONGED_INACTIVITY,
                     context = context,
-                    recommendationId = actionId(
-                        CoachReason.PROLONGED_INACTIVITY,
-                        glucose.id,
-                        null,
+                    recommendationId = inactivity.recommendationId,
+                    validUntilEpochMillis = minOf(
+                        freshUntilEpochMillis,
+                        inactivity.activityFreshUntilEpochMillis,
                     ),
-                    validUntilEpochMillis = freshUntilEpochMillis,
                     settings = settings,
                     title = "You've been inactive. Take a short walk?",
-                    triggerContextId = triggerContextId,
-                    triggerAtEpochMillis = triggerAtEpochMillis,
-                    algorithmVersion = INACTIVITY_ALGORITHM_VERSION,
+                    triggerContextId = inactivity.triggerIdentity,
+                    triggerAtEpochMillis = inactivity.thresholdCrossingAtEpochMillis,
+                    algorithmVersion = InactivityConfirmationPolicy.ALGORITHM_VERSION,
                 )
             }
         }
@@ -276,15 +242,6 @@ class CoachRuleEngine {
         return isInTimeRange(minuteOfDay, start, end)
     }
 
-    private fun isInWorkingHours(
-        minuteOfDay: Int,
-        settings: CoachSettings,
-    ): Boolean {
-        val start = settings.workingHoursStartMinuteOfDay
-        val end = settings.workingHoursEndMinuteOfDay
-        return start == end || isInTimeRange(minuteOfDay, start, end)
-    }
-
     private fun postMealRecommendationId(context: CoachContext): String = listOf(
         CoachReason.POST_MEAL_WINDOW.name,
         requireNotNull(context.mostRecentMeal).id,
@@ -312,19 +269,11 @@ class CoachRuleEngine {
     companion object {
         private const val MILLIS_PER_MINUTE = 60_000L
         private const val POST_MEAL_ALGORITHM_VERSION = 2
-        private const val INACTIVITY_ALGORITHM_VERSION = 2
         private val ACTION_REASONS = setOf(
             CoachReason.RAPID_GLUCOSE_RISE,
             CoachReason.POST_MEAL_WINDOW,
             CoachReason.PROLONGED_INACTIVITY,
         )
-
-        private fun actionId(
-            reason: CoachReason,
-            glucoseReadingId: String,
-            contextId: String?,
-        ): String = listOfNotNull(reason.name, glucoseReadingId, contextId).joinToString(":")
-
         private fun isInTimeRange(
             minuteOfDay: Int,
             start: Int,

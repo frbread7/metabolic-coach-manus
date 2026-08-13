@@ -402,6 +402,8 @@ Version 1 glucose is read from Nightscout, not Health Connect. The phone uses He
 It stores only daily exercise-session count/duration aggregates, not detailed per-session workout
 history, exercise type, or route. The inactive Health Connect glucose adapter remains isolated
 behind `GlucoseProvider` for possible future use, but Version 1 provider policy does not select it.
+`v0.6.2` consumes the already persisted `ActivitySnapshot`; it adds no Health Connect query,
+provider behavior, polling cadence, WorkManager job, or background wake.
 
 Foreground reads require the record permissions selected by the user. Background reads are
 requested only when the device reports
@@ -423,9 +425,13 @@ actions:
 6. active snooze;
 7. cooldown or daily notification limit.
 
-Only post-meal and rapid-rise actions are enabled in `v0.6.1`. The retained inactivity foundation
-would choose stairs, or a walk fallback when stair reminders are disabled and
-   walking reminders remain enabled.
+`v0.6.2` enables prolonged-inactivity coaching as a WALK-only third-priority candidate. A pure
+`InactivityConfirmationPolicy` requires a nonblank activity source, internally consistent
+same-day timestamps, current working hours, enabled walking reminders, and an exact-threshold or
+greater inactivity duration. Missing, future, previous-day/cross-midnight, inconsistent, or stale
+activity fails closed. The existing `staleReadingMinutes` bound is also the conservative activity
+freshness ceiling for this milestone; its default and range are unchanged. Stair settings have no
+effect on automated inactivity coaching, and automated stairs remain disabled.
 
 All user-facing coaching durations, thresholds, time windows, daily limits, enablement switches,
 units, and observation sample counts are represented in `CoachSettings` and persisted by the phone.
@@ -443,11 +449,27 @@ cross-source pairs, or a nonqualifying reading fail closed without a provider re
 
 The rapid algorithm-v3 identity is a bounded SHA-256 fingerprint of the source, both reading
 IDs/timestamps, and algorithm version. Post-meal keeps its algorithm-v2 meal/source identity.
-Rapid and inactivity actions expire when their glucose reading becomes stale; a post-meal action
-expires at the earlier of glucose staleness and the meal-window end. Phone and Wear hide a cached
-action during quiet hours, when notifications are disabled, while a session is active, or whenever
-shared exercise safety is not `SAFE`. Complete source/trigger/safety provenance is required; a
-rapid action additionally stops being current when a newer reading replaces its confirmed pair.
+Inactivity uses an algorithm-v4 SHA-256 episode identity derived from reason, activity source,
+last-movement timestamp, threshold crossing, and algorithm version. Glucose IDs/timestamps,
+activity refresh time, current time, and step/floor totals do not change that identity. The
+persisted snapshot for one episode remains immutable and cannot gain a later expiry after refresh.
+
+Rapid actions expire when glucose becomes stale; post-meal expires at the earlier of glucose
+staleness and the meal-window end; inactivity expires at the earlier of glucose freshness and
+activity-snapshot freshness. Phone and Wear hide a cached action during quiet hours, when
+notifications are disabled, outside working hours for inactivity, while a session is active, or
+whenever shared exercise safety is not `SAFE`. Complete source/trigger/safety provenance is
+required. Rapid additionally stops being current when a newer reading replaces its confirmed pair;
+inactivity stops being current after new movement, activity-source/settings mismatch, invalid
+activity context, or an episode-identity change. Phone Start rechecks the latest persisted activity
+context at processing time. Wear consumes the existing `ActivitySnapshot` and recommendation
+provenance; no Wear Data Layer field or schema was added.
+
+The coordinator remains the canonical publication authority. A synthesized inactivity candidate is
+not eligible for the phone card until its immutable snapshot is stored and the successful
+publication is recorded. The same effective action is then mirrored to Watch state and the optional
+phone notification. Notification and complication display lifetimes end at the earliest of the
+immutable action validity, the next quiet-hours start, or—for inactivity—the working-hours end.
 
 ## Watch and watch-face design
 
