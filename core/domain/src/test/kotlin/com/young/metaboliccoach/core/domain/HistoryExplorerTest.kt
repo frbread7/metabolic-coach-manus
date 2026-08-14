@@ -212,6 +212,54 @@ class HistoryExplorerTest {
     }
 
     @Test
+    fun `viewport chart ignores parent period aggregation and rebuilds visible detail`() {
+        val range = range(
+            preset = HistoryPeriodPreset.DAYS_90,
+            start = 30L * DAY_MILLIS,
+            end = 30L * DAY_MILLIS + 12L * HOUR_MILLIS,
+        )
+        val readings = readingsEveryFiveMinutes(
+            start = range.startEpochMillis,
+            endInclusive = range.endExclusiveEpochMillis,
+        ) { 140 }
+
+        val parentAggregated = GlucoseTrendSeriesBuilder.build(readings, SOURCE, range)
+        val viewport = GlucoseTrendSeriesBuilder.buildViewport(readings, SOURCE, range)
+
+        assertTrue(parentAggregated.segments.flatMap { it.buckets }.size <= 2)
+        assertTrue(viewport.segments.flatMap { it.buckets }.size > 100)
+        assertTrue(viewport.segments.flatMap { it.buckets }.all {
+            it.endExclusiveEpochMillis - it.startEpochMillis == 1L
+        })
+    }
+
+    @Test
+    fun `dense viewport adaptively caps geometry and preserves extrema`() {
+        val range = range(
+            preset = HistoryPeriodPreset.DAYS_90,
+            start = 0L,
+            end = 30L * MINUTE_MILLIS,
+        )
+        val readings = buildList {
+            for (second in 0..1_800) {
+                val value = when (second) {
+                    120 -> 45
+                    240 -> 320
+                    else -> 140
+                }
+                add(reading("dense-$second", second * 1_000L, value))
+            }
+        }
+
+        val result = GlucoseTrendSeriesBuilder.buildViewport(readings, SOURCE, range)
+        val buckets = result.segments.flatMap { it.buckets }
+
+        assertTrue(buckets.size <= 400)
+        assertEquals(45.0, buckets.minOf { it.minimumMgDl }, 0.001)
+        assertEquals(320.0, buckets.maxOf { it.maximumMgDl }, 0.001)
+    }
+
+    @Test
     fun `sparse singleton segments remain bounded and preserve global extrema`() {
         val range = range(HistoryPeriodPreset.DAYS_90, 0L, 90L * DAY_MILLIS)
         val readings = buildList {

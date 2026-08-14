@@ -179,7 +179,7 @@ and pruning is isolated per source while preserving each source's newest record.
 After confirming 1 year or Keep all downloaded, press **Download one older range** to request one
 bounded 90-day range and repeat for another range. The operation is resumable and reports paused or
 failed state after interruption/network loss. It does not alter the current glucose state or watch.
-### History Explorer (v0.7.1)
+### History Explorer (v0.7.2)
 
 Open **History** to read glucose already stored on this phone. Choose 6 hours, 12 hours, 24 hours,
 7 days, 14 days, 30 days, or 90 days. The 6h and 12h choices are exact elapsed-time windows, even
@@ -197,6 +197,12 @@ not a numeric GMI or HbA1c-like estimate.
 
 Opening History does not download data. Use the existing Settings history controls when older data
 must be downloaded. The last fixed period is remembered; custom dates are not a saved goal.
+
+The chart's **Visible chart window** can be narrowed to 30 minutes or widened to the full selected
+period. Pinch horizontally to zoom around the fingers, drag horizontally to pan, or use the visible
+**−**, **+**, and **Reset** controls. Vertical swipes continue to scroll the page. While a new local
+window is loading, the previous chart remains labeled with the period it actually represents.
+Changing this visible window does not change the selected-period GMI calculation or download data.
 
 ### Wear app
 

@@ -50,9 +50,30 @@ handed off.
 These are debug-signed engineering artifacts, not production releases. Regenerate and rehash them
 after every source/build change.
 
-## v0.7.1 short local History engineering candidate
+## v0.7.2 interactive local History engineering candidate
 
-The active engineering milestone is `v0.7.1` (versionCode `13`) across phone, Wear, and watch face.
+The active engineering milestone is `v0.7.2` (versionCode `14`) across phone, Wear, and watch face.
+It adds phone-only pinch zoom, horizontal pan, and accessible zoom/reset controls over exact-source
+local Room history. Selected-period GMI remains bound to the full selected period. No provider,
+current-reading, network refresh, backfill, retention, Room schema, export/reset, coaching,
+notification, Wear protocol, or watch-face production behavior changes.
+
+The expected local package names are:
+
+```text
+metabolic-coach-phone-debug.apk
+metabolic-coach-wear-debug.apk
+metabolic-coach-watchface-debug.apk
+MetabolicCoach-v0.7.2.zip
+```
+
+The APOS review returned `GO WITH CONDITIONS`. Forced pipeline, review, identity, and hash evidence
+is pending and must be recorded only after it succeeds. Android instrumentation and physical device
+execution remain `NOT RUN`. Current status is `Engineering: IN PROGRESS / Physical: DEFERRED`.
+
+## v0.7.1 short local History engineering candidate (historical)
+
+The preceding engineering milestone is `v0.7.1` (versionCode `13`) across phone, Wear, and watch face.
 It adds fixed 6h and 12h choices to the phone's accepted exact-source local History path. The APOS
 architecture review returned `GO` with no blocker. No provider/current-reading, backfill/retention,
 Room schema, GMI policy/formula/wording, coaching, notification, Wear Data Layer, Wear UI, or

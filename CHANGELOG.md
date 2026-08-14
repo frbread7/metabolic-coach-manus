@@ -2,6 +2,30 @@
 
 All notable Metabolic Coach package changes are recorded here.
 
+## v0.7.2 — 2026-08-13 — Interactive exact-source History chart
+
+### Added
+
+- The phone History chart supports horizontal pinch zoom and one-finger horizontal pan inside the
+  selected period, with visible Zoom out, Zoom in, and Reset controls.
+- A separate visible-window label and loading/error state keep the last rendered chart truthfully
+  identified while a new viewport is debounced and loaded.
+- Each changed viewport re-queries exact-source local Room history and rebuilds visible detail from
+  canonical readings; zoom never geometrically magnifies an older aggregate.
+
+### Safety, scope, and verification status
+
+- Selected-period GMI remains bound to the full selected period and is never recalculated or
+  cleared by viewport navigation.
+- The 200 ms debounce and source/range/viewport/generation gate reject delayed work; failed loads
+  retain the last correctly labeled rendered chart.
+- No provider/current-reading, network refresh, backfill, retention, Room schema, export/reset,
+  coaching, notification, Wear protocol, or watch-face behavior changes.
+- Phone, Wear, and watch-face metadata is aligned at versionName `0.7.2`, versionCode `14`; the
+  production feature itself is phone-only.
+- Status remains `Engineering: IN PROGRESS / Physical: DEFERRED` until the forced local release gate
+  and independent review are recorded. Android instrumentation and all physical rows are `NOT RUN`.
+
 ## v0.7.1 — 2026-08-13 — Six- and twelve-hour local History windows
 
 ### Added

@@ -230,14 +230,26 @@ class HistoryExplorerLoaderTest {
             detail = "old",
         )
         val state = HistoryExplorerUiState(
-            range = range,
-            chart = oldResult,
+            selectedRange = range,
+            requestedViewport = HistoryViewport(
+                range.startEpochMillis,
+                range.endExclusiveEpochMillis,
+            ),
+            renderedViewport = RenderedHistoryViewport(
+                sourceId = "source-a",
+                selectedRange = range,
+                viewport = HistoryViewport(
+                    range.startEpochMillis,
+                    range.endExclusiveEpochMillis,
+                ),
+                chart = oldResult,
+            ),
             loadStatus = HistoryExplorerLoadStatus.READY,
         )
 
         val sourceSafe = state.forActiveSource("source-b")
 
-        assertNull(sourceSafe.chart)
+        assertNull(sourceSafe.renderedViewport)
         assertEquals(HistoryExplorerLoadStatus.LOADING, sourceSafe.loadStatus)
     }
 

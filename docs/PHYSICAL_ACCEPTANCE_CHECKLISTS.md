@@ -48,6 +48,7 @@ new pinned run.
 | `v0.6.2` | Fail-closed prolonged-inactivity WALK coaching only | Engineering PASS / Physical DEFERRED | [v0.6.2 contract](V0_6_2_INACTIVITY_WALK_COACHING.md); cumulative backlog |
 | `v0.7.0` | Integrated walk-coaching RC | Engineering PASS / Physical DEFERRED | [Consolidated v0.7.0 checklist](V0_7_0_INTEGRATED_WALK_RC.md) |
 | `v0.7.1` | Phone-only 6h/12h local History windows | Engineering PASS / Physical DEFERRED | [v0.7.1 checklist](V0_7_1_SHORT_HISTORY_WINDOWS.md) |
+| `v0.7.2` | Phone-only interactive exact-source History chart | Engineering IN PROGRESS / Physical DEFERRED | [v0.7.2 checklist](V0_7_2_INTERACTIVE_HISTORY_CHART.md) |
 | `v0.9.0` beta | One-week daily-use reliability and safety observation | Planned after feature gates | This document, §one-week beta |
 | `v1.0` | Production daily-use release | Planned | This document, §v1.0 |
 

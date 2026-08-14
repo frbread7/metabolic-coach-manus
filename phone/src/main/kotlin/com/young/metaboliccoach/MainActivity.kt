@@ -12,6 +12,8 @@ import androidx.activity.viewModels
 import androidx.core.net.toUri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -25,7 +27,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -65,6 +69,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -117,10 +123,14 @@ import com.young.metaboliccoach.ui.PhoneUiState
 import com.young.metaboliccoach.ui.PhoneViewModel
 import com.young.metaboliccoach.ui.HistoryExplorerLoadStatus
 import com.young.metaboliccoach.ui.HistoryExplorerUiState
+import com.young.metaboliccoach.ui.HistoryViewport
+import com.young.metaboliccoach.ui.HistoryViewportLoadStatus
+import com.young.metaboliccoach.ui.HistoryViewportMath
 import dagger.hilt.android.AndroidEntryPoint
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
 @AndroidEntryPoint
@@ -173,6 +183,11 @@ class MainActivity : ComponentActivity() {
                     onCustomHistoryStartChanged = viewModel::updateCustomHistoryStartDate,
                     onCustomHistoryEndChanged = viewModel::updateCustomHistoryEndDate,
                     onApplyCustomHistoryRange = viewModel::applyCustomHistoryRange,
+                    onTransformHistoryViewport = viewModel::transformHistoryViewport,
+                    onZoomInHistoryViewport = viewModel::zoomInHistoryViewport,
+                    onZoomOutHistoryViewport = viewModel::zoomOutHistoryViewport,
+                    onResetHistoryViewport = viewModel::resetHistoryViewport,
+                    onRetryHistoryViewport = viewModel::retryHistoryViewport,
                     onConnectHealth = {
                         when (healthConnectSdkStatus.intValue) {
                             HealthConnectClient.SDK_AVAILABLE -> {
@@ -260,6 +275,11 @@ private fun MetabolicCoachApp(
     onCustomHistoryStartChanged: (String) -> Unit,
     onCustomHistoryEndChanged: (String) -> Unit,
     onApplyCustomHistoryRange: () -> Unit,
+    onTransformHistoryViewport: (Float, Float, Float, Float) -> Unit,
+    onZoomInHistoryViewport: () -> Unit,
+    onZoomOutHistoryViewport: () -> Unit,
+    onResetHistoryViewport: () -> Unit,
+    onRetryHistoryViewport: () -> Unit,
     onConnectHealth: () -> Unit,
     onEnableNotifications: () -> Unit,
 ) {
@@ -318,6 +338,11 @@ private fun MetabolicCoachApp(
                 onCustomStartChanged = onCustomHistoryStartChanged,
                 onCustomEndChanged = onCustomHistoryEndChanged,
                 onApplyCustomRange = onApplyCustomHistoryRange,
+                onTransformViewport = onTransformHistoryViewport,
+                onZoomInViewport = onZoomInHistoryViewport,
+                onZoomOutViewport = onZoomOutHistoryViewport,
+                onResetViewport = onResetHistoryViewport,
+                onRetryViewport = onRetryHistoryViewport,
                 contentPadding = padding,
             )
             PhoneDestination.SETTINGS -> SettingsScreen(
@@ -350,17 +375,25 @@ private fun MetabolicCoachApp(
 }
 
 @Composable
-private fun HistoryExplorerScreen(
+internal fun HistoryExplorerScreen(
     state: HistoryExplorerUiState,
     glucoseUnit: GlucoseUnit,
     onSelectPreset: (HistoryPeriodPreset) -> Unit,
     onCustomStartChanged: (String) -> Unit,
     onCustomEndChanged: (String) -> Unit,
     onApplyCustomRange: () -> Unit,
+    onTransformViewport: (Float, Float, Float, Float) -> Unit,
+    onZoomInViewport: () -> Unit,
+    onZoomOutViewport: () -> Unit,
+    onResetViewport: () -> Unit,
+    onRetryViewport: () -> Unit,
     contentPadding: PaddingValues,
+    listState: LazyListState? = null,
 ) {
+    val resolvedListState = listState ?: rememberLazyListState()
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
+        state = resolvedListState,
         contentPadding = PaddingValues(
             start = 20.dp,
             end = 20.dp,
@@ -459,8 +492,18 @@ private fun HistoryExplorerScreen(
                 HistoryExplorerLoadStatus.READY -> Unit
             }
         }
-        state.chart?.let { chart ->
-            item { GlucoseHistoryChartCard(chart, glucoseUnit) }
+        state.renderedViewport?.let {
+            item {
+                GlucoseHistoryChartCard(
+                    state = state,
+                    glucoseUnit = glucoseUnit,
+                    onTransformViewport = onTransformViewport,
+                    onZoomInViewport = onZoomInViewport,
+                    onZoomOutViewport = onZoomOutViewport,
+                    onResetViewport = onResetViewport,
+                    onRetryViewport = onRetryViewport,
+                )
+            }
         }
         state.selectedPeriodGmi?.let { result ->
             item { SelectedPeriodGmiCard(result, glucoseUnit) }
@@ -470,29 +513,99 @@ private fun HistoryExplorerScreen(
 
 @Composable
 private fun GlucoseHistoryChartCard(
-    chart: GlucoseChartResult,
+    state: HistoryExplorerUiState,
     glucoseUnit: GlucoseUnit,
+    onTransformViewport: (Float, Float, Float, Float) -> Unit,
+    onZoomInViewport: () -> Unit,
+    onZoomOutViewport: () -> Unit,
+    onResetViewport: () -> Unit,
+    onRetryViewport: () -> Unit,
 ) {
+    val rendered = state.renderedViewport ?: return
+    val chart = rendered.chart
+    val selectedRange = state.selectedRange ?: rendered.selectedRange
+    val requestedViewport = state.requestedViewport ?: rendered.viewport
+    val fullViewport = HistoryViewportMath.full(selectedRange)
+    val canZoomIn = requestedViewport.durationMillis >
+        HistoryViewportMath.MINIMUM_DURATION_MILLIS
+    val canZoomOut = fullViewport != null && requestedViewport != fullViewport
+    val isUpdating = state.viewportLoadStatus == HistoryViewportLoadStatus.DEBOUNCING ||
+        state.viewportLoadStatus == HistoryViewportLoadStatus.LOADING
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(historyRangeLabel(chart.range), style = MaterialTheme.typography.titleLarge)
+            Text(
+                "Selected period: ${historyRangeLabel(selectedRange)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text("Visible chart window", style = MaterialTheme.typography.titleLarge)
+            Text(historyViewportRangeLabel(rendered.viewport, selectedRange.displayTimeZoneId))
+            if (isUpdating) {
+                Text(
+                    "Updating visible chart…",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.semantics {
+                        contentDescription = "Updating history chart"
+                    },
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onZoomOutViewport,
+                    enabled = canZoomOut,
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { contentDescription = "Zoom out history chart" },
+                ) { Text("−") }
+                OutlinedButton(
+                    onClick = onZoomInViewport,
+                    enabled = canZoomIn,
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { contentDescription = "Zoom in history chart" },
+                ) { Text("+") }
+                OutlinedButton(
+                    onClick = onResetViewport,
+                    enabled = canZoomOut,
+                    modifier = Modifier
+                        .weight(1.4f)
+                        .semantics { contentDescription = "Reset history chart" },
+                ) { Text("Reset") }
+            }
+            if (state.viewportLoadStatus == HistoryViewportLoadStatus.ERROR) {
+                Text(state.viewportDetail, color = MaterialTheme.colorScheme.error)
+                TextButton(
+                    onClick = onRetryViewport,
+                    modifier = Modifier.semantics {
+                        contentDescription = "Retry history chart"
+                    },
+                ) { Text("Retry chart") }
+            }
             if (chart.status != GlucoseChartStatus.AVAILABLE) {
                 Text(chart.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                return@Column
             }
             val buckets = chart.segments.flatMap { it.buckets }
-            GlucoseTrendCanvas(chart)
+            InteractiveGlucoseTrendCanvas(
+                chart = chart,
+                selectedRange = selectedRange,
+                requestedViewport = requestedViewport,
+                onTransformViewport = onTransformViewport,
+            )
             val minimum = buckets.minOfOrNull { it.minimumMgDl }
             val maximum = buckets.maxOfOrNull { it.maximumMgDl }
             Text(
-                "Range ${formatGlucose(minimum, glucoseUnit)} – " +
+                "Visible range ${formatGlucose(minimum, glucoseUnit)} – " +
                     formatGlucose(maximum, glucoseUnit),
             )
             Text(
-                "Coverage ${formatPercent(chart.coverage.coveragePercent)} • " +
+                "Visible coverage ${formatPercent(chart.coverage.coveragePercent)} • " +
                     "${chart.coverage.gapCount} gap(s) • largest " +
                     formatDuration(chart.coverage.largestGapMillis),
                 style = MaterialTheme.typography.bodySmall,
@@ -510,9 +623,79 @@ private fun GlucoseHistoryChartCard(
 }
 
 @Composable
-private fun GlucoseTrendCanvas(chart: GlucoseChartResult) {
+private fun InteractiveGlucoseTrendCanvas(
+    chart: GlucoseChartResult,
+    selectedRange: HistoryRange,
+    requestedViewport: HistoryViewport,
+    onTransformViewport: (Float, Float, Float, Float) -> Unit,
+) {
+    var chartWidthPixels by remember(chart.sourceId, selectedRange) { mutableIntStateOf(0) }
+    val canPan = requestedViewport.durationMillis < selectedRange.durationMillis
+    val renderedViewport = HistoryViewport(
+        chart.range.startEpochMillis,
+        chart.range.endExclusiveEpochMillis,
+    )
+    val visibleWindowDescription = "Visible window " +
+        historyViewportRangeLabel(renderedViewport, selectedRange.displayTimeZoneId) + ". " +
+        if (renderedViewport.durationMillis < selectedRange.durationMillis) {
+            "Chart is zoomed."
+        } else {
+            "Chart shows the full selected period."
+        }
+    val transformState = rememberTransformableState { centroid, zoomChange, panChange, _ ->
+        val width = chartWidthPixels.toFloat()
+        if (width > 0f) {
+            onTransformViewport(
+                zoomChange,
+                (centroid.x / width).coerceIn(0f, 1f),
+                panChange.x,
+                width,
+            )
+        }
+    }
+    GlucoseTrendCanvas(
+        chart = chart,
+        accessibilityContext = visibleWindowDescription,
+        modifier = Modifier
+            .onSizeChanged { chartWidthPixels = it.width }
+            .transformable(
+                state = transformState,
+                canPan = { delta ->
+                    canPan && HistoryViewportMath.isHorizontalIntent(
+                        delta.x.toDouble(),
+                        delta.y.toDouble(),
+                    )
+                },
+                lockRotationOnZoomPan = true,
+            ),
+    )
+}
+
+@Composable
+private fun GlucoseTrendCanvas(
+    chart: GlucoseChartResult,
+    accessibilityContext: String,
+    modifier: Modifier = Modifier,
+) {
     val buckets = chart.segments.flatMap { it.buckets }
-    if (buckets.isEmpty()) return
+    if (buckets.isEmpty()) {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(220.dp)
+                .testTag(HISTORY_CHART_TEST_TAG)
+                .semantics {
+                    contentDescription = "$accessibilityContext ${chart.detail}"
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "No local readings in this visible window.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
     val observedMinimum = buckets.minOf { it.minimumMgDl }
     val observedMaximum = buckets.maxOf { it.maximumMgDl }
     val padding = ((observedMaximum - observedMinimum) * 0.08).coerceAtLeast(8.0)
@@ -532,12 +715,13 @@ private fun GlucoseTrendCanvas(chart: GlucoseChartResult) {
     }
     val accessibility = "Glucose trend with ${chart.segments.size} disconnected segment(s), " +
         "${"%.1f".format(chart.coverage.coveragePercent)} percent coverage. " +
-        "Missing periods are not connected. $trendSummary"
+        "Missing periods are not connected. $trendSummary $accessibilityContext"
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(220.dp)
+            .testTag(HISTORY_CHART_TEST_TAG)
             .semantics { contentDescription = accessibility }
             .drawWithCache {
                 fun x(epochMillis: Long): Float = (
@@ -590,6 +774,8 @@ private fun GlucoseTrendCanvas(chart: GlucoseChartResult) {
             },
     )
 }
+
+internal const val HISTORY_CHART_TEST_TAG = "history-glucose-chart"
 
 @Composable
 private fun SelectedPeriodGmiCard(
@@ -663,6 +849,14 @@ private fun historyRangeLabel(range: HistoryRange): String = when (range.preset)
     HistoryPeriodPreset.DAYS_30 -> "Last 30 days"
     HistoryPeriodPreset.DAYS_90 -> "Last 90 days"
     HistoryPeriodPreset.CUSTOM -> "Custom ${range.calendarDayCount}-day period"
+}
+
+private fun historyViewportRangeLabel(viewport: HistoryViewport, displayTimeZoneId: String): String {
+    val zone = ZoneId.of(displayTimeZoneId)
+    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+    val start = Instant.ofEpochMilli(viewport.startEpochMillis).atZone(zone).format(formatter)
+    val end = Instant.ofEpochMilli(viewport.endExclusiveEpochMillis).atZone(zone).format(formatter)
+    return "$start to $end"
 }
 
 private fun historyDateRange(range: HistoryRange): String {

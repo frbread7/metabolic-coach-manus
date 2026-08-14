@@ -59,6 +59,7 @@ fi
     :core:data:compileDebugAndroidTestKotlin \
     :core:sync:testDebugUnitTest \
     :phone:testDebugUnitTest \
+    :phone:compileDebugAndroidTestKotlin \
     :wear:testDebugUnitTest \
     ":phone:lint$task_suffix" \
     ":wear:lint$task_suffix" \

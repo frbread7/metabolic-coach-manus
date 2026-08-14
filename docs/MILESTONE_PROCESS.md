@@ -169,5 +169,12 @@ non-conflicting earlier constraints, and avoid inferring acceptance that the use
   backfill/retention, Room, chart-interaction/aggregation, GMI policy, coaching, notification,
   Wear, or watch-face change. Phone checks may remain `Physical: DEFERRED`; they are accumulated in
   the root backlog and are never inferred from automated evidence.
+- `v0.7.2` interactive local History chart: the repository-scoped APOS review returned `GO WITH
+  CONDITIONS` for a phone-only transient viewport over exact-source Room history. Selected-period
+  GMI remains immutable during navigation; every viewport change must re-query canonical local
+  rows and pass source/range/viewport/generation publication gating. Any provider/current-reading,
+  persistence/schema, GMI policy, coaching, notification, Wear, watch-face, or other foundational
+  boundary expansion stops the milestone for another review. Phone gesture/performance checks are
+  batched as `Physical: DEFERRED`, never inferred from compiled UI tests.
 
 The completed physical test was defined in [V0.3_WEAR_ACCEPTANCE.md](V0.3_WEAR_ACCEPTANCE.md).

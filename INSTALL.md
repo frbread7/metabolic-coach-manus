@@ -129,6 +129,19 @@ testing is deferred, so every row remains `NOT RUN`. If installed later, use
 [the v0.7.1 checklist](docs/V0_7_1_SHORT_HISTORY_WINDOWS.md) and record only privacy-safe
 categorical results.
 
+## v0.7.2 interactive History engineering-candidate preflight
+
+The v0.7.2 package adds phone-only pinch zoom, horizontal pan, and accessible zoom/reset controls
+to the exact-source local History chart. Verify the externally recorded ZIP SHA-256, pinned commit,
+versionName `0.7.2`, versionCode `14`, and signing certificate before installation. Keep all three
+APKs from the same archive together; Wear and watch-face metadata is aligned for packaging only.
+
+The feature reads only already-stored local rows and never changes selected-period GMI or initiates
+provider/network/backfill work. Physical testing is deferred, so every gesture, scroll-arbitration,
+performance, and device regression row remains `NOT RUN`. If installed later, use
+[the v0.7.2 checklist](docs/V0_7_2_INTERACTIVE_HISTORY_CHART.md) and record privacy-safe categorical
+results only.
+
 ## Historical v0.5.1 CI artifact preflight
 
 The v0.5.1 package is a debug-signed engineering candidate for the phone-only local History

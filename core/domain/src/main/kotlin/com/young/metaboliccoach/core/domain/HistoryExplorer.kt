@@ -129,6 +129,43 @@ object GlucoseTrendSeriesBuilder {
         maxInterpolationGapMinutes: Long =
             GlycemicGoalPlanner.DEFAULT_MAX_INTERPOLATION_GAP_MINUTES,
         cancellationCheck: () -> Unit = {},
+    ): GlucoseChartResult = buildInternal(
+        readings = readings,
+        sourceId = sourceId,
+        range = range,
+        maxInterpolationGapMinutes = maxInterpolationGapMinutes,
+        usePresetAggregation = true,
+        cancellationCheck = cancellationCheck,
+    )
+
+    /**
+     * Builds a chart for an interactive viewport from canonical raw readings. Parent-period fixed
+     * aggregation must not leak into a zoomed viewport; adaptive aggregation is used only when the
+     * visible raw point count exceeds the defensive render cap.
+     */
+    fun buildViewport(
+        readings: List<GlucoseReading>,
+        sourceId: String,
+        range: HistoryRange,
+        maxInterpolationGapMinutes: Long =
+            GlycemicGoalPlanner.DEFAULT_MAX_INTERPOLATION_GAP_MINUTES,
+        cancellationCheck: () -> Unit = {},
+    ): GlucoseChartResult = buildInternal(
+        readings = readings,
+        sourceId = sourceId,
+        range = range,
+        maxInterpolationGapMinutes = maxInterpolationGapMinutes,
+        usePresetAggregation = false,
+        cancellationCheck = cancellationCheck,
+    )
+
+    private fun buildInternal(
+        readings: List<GlucoseReading>,
+        sourceId: String,
+        range: HistoryRange,
+        maxInterpolationGapMinutes: Long,
+        usePresetAggregation: Boolean,
+        cancellationCheck: () -> Unit,
     ): GlucoseChartResult {
         cancellationCheck()
         if (sourceId.isBlank() || range.durationMillis <= 0L || maxInterpolationGapMinutes <= 0L) {
@@ -186,6 +223,7 @@ object GlucoseTrendSeriesBuilder {
         val allIntervals = preparedSegments.flatMap(PreparedSegment::intervals)
         val coverage = calculateCoverage(allIntervals, range)
         val requestedBucketMillis = range.preset.aggregationBucketMillis
+            .takeIf { usePresetAggregation }
         val rawPointCount = preparedSegments.sumOf { it.displayPoints.size }
         val bucketMillis = when {
             requestedBucketMillis != null -> requestedBucketMillis
@@ -194,7 +232,18 @@ object GlucoseTrendSeriesBuilder {
         }
         val chartSegments = preparedSegments.mapNotNull { segment ->
             val buckets = if (bucketMillis == null) {
-                segment.displayPoints.map(::pointBucket)
+                segment.displayPoints
+                    .let { displayPoints ->
+                        if (usePresetAggregation) {
+                            displayPoints
+                        } else {
+                            displayPoints.filter {
+                                it.epochMillis >= range.startEpochMillis &&
+                                    it.epochMillis < range.endExclusiveEpochMillis
+                            }
+                        }
+                    }
+                    .map(::pointBucket)
             } else {
                 aggregate(segment, range, bucketMillis, cancellationCheck)
             }

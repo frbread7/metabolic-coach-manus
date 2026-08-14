@@ -39,7 +39,6 @@ import com.young.metaboliccoach.core.model.GlucoseDataOrigin
 import com.young.metaboliccoach.core.model.GlucoseHistorySettings
 import com.young.metaboliccoach.core.model.GlucoseHistoryStatus
 import com.young.metaboliccoach.core.model.GlucoseReading
-import com.young.metaboliccoach.core.model.GlucoseChartResult
 import com.young.metaboliccoach.core.model.GlycemicPlannerSettings
 import com.young.metaboliccoach.core.model.GlycemicPlanningMilestone
 import com.young.metaboliccoach.core.model.GlycemicPlanningMilestoneEvaluation
@@ -90,11 +89,14 @@ enum class HistoryExplorerLoadStatus {
 
 data class HistoryExplorerUiState(
     val selectedPreset: HistoryPeriodPreset = HistoryPeriodPreset.HOURS_24,
-    val range: HistoryRange? = null,
-    val chart: GlucoseChartResult? = null,
+    val selectedRange: HistoryRange? = null,
+    val requestedViewport: HistoryViewport? = null,
+    val renderedViewport: RenderedHistoryViewport? = null,
     val selectedPeriodGmi: SelectedPeriodGmiResult? = null,
     val loadStatus: HistoryExplorerLoadStatus = HistoryExplorerLoadStatus.IDLE,
     val detail: String = "Open History to review locally stored readings.",
+    val viewportLoadStatus: HistoryViewportLoadStatus = HistoryViewportLoadStatus.IDLE,
+    val viewportDetail: String = "",
     val requestGeneration: Long = 0L,
     val customDraft: HistoryCustomDraftUiState = HistoryCustomDraftUiState(),
 )
@@ -197,6 +199,13 @@ class PhoneViewModel @Inject constructor(
         glucoseRepository = glucoseRepository,
         glycemicGoalRepository = glycemicGoalRepository,
         settingsRepository = settingsRepository,
+    )
+    private val historyViewportLoader = HistoryViewportLoader(glucoseRepository)
+    private val historyViewportCoordinator = HistoryViewportCoordinator(
+        scope = viewModelScope,
+        loadViewport = historyViewportLoader::load,
+        readState = { historyExplorerState.value },
+        writeState = { historyExplorerState.value = it },
     )
 
     private val current = combine(
@@ -421,6 +430,7 @@ class PhoneViewModel @Inject constructor(
         historyVisible = visible
         visibleHistorySourceId = sourceId
         historyRequestGate.updateVisibility(visible, sourceId)
+        historyViewportCoordinator.updateVisibility(visible, sourceId)
         if (!visible) {
             historyLoadJob?.cancel()
             return
@@ -446,13 +456,17 @@ class PhoneViewModel @Inject constructor(
         if (preset == HistoryPeriodPreset.CUSTOM) {
             historyLoadJob?.cancel()
             historyRequestGate.invalidate()
+            historyViewportCoordinator.invalidate()
             historyExplorerState.value = historyExplorerState.value.copy(
                 selectedPreset = preset,
-                range = null,
-                chart = null,
+                selectedRange = null,
+                requestedViewport = null,
+                renderedViewport = null,
                 selectedPeriodGmi = null,
                 loadStatus = HistoryExplorerLoadStatus.IDLE,
                 detail = "Choose 14 to 90 completed local calendar days.",
+                viewportLoadStatus = HistoryViewportLoadStatus.IDLE,
+                viewportDetail = "",
             )
             return
         }
@@ -502,20 +516,24 @@ class PhoneViewModel @Inject constructor(
             is HistoryRangeResolution.Invalid -> {
                 historyLoadJob?.cancel()
                 historyRequestGate.invalidate()
+                historyViewportCoordinator.invalidate()
                 historyExplorerState.value = historyExplorerState.value.copy(
                     selectedPreset = HistoryPeriodPreset.CUSTOM,
-                    range = null,
-                    chart = null,
+                    selectedRange = null,
+                    requestedViewport = null,
+                    renderedViewport = null,
                     selectedPeriodGmi = null,
                     loadStatus = HistoryExplorerLoadStatus.ERROR,
                     detail = resolution.detail,
+                    viewportLoadStatus = HistoryViewportLoadStatus.IDLE,
+                    viewportDetail = "",
                     customDraft = historyCustomDraftStore.updateError(resolution.detail),
                 )
             }
             is HistoryRangeResolution.Resolved -> {
                 historyExplorerState.value = historyExplorerState.value.copy(
                     selectedPreset = HistoryPeriodPreset.CUSTOM,
-                    range = resolution.range,
+                    selectedRange = resolution.range,
                     customDraft = historyCustomDraftStore.updateError(null),
                 )
                 if (historyVisible) {
@@ -528,7 +546,7 @@ class PhoneViewModel @Inject constructor(
     private fun loadSelectedHistory(sourceId: String?) {
         val currentState = historyExplorerState.value
         val range = if (currentState.selectedPreset == HistoryPeriodPreset.CUSTOM) {
-            currentState.range ?: return
+            currentState.selectedRange ?: return
         } else {
             when (
                 val resolution = HistoryRangeResolver.resolveFixed(
@@ -553,24 +571,36 @@ class PhoneViewModel @Inject constructor(
     private fun loadHistoryRange(sourceId: String?, range: HistoryRange) {
         historyLoadJob?.cancel()
         historyRequestGate.invalidate()
+        historyViewportCoordinator.invalidate()
+        val fullViewport = HistoryViewportMath.full(range)
         val capturedSourceId = sourceId?.takeIf(String::isNotBlank)
-        if (capturedSourceId == null) {
+        if (capturedSourceId == null || fullViewport == null) {
             historyExplorerState.value = historyExplorerState.value.copy(
-                range = range,
-                chart = null,
+                selectedRange = range,
+                requestedViewport = null,
+                renderedViewport = null,
                 selectedPeriodGmi = null,
                 loadStatus = HistoryExplorerLoadStatus.ERROR,
-                detail = "No selected glucose source has local history.",
+                detail = if (capturedSourceId == null) {
+                    "No selected glucose source has local history."
+                } else {
+                    "The selected history period is invalid."
+                },
+                viewportLoadStatus = HistoryViewportLoadStatus.IDLE,
+                viewportDetail = "",
             )
             return
         }
         val token = historyRequestGate.begin(capturedSourceId)
         historyExplorerState.value = historyExplorerState.value.copy(
-            range = range,
-            chart = null,
+            selectedRange = range,
+            requestedViewport = fullViewport,
+            renderedViewport = null,
             selectedPeriodGmi = null,
             loadStatus = HistoryExplorerLoadStatus.LOADING,
             detail = "Loading local history…",
+            viewportLoadStatus = HistoryViewportLoadStatus.LOADING,
+            viewportDetail = "Loading visible chart…",
             requestGeneration = token.generation,
         )
         historyLoadJob = viewModelScope.launch {
@@ -578,11 +608,19 @@ class PhoneViewModel @Inject constructor(
                 val result = historyExplorerLoader.load(capturedSourceId, range)
                 if (historyRequestGate.canPublish(token)) {
                     historyExplorerState.value = historyExplorerState.value.copy(
-                        range = range,
-                        chart = result.chart,
+                        selectedRange = range,
+                        requestedViewport = fullViewport,
+                        renderedViewport = RenderedHistoryViewport(
+                            sourceId = capturedSourceId,
+                            selectedRange = range,
+                            viewport = fullViewport,
+                            chart = result.chart,
+                        ),
                         selectedPeriodGmi = result.selectedPeriodGmi,
                         loadStatus = HistoryExplorerLoadStatus.READY,
                         detail = result.chart.detail,
+                        viewportLoadStatus = HistoryViewportLoadStatus.READY,
+                        viewportDetail = result.chart.detail,
                         requestGeneration = token.generation,
                     )
                 }
@@ -591,16 +629,78 @@ class PhoneViewModel @Inject constructor(
             } catch (_: Throwable) {
                 if (historyRequestGate.canPublish(token)) {
                     historyExplorerState.value = historyExplorerState.value.copy(
-                        range = range,
-                        chart = null,
+                        selectedRange = range,
+                        requestedViewport = fullViewport,
+                        renderedViewport = null,
                         selectedPeriodGmi = null,
                         loadStatus = HistoryExplorerLoadStatus.ERROR,
                         detail = "Local history could not be loaded.",
+                        viewportLoadStatus = HistoryViewportLoadStatus.ERROR,
+                        viewportDetail = "Visible chart could not be loaded.",
                         requestGeneration = token.generation,
                     )
                 }
             }
         }
+    }
+
+    fun transformHistoryViewport(
+        zoomScale: Float,
+        focalFraction: Float,
+        panDeltaXPixels: Float,
+        chartWidthPixels: Float,
+    ) {
+        val state = historyExplorerState.value
+        val selectedRange = state.selectedRange ?: return
+        val current = state.requestedViewport ?: return
+        val zoomed = HistoryViewportMath.zoom(
+            viewport = current,
+            selectedRange = selectedRange,
+            zoomScale = zoomScale.toDouble(),
+            focalFraction = focalFraction.toDouble(),
+        )
+        val transformed = HistoryViewportMath.pan(
+            viewport = zoomed,
+            selectedRange = selectedRange,
+            pixelDeltaX = panDeltaXPixels.toDouble(),
+            chartWidthPixels = chartWidthPixels.toDouble(),
+        )
+        requestHistoryViewport(transformed)
+    }
+
+    fun zoomInHistoryViewport() {
+        updateHistoryViewport(HistoryViewportMath::zoomIn)
+    }
+
+    fun zoomOutHistoryViewport() {
+        updateHistoryViewport(HistoryViewportMath::zoomOut)
+    }
+
+    fun resetHistoryViewport() {
+        updateHistoryViewport(HistoryViewportMath::reset)
+    }
+
+    fun retryHistoryViewport() {
+        historyExplorerState.value.requestedViewport?.let { requestHistoryViewport(it, force = true) }
+    }
+
+    private fun updateHistoryViewport(
+        transform: (HistoryViewport, HistoryRange) -> HistoryViewport,
+    ) {
+        val state = historyExplorerState.value
+        val selectedRange = state.selectedRange ?: return
+        val current = state.requestedViewport ?: return
+        requestHistoryViewport(transform(current, selectedRange))
+    }
+
+    private fun requestHistoryViewport(viewport: HistoryViewport, force: Boolean = false) {
+        val state = historyExplorerState.value
+        val selectedRange = state.selectedRange ?: return
+        val sourceId = visibleHistorySourceId?.takeIf(String::isNotBlank) ?: return
+        if (!historyVisible) return
+        if (!force && viewport == state.requestedViewport) return
+
+        historyViewportCoordinator.request(sourceId, selectedRange, viewport)
     }
 
     fun refresh() {

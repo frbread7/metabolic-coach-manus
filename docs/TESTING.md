@@ -476,6 +476,18 @@ Status is `Engineering: PASS / Physical: DEFERRED`; every new phone row and ever
 deferred device row remains `NOT RUN`. The v0.7.0 archive remains preserved at SHA-256
 `e8165936f92bfe1b7c0d710d11dbc6c73cd366d8a375b962a5cf1729c8fd0af4`.
 
+### v0.7.2 interactive exact-source History chart gate
+
+APOS returned `GO WITH CONDITIONS` for a phone-only transient viewport. The focused gate must prove
+pure zoom/pan bounds, exact-source half-open local reloads, 200 ms debounce, stale publication
+rejection, atomic requested/rendered state, and selected-period GMI immutability. Compose UI test
+sources must compile; without an attached Android runtime their execution remains `NOT RUN`.
+
+The authoritative forced local pipeline, independent final review, pinned commit, JUnit counts,
+lint/WFF/signature/package results, and artifact hashes are recorded in
+[the v0.7.2 milestone document](V0_7_2_INTERACTIVE_HISTORY_CHART.md) after they actually complete.
+Until then the status is `Engineering: IN PROGRESS / Physical: DEFERRED`.
+
 Historical v0.2 debug artifact SHA-256 values:
 
 ```text

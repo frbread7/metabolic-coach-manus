@@ -309,6 +309,17 @@ their stable enum names and retains the established 24h fallback for custom or m
 No provider/backfill dependency, Room schema, chart interaction architecture, or downstream
 consumer is added.
 
+`v0.7.2` adds a transient interactive viewport without changing the selected-period contract.
+`selectedRange` still owns the full-period chart load and selected-period GMI. Gesture/control
+intent updates `requestedViewport`; only a matching exact-source local query may atomically replace
+`RenderedHistoryViewport(sourceId, selectedRange, viewport, chart)`. The previous rendered bundle
+retains its own label while a request is debounced or loading, so an older aggregate is never
+geometrically enlarged or relabeled as newer detail. The viewport loader queries the inclusive DAO
+as `[viewportStart - 20m, viewportEndExclusive - 1]`, then prepares a half-open visible chart using
+raw points up to the 400-bucket cap and adaptive aggregation only above it. Its dependency is
+`GlucoseRepository` only: there is no GMI/settings, provider, refresh, backfill, retention, coaching,
+Wear, or current-reading dependency.
+
 ### Refresh and coaching
 
 1. After the user configures and selects a Nightscout server, the phone schedules unique periodic
