@@ -10,3 +10,7 @@
 - [x] Install and point Gradle to the required JDK 17 toolchain so Android and Wear OS modules can compile.
 - [x] Resolve the WFF validator checksum failure using the repository’s approved verification path before running the full release pipeline.
 - [x] Document the completed milestone and deliver the repository changes.
+- [x] Review the post-v0.7.2 milestone roadmap, deferred device acceptance gates, and release prerequisites.
+- [x] Identify the documented final goal and distinguish remaining engineering, physical validation, signing, and distribution work.
+- [x] Reconcile the stale v0.7.2 candidate wording in the release guide with the recorded engineering-pass evidence.
+- [ ] Deliver the remaining-milestones roadmap to the project owner.

@@ -50,9 +50,9 @@ handed off.
 These are debug-signed engineering artifacts, not production releases. Regenerate and rehash them
 after every source/build change.
 
-## v0.7.2 interactive local History engineering candidate
+## v0.7.2 interactive local History engineering evidence
 
-The active engineering milestone is `v0.7.2` (versionCode `14`) across phone, Wear, and watch face.
+The most recently completed engineering milestone is `v0.7.2` (versionCode `14`) across phone, Wear, and watch face.
 It adds phone-only pinch zoom, horizontal pan, and accessible zoom/reset controls over exact-source
 local Room history. Selected-period GMI remains bound to the full selected period. No provider,
 current-reading, network refresh, backfill, retention, Room schema, export/reset, coaching,
@@ -67,9 +67,12 @@ metabolic-coach-watchface-debug.apk
 MetabolicCoach-v0.7.2.zip
 ```
 
-The APOS review returned `GO WITH CONDITIONS`. Forced pipeline, review, identity, and hash evidence
-is pending and must be recorded only after it succeeds. Android instrumentation and physical device
-execution remain `NOT RUN`. Current status is `Engineering: IN PROGRESS / Physical: DEFERRED`.
+The APOS review returned `GO WITH CONDITIONS`, and the remaining automated engineering condition
+passed: the forced local pipeline completed 342 actionable tasks with 65 JUnit XML suites/450 test
+cases and no failures, errors, or skips. Lint, WFF v4 source/APK memory validation, APK signature
+verification, phone/Wear certificate continuity, and deterministic five-file package verification
+also passed. Android instrumentation and physical device execution remain `NOT RUN`. Current status
+is `Engineering: PASS / Physical: DEFERRED`; see the v0.7.2 milestone document for pinned hashes.
 
 ## v0.7.1 short local History engineering candidate (historical)
 
