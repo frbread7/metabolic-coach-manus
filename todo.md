@@ -9,4 +9,4 @@
 - [x] Configure a local Android SDK Platform 36 and Build Tools environment so the repository’s documented Gradle pipeline can run in this workspace.
 - [x] Install and point Gradle to the required JDK 17 toolchain so Android and Wear OS modules can compile.
 - [x] Resolve the WFF validator checksum failure using the repository’s approved verification path before running the full release pipeline.
-- [ ] Document the completed milestone and deliver the repository changes.
+- [x] Document the completed milestone and deliver the repository changes.
