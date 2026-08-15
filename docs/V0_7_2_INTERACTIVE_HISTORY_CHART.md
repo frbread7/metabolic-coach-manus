@@ -1,6 +1,6 @@
 # v0.7.2 Interactive local History chart
 
-Status: `Engineering: IN PROGRESS / Physical: DEFERRED`.
+Status: `Engineering: PASS / Physical: DEFERRED`.
 
 `v0.7.2` is a phone-only History usability increment. It adds horizontal pinch zoom, horizontal
 drag pan, visible Zoom in/Zoom out/Reset controls, and an explicit visible-window label to the
@@ -53,14 +53,21 @@ Engineering completion requires:
 
 ### Recorded engineering evidence
 
-Evidence is recorded only after the forced local pipeline and independent final review complete.
+- Pinned feature/build commit: `501c11314d7b55549989b3a3fed4465560e8ebc0` (`build: pin verified WFF validation release assets`).
+- Focused phone unit-test gate: `:phone:testDebugUnitTest` passed after the Android SDK Platform 36 and JDK 17 environment was configured.
+- Forced local pipeline: `./scripts/build-apks.sh` passed with 342 actionable tasks executed.
+- JUnit evidence: 65 XML suites, 450 test cases, and zero failures, errors, or skipped tests.
+- Lint, Room Android-test-source compilation, WFF v4 source validation, WFF APK resource-only and memory-footprint validation, APK assembly, v2 signature verification, and phone/Wear signing-certificate continuity all passed.
+- Android instrumentation execution: `NOT RUN` (no attached Android runtime; deferred and not equivalent to pass).
+- Phone/Wear signing certificate SHA-256: `2af021e5729d9386961ced398f4d2632baa842f9ae632ff2437af52838e88f61`.
+- Debug artifact SHA-256 values:
 
-- Pinned feature/build commit: `PENDING`.
-- Focused gate: `PENDING`.
-- Forced pipeline: `PENDING`.
-- JUnit/lint/WFF/signature/package evidence: `PENDING`.
-- Android instrumentation execution: `NOT RUN` (deferred; not equivalent to pass).
-- APK, certificate, and ZIP hashes: `PENDING`.
+```text
+f91ec999ce74d9ac79e88c2fb79f5acbd882cbe4c50429316f0fac9744759282  metabolic-coach-phone-debug.apk
+28b0d922d60dfd28db79bdaea79755fa46a01dfa07837e799ecdaf024d7927c0  metabolic-coach-wear-debug.apk
+3635dc34d9ffbb2682fee941ad5ab240f938f60a40425b84f11d00ff4951a1fd  metabolic-coach-watchface-debug.apk
+6637cc563a93ec2f2e611684e981755c7e57d40ef3df6486fdb73c453710117f  MetabolicCoach-v0.7.2.zip
+```
 
 ## Deferred phone acceptance checklist
 
@@ -89,7 +96,6 @@ Phone, Wear, and watch face use versionName `0.7.2` and versionCode `14` for the
 package contract; production behavior changes only in the phone History screen. The expected archive
 is `MetabolicCoach-v0.7.2.zip`. It must not overwrite or relabel any earlier artifact.
 
-After the automated pipeline and independent review pass, record the pinned commit, suite/execution
-counts, APK/certificate/ZIP hashes, and instrumentation gap here. Close only this milestone as
-`Engineering: PASS / Physical: DEFERRED`, then request a new APOS review before another feature or
-milestone transition.
+The automated local gate is complete. The physical checklist remains deferred and must not be
+represented as device acceptance. Request a new APOS review before another feature or milestone
+transition.

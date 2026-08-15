@@ -483,10 +483,11 @@ pure zoom/pan bounds, exact-source half-open local reloads, 200 ms debounce, sta
 rejection, atomic requested/rendered state, and selected-period GMI immutability. Compose UI test
 sources must compile; without an attached Android runtime their execution remains `NOT RUN`.
 
-The authoritative forced local pipeline, independent final review, pinned commit, JUnit counts,
+The authoritative forced local pipeline, implementation review, pinned commit, JUnit counts,
 lint/WFF/signature/package results, and artifact hashes are recorded in
-[the v0.7.2 milestone document](V0_7_2_INTERACTIVE_HISTORY_CHART.md) after they actually complete.
-Until then the status is `Engineering: IN PROGRESS / Physical: DEFERRED`.
+[the v0.7.2 milestone document](V0_7_2_INTERACTIVE_HISTORY_CHART.md). The status is
+`Engineering: PASS / Physical: DEFERRED`; Android instrumentation and all physical acceptance rows
+remain `NOT RUN`.
 
 Historical v0.2 debug artifact SHA-256 values:
 

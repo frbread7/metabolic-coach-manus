@@ -23,8 +23,13 @@ All notable Metabolic Coach package changes are recorded here.
   coaching, notification, Wear protocol, or watch-face behavior changes.
 - Phone, Wear, and watch-face metadata is aligned at versionName `0.7.2`, versionCode `14`; the
   production feature itself is phone-only.
-- Status remains `Engineering: IN PROGRESS / Physical: DEFERRED` until the forced local release gate
-  and independent review are recorded. Android instrumentation and all physical rows are `NOT RUN`.
+- The forced local gate passed 342 executable tasks with 65 JUnit XML suites/450 test cases and no
+  failures, errors, or skips. Lint, WFF v4 source/APK memory validation, APK v2 signatures,
+  phone/Wear certificate continuity, and deterministic five-file ZIP packaging passed.
+- The WFF validator and memory-footprint tools are pinned to verified official release assets rather
+  than a mutable `latest` redirect, preserving checksum-gated reproducibility.
+- Status is `Engineering: PASS / Physical: DEFERRED`. Android instrumentation and all physical rows
+  remain `NOT RUN`.
 
 ## v0.7.1 — 2026-08-13 — Six- and twelve-hour local History windows
 
