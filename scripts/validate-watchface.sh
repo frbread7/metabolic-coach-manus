@@ -8,10 +8,12 @@ memory_tool="$tools_dir/memory-footprint.jar"
 watchface_xml="$repo_root/watchface/src/main/res/raw/watchface.xml"
 watchface_apk="${1:-}"
 
-validator_url="https://github.com/google/watchface/releases/download/latest/wff-validator.jar"
-validator_sha256="3a10def0521ab97f41ab1b7e27a35649370af51580603b5bf656604d88f1aa29"
-memory_url="https://github.com/google/watchface/releases/download/latest/memory-footprint.jar"
-memory_sha256="9aab2dc1c3e9694afaf58ef0f504d376dcaf7c1db6fd2505e3a66c6081fee44a"
+# Pin the official release asset instead of the mutable `latest` redirect so the
+# repository checksum gate remains deterministic and can detect supply changes.
+validator_url="https://github.com/google/watchface/releases/download/release/wff-validator.jar"
+validator_sha256="90257944251f16b3c01fa1722e923acc5d5681262d3532cf8c733cbd19725265"
+memory_url="https://github.com/google/watchface/releases/download/release/memory-footprint.jar"
+memory_sha256="ee4d344d41d1288255ca1bd117d58d5a5bbb7bd33cac217562f052fc2bd4457c"
 
 mkdir -p "$tools_dir"
 
