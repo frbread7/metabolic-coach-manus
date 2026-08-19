@@ -13,4 +13,7 @@
 - [x] Review the post-v0.7.2 milestone roadmap, deferred device acceptance gates, and release prerequisites.
 - [x] Identify the documented final goal and distinguish remaining engineering, physical validation, signing, and distribution work.
 - [x] Reconcile the stale v0.7.2 candidate wording in the release guide with the recorded engineering-pass evidence.
-- [ ] Deliver the remaining-milestones roadmap to the project owner.
+- [x] Deliver the remaining-milestones roadmap to the project owner.
+- [x] Review the repository signing configuration and the accepted certificate continuity requirements.
+- [x] Identify the secure signing-key restoration path based on available backups or signing-service access; repository-secret listing is unavailable to the connected integration.
+- [x] Deliver the signing-key restoration and verification steps without collecting private key material.
